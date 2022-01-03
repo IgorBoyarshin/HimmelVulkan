@@ -10,6 +10,13 @@
 
 
 struct HmlDevice {
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+    };
+
+
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
         std::optional<uint32_t> presentFamily;
@@ -17,12 +24,6 @@ struct HmlDevice {
         bool isComplete() const {
             return graphicsFamily.has_value() && presentFamily.has_value();
         }
-    };
-
-    struct SwapChainSupportDetails {
-        VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> presentModes;
     };
 
 
@@ -51,30 +52,30 @@ struct HmlDevice {
 
         if (const auto obj = createInstance(hmlWindow->name); obj) {
             hmlDevice->instance = obj;
-        } else return std::unique_ptr<HmlDevice>{nullptr};
+        } else return { nullptr };
 
         if (enableValidationLayers) {
             if (const auto obj = createDebugMessanger(hmlDevice->instance); obj) {
                 hmlDevice->debugMessenger = obj;
-            } else return std::unique_ptr<HmlDevice>{nullptr};
+            } else return { nullptr };
         }
 
         if (const auto obj = createSurface(hmlDevice->instance, hmlWindow->window); obj) {
             hmlDevice->surface = obj;
-        } else return std::unique_ptr<HmlDevice>{nullptr};
+        } else return { nullptr };
 
         if (const auto physicalDevice = pickPhysicalDevice(hmlDevice->instance, hmlDevice->surface); physicalDevice) {
             hmlDevice->physicalDevice = physicalDevice;
             hmlDevice->queueFamilyIndices = pickQueueFamilyIndices(physicalDevice, hmlDevice->surface);
             vkGetPhysicalDeviceMemoryProperties(physicalDevice, &(hmlDevice->memProperties));
-        } else return std::unique_ptr<HmlDevice>{nullptr};
+        } else return { nullptr };
 
         if (const auto device = createLogicalDevice(hmlDevice->physicalDevice, hmlDevice->queueFamilyIndices); device) {
             hmlDevice->device = device;
             // The penultimate parameter is the index of the queue within the family
             vkGetDeviceQueue(device, hmlDevice->queueFamilyIndices.graphicsFamily.value(), 0, &(hmlDevice->graphicsQueue));
             vkGetDeviceQueue(device, hmlDevice->queueFamilyIndices.presentFamily.value(),  0, &(hmlDevice->presentQueue));
-        } else return std::unique_ptr<HmlDevice>{nullptr};
+        } else return { nullptr };
 
         return hmlDevice;
     }
@@ -88,6 +89,36 @@ struct HmlDevice {
             destroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
         vkDestroyInstance(instance, nullptr);
+    }
+
+
+    // Must be queried each time at recreation because swapChainExtent could be
+    // restricted by the window manager to match the actual OS window.
+    static SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
+        SwapChainSupportDetails details;
+
+        // Capabilities
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &details.capabilities);
+
+        // Format
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+        if (formatCount != 0) {
+            details.formats.resize(formatCount);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface,
+                    &formatCount, details.formats.data());
+        }
+
+        // Present mode
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
+        if (presentModeCount != 0) {
+            details.presentModes.resize(presentModeCount);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface,
+                    &presentModeCount, details.presentModes.data());
+        }
+
+        return details;
     }
     // ========================================================================
     // ========================================================================
@@ -357,7 +388,7 @@ struct HmlDevice {
 
         if (!checkDeviceExtensionSupport(physicalDevice, requiredDeviceExtensions)) return false;
 
-        const SwapChainSupportDetails swapChainSupportDetails = querySwapChainSupport(physicalDevice, surface);
+        const auto swapChainSupportDetails = querySwapChainSupport(physicalDevice, surface);
         if (swapChainSupportDetails.formats.empty() || swapChainSupportDetails.presentModes.empty()) return false;
 
         return true;
@@ -417,36 +448,6 @@ struct HmlDevice {
     }
 
 
-    // Must be queried each time at recreation because swapChainExtent could be
-    // restricted by the window manager to match the actual OS window.
-    static SwapChainSupportDetails querySwapChainSupport(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface) {
-        SwapChainSupportDetails details;
-
-        // Capabilities
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &details.capabilities);
-
-        // Format
-        uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
-        if (formatCount != 0) {
-            details.formats.resize(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface,
-                    &formatCount, details.formats.data());
-        }
-
-        // Present mode
-        uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
-        if (presentModeCount != 0) {
-            details.presentModes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface,
-                    &presentModeCount, details.presentModes.data());
-        }
-
-        return details;
-    }
-
-
     static VkDevice createLogicalDevice(VkPhysicalDevice physicalDevice,
             const QueueFamilyIndices& queueFamilyIndices) {
         // Collect queues to be created
@@ -492,77 +493,6 @@ struct HmlDevice {
 
         return device;
     }
-
-
-    // VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-    //     // Surface format === color depth
-    //     for (const auto& availableFormat : availableFormats) {
-    //         if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
-    //             availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-    //             return availableFormat;
-    //         }
-    //     }
-    //
-    //     return availableFormats[0];
-    // }
-
-
-    // VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-    //     // FIFO will display all generated images in-order.
-    //     // Mailbox will always display the most recent available image.
-    //
-    //     // Try to find Mailbox -- analog of tripple buffering.
-    //     for (const auto& availablePresentMode : availablePresentModes) {
-    //         if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-    //             return availablePresentMode;
-    //         }
-    //     }
-    //
-    //     // return VK_PRESENT_MODE_IMMEDIATE_KHR;
-    //     return VK_PRESENT_MODE_FIFO_KHR; // guaranteed to be available
-    // }
-
-
-    // VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
-    //     if (capabilities.currentExtent.width == UINT32_MAX) {
-    //         // The window manager allows us to differ from the resolution of the window
-    //
-    //         const auto minWidth = capabilities.minImageExtent.width;
-    //         const auto maxWidth = capabilities.maxImageExtent.width;
-    //         const auto minHeight = capabilities.minImageExtent.height;
-    //         const auto maxHeight = capabilities.maxImageExtent.height;
-    //
-    //         int width, height;
-    //         glfwGetFramebufferSize(window, &width, &height);
-    //
-    //         VkExtent2D extent = {
-    //             static_cast<uint32_t>(width),
-    //             static_cast<uint32_t>(height)
-    //         };
-    //
-    //         extent.width  = std::clamp(extent.width, minWidth, maxWidth);
-    //         extent.height = std::clamp(extent.height, minHeight, maxHeight);
-    //
-    //         return extent;
-    //     } else {
-    //         // Must match the size of the actual OS window
-    //         return capabilities.currentExtent;
-    //     }
-    // }
-
-
-    // uint32_t findMemoryType(const VkPhysicalDeviceMemoryProperties& memProperties,
-    //         uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-    //     for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-    //         if ((typeFilter & (1 << i)) && ((memProperties.memoryTypes[i].propertyFlags & properties) == properties)) {
-    //             return i;
-    //         }
-    //     }
-    //
-    //     throw std::runtime_error("failed to find suitable memory type!");
-    // }
-
-
 };
 
 #endif

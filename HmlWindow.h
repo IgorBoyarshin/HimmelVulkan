@@ -2,6 +2,7 @@
 #define HML_WINDOW
 
 #include <utility> // pair
+#include <vector>
 #include <memory> // unique_ptr
 
 #define GLFW_INCLUDE_VULKAN
@@ -41,6 +42,13 @@ struct HmlWindow {
     }
 
 
+    std::pair<uint32_t, uint32_t> getFramebufferSize() noexcept {
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        return std::make_pair( static_cast<uint32_t>(width), static_cast<uint32_t>(height) );
+    }
+
+
     static void resizeCallback(GLFWwindow* window, int width, int height) {
         // std::cout << ":> Resize request triggered through GLFW callback.\n";
         auto app = reinterpret_cast<HmlWindow*>(glfwGetWindowUserPointer(window));
@@ -53,6 +61,10 @@ struct HmlWindow {
         glfwDestroyWindow(window);
         glfwTerminate();
     }
+
+
+
+
 };
 
 #endif

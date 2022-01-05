@@ -23,7 +23,8 @@ struct HmlCommands {
     uint32_t generalQueueIndex;
     uint32_t onetimeQueueIndex;
 
-    // std::vector<VkCommandBuffer> commandBuffers; // cleaned automatically upon CommandPool destruction
+    // Cleaned automatically upon CommandPool destruction
+    // std::vector<VkCommandBuffer> commandBuffers;
 
     std::shared_ptr<HmlDevice> hmlDevice;
 
@@ -75,6 +76,56 @@ struct HmlCommands {
         }
 
         return commandPool;
+    }
+
+
+    // TODO maybe specify pool type as argument
+    std::vector<VkCommandBuffer> allocate(size_t count) {
+        std::vector<VkCommandBuffer> commandBuffers(count);
+
+        VkCommandBufferAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = commandPoolGeneral;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
+
+        if (vkAllocateCommandBuffers(hmlDevice->device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+            std::cerr << "::> Failed to allocate CommandBuffers.\n";
+            return {};
+        }
+
+        return commandBuffers;
+    }
+
+
+    // TODO pass flags as argument
+    void beginRecording(VkCommandBuffer commandBuffer) {
+        VkCommandBufferBeginInfo beginInfo = {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        // flags:
+        // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT: The command buffer will
+        // be rerecorded right after executing it once;
+        // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT: This is a secondary
+        // command buffer that will be entirely within a single render pass;
+        // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: The command buffer can
+        // be resubmitted while it is also already pending execution.
+        beginInfo.flags = 0; // Optional
+        beginInfo.pInheritanceInfo = nullptr; // Optional
+
+        // This call implicitly resets the buffer
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+            std::cerr << "::> Failed to begin CommandBuffer recording.\n";
+            return;
+        }
+    }
+
+
+    void endRecording(VkCommandBuffer commandBuffer) {
+        // Errors of recording are reported only here
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            std::cerr << "::> Failed to record CommandBuffer.\n";
+            return;
+        }
     }
 
 

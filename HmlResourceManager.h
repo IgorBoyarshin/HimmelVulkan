@@ -8,6 +8,16 @@
 #include "stb_image.h"
 
 
+// TODO
+// Maybe store resources themselves inside a Renderer, so that when a Renderer
+// is no londer needed the respective resources are freed.
+//
+// Or maybe store resources here, but upon the creation return a smart_ptr with
+// the ID, so that when a renderer dies, its ptr dies, and the resources is freed
+// automatically.
+// TODO
+
+
 struct HmlResourceManager {
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
@@ -44,11 +54,24 @@ struct HmlResourceManager {
         vkDestroyImage(hmlDevice->device, textureImage, nullptr);
         vkFreeMemory(hmlDevice->device, textureImageMemory, nullptr);
 
+        vkDestroyBuffer(hmlDevice->device, indexBuffer, nullptr);
+        vkFreeMemory(hmlDevice->device, indexBufferMemory, nullptr);
+        vkDestroyBuffer(hmlDevice->device, vertexBuffer, nullptr);
+        vkFreeMemory(hmlDevice->device, vertexBufferMemory, nullptr);
+
         // TODO range
         for (size_t i = 0; i < uniformBuffers.size(); i++) {
             vkDestroyBuffer(hmlDevice->device, uniformBuffers[i], nullptr);
             vkFreeMemory(hmlDevice->device, uniformBuffersMemory[i], nullptr);
         }
+    }
+
+
+    void updateUniformBuffer(uint32_t uboIndex, const void* newData, size_t sizeBytes) {
+        void* data;
+        vkMapMemory(hmlDevice->device, uniformBuffersMemory[uboIndex], 0, sizeBytes, 0, &data);
+            memcpy(data, newData, sizeBytes);
+        vkUnmapMemory(hmlDevice->device, uniformBuffersMemory[uboIndex]);
     }
 
 
@@ -65,6 +88,18 @@ struct HmlResourceManager {
         createTextureImage(textureImage, textureImageMemory, fileName);
         textureImageView = createTextureImageView(textureImage);
         textureSampler = createTextureSampler();
+    }
+
+    // TODO return (smart_ptr?) ID
+    int newVertexBuffer(const void* vertices, size_t sizeBytes) {
+        createVertexBufferThroughStaging(vertexBuffer, vertexBufferMemory, vertices, sizeBytes);
+        return 0;
+    }
+
+    // TODO return (smart_ptr?) ID
+    int newIndexBuffer(const std::vector<uint16_t>& indices) {
+        createIndexBufferThroughStaging(indexBuffer, indexBufferMemory, indices);
+        return 0;
     }
     // ========================================================================
     // ========================================================================
@@ -127,7 +162,9 @@ struct HmlResourceManager {
 
 
     void createIndexBufferThroughStaging(VkBuffer& indexBuffer,
-            VkDeviceMemory& indexBufferMemory, const void* indices, size_t sizeBytes) {
+            VkDeviceMemory& indexBufferMemory, const std::vector<uint16_t>& indices) {
+        size_t sizeBytes = sizeof(indices[0]) * indices.size();
+
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(static_cast<VkDeviceSize>(sizeBytes), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -136,7 +173,7 @@ struct HmlResourceManager {
 
         void* data;
         vkMapMemory(hmlDevice->device, stagingBufferMemory, 0, static_cast<VkDeviceSize>(sizeBytes), 0, &data);
-            memcpy(data, indices, sizeBytes);
+            memcpy(data, indices.data(), sizeBytes);
         vkUnmapMemory(hmlDevice->device, stagingBufferMemory);
 
         createBuffer(static_cast<VkDeviceSize>(sizeBytes), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,

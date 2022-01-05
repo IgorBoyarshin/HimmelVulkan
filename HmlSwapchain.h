@@ -108,6 +108,7 @@ struct HmlSwapchain {
         return hmlSwapchain;
     }
 
+
     ~HmlSwapchain() {
         std::cout << ":> Destroying HmlSwapchain...\n";
 
@@ -125,6 +126,16 @@ struct HmlSwapchain {
             vkDestroyImageView(hmlDevice->device, imageView, nullptr);
         }
         vkDestroySwapchainKHR(hmlDevice->device, swapchain, nullptr);
+    }
+
+
+    size_t imagesCount() const noexcept {
+        return imageViews.size();
+    }
+
+
+    float extentAspect() const noexcept {
+        return static_cast<float>(extent.width) / static_cast<float>(extent.height);
     }
     // ========================================================================
     // ========================================================================

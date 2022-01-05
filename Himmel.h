@@ -1,4 +1,5 @@
 #include <memory> // shaded_ptr
+#include <vector>
 
 #include "HmlWindow.h"
 #include "HmlDevice.h"
@@ -6,6 +7,7 @@
 #include "HmlSwapchain.h"
 #include "HmlResourceManager.h"
 #include "HmlRenderer.h"
+#include "HmlModel.h"
 
 
 struct Himmel {
@@ -35,8 +37,66 @@ struct Himmel {
         hmlSwapchain = HmlSwapchain::create(hmlWindow, hmlDevice, hmlResourceManager);
         if (!hmlSwapchain) return false;
 
-        hmlRenderer = HmlRenderer::createSimpleRenderer(hmlDevice, hmlSwapchain, hmlResourceManager);
+        hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager);
         if (!hmlRenderer) return false;
+
+
+        {
+            std::vector<HmlSimpleModel::Vertex> vertices;
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {-0.5f, -0.5f, 0.0f},
+                .color = {1.0f, 0.0f, 0.0f},
+                .texCoord = {1.0f, 0.0f}
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {0.5f, -0.5f, 0.0f},
+                .color = {0.0f, 1.0f, 0.0f},
+                .texCoord = {0.0f, 0.0f}
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {0.5f, 0.5f, 0.0f},
+                .color = {0.0f, 0.0f, 1.0f},
+                .texCoord = {0.0f, 1.0f}
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {-0.5f, 0.5f, 0.0f},
+                .color = {1.0f, 1.0f, 1.0f},
+                .texCoord = {1.0f, 1.0f}
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {-0.5f, -0.5f, -1.0f},
+                .color = {1.0f, 0.0f, 0.0f},
+                .texCoord = {1.0f, 0.0f}
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {0.5f, -0.5f, -1.0f},
+                .color = {0.0f, 1.0f, 0.0f},
+                .texCoord = {0.0f, 0.0f}
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {0.5f, 0.5f, -1.0f},
+                .color = {0.0f, 0.0f, 1.0f},
+                .texCoord = {0.0f, 1.0f}
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {-0.5f, 0.5f, -1.0f},
+                .color = {1.0f, 1.0f, 1.0f},
+                .texCoord = {1.0f, 1.0f}
+            });
+
+            const std::vector<uint16_t> indices = {
+                0, 1, 2, 2, 3, 0,
+                4, 5, 6, 6, 7, 4,
+            };
+
+            hmlRenderer->addEntity(vertices.data(), vertices.size() * sizeof(HmlSimpleModel::Vertex), indices);
+
+            hmlRenderer->bakeCommandBuffers();
+        }
+
+
+        hmlRenderer->run();
+
 
         return true;
     }

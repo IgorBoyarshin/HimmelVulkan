@@ -19,8 +19,8 @@ struct HmlWindow {
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // disable OpenGL
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        // glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         HmlWindow* hmlWindow = new HmlWindow;
         hmlWindow->name = name;
@@ -50,7 +50,7 @@ struct HmlWindow {
 
 
     static void resizeCallback(GLFWwindow* window, int width, int height) {
-        // std::cout << ":> Resize request triggered through GLFW callback.\n";
+        std::cout << ":> Resize request triggered through GLFW callback.\n";
         auto app = reinterpret_cast<HmlWindow*>(glfwGetWindowUserPointer(window));
         app->framebufferResizeRequested = true;
     }

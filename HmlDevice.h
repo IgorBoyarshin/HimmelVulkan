@@ -7,6 +7,7 @@
 #include <set>
 
 #include "HmlWindow.h"
+#include "util.h"
 
 
 struct HmlDevice {
@@ -90,8 +91,9 @@ struct HmlDevice {
         }
         vkDestroyInstance(instance, nullptr);
     }
-
-
+    // ========================================================================
+    // ========================================================================
+    // ========================================================================
     // Must be queried each time at recreation because swapChainExtent could be
     // restricted by the window manager to match the actual OS window.
     static SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
@@ -281,7 +283,9 @@ struct HmlDevice {
         // To get rid of numerous "Device Extension" infos
         if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) return VK_FALSE;
 
-        std::cerr << "(validation layer) ";
+        static int counter = 0;
+        // std::cerr << "(validation layer) ";
+        std::cerr << "(" << counter++ << ")  ";
 
         std::cerr << '[';
         switch (messageSeverity) {
@@ -302,6 +306,7 @@ struct HmlDevice {
         std::cerr << "]";
 
         std::cerr << " : " << pCallbackData->pMessage << '\n';
+        std::cout << '\n';
 
         // if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
         return VK_FALSE;

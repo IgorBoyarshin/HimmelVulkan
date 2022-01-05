@@ -1,0 +1,126 @@
+#ifndef HML_COMMANDS
+#define HML_COMMANDS
+
+
+struct HmlCommands {
+    // Reasons to use a command pool:
+    // 1) There may be short-lived command buffers, and creation/destruction of
+    //    command buffers is expensive.
+    // 2) Command buffers use shared (CPU & GPU) memory, which can be mapped only
+    //    in large granularities. That means that small command buffers may waste
+    //    memory.
+    // 3) Memory mapping is expensive because it involves modifying page table
+    //    and TLB cache invalidation. So it is better to map a large command pool
+    //    once and allocate smaller command buffers within it.
+
+
+    // TODO create a separate pool for Graphics and Presentation
+    VkCommandPool commandPoolGeneral;
+    // TODO do not recreate a one-time command each time, just rerecord it
+    VkCommandPool commandPoolOnetime;
+    VkQueue generalQueue;
+    VkQueue onetimeQueue;
+    uint32_t generalQueueIndex;
+    uint32_t onetimeQueueIndex;
+
+    // std::vector<VkCommandBuffer> commandBuffers; // cleaned automatically upon CommandPool destruction
+
+    std::shared_ptr<HmlDevice> hmlDevice;
+
+
+
+    static std::unique_ptr<HmlCommands> create(std::shared_ptr<HmlDevice> hmlDevice) {
+        auto hmlCommands = std::make_unique<HmlCommands>();
+        hmlCommands->hmlDevice = hmlDevice;
+
+        hmlCommands->generalQueue = hmlDevice->graphicsQueue; // XXX queue type
+        hmlCommands->generalQueueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX queue type
+        hmlCommands->commandPoolGeneral = hmlCommands->createCommandPool(hmlCommands->generalQueueIndex,
+                static_cast<VkCommandPoolCreateFlagBits>(0));
+        if (!hmlCommands->commandPoolGeneral) return { nullptr };
+
+        hmlCommands->onetimeQueue = hmlDevice->graphicsQueue; // XXX queue type
+        hmlCommands->onetimeQueueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX queue type
+        hmlCommands->commandPoolOnetime = hmlCommands->createCommandPool(hmlCommands->onetimeQueueIndex,
+                VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
+        if (!hmlCommands->commandPoolOnetime) return { nullptr };
+
+        return hmlCommands;
+    }
+
+
+    ~HmlCommands() {
+        std::cout << ":> Destroying HmlCommands...\n";
+        vkDestroyCommandPool(hmlDevice->device, commandPoolOnetime, nullptr);
+        vkDestroyCommandPool(hmlDevice->device, commandPoolGeneral, nullptr);
+    }
+
+
+    VkCommandPool createCommandPool(uint32_t queueFamilyIndex, VkCommandPoolCreateFlagBits flags) {
+        // A CommandPool is specific to each QueueFamily
+        VkCommandPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.queueFamilyIndex = queueFamilyIndex;
+        // flags:
+        // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT: Hint that command buffers are
+        // rerecorded with new commands very often (may change memory allocation behavior);
+        // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT: Allow command buffers to be
+        // rerecorded individually, without this flag they all have to be reset together.
+        poolInfo.flags = flags;
+
+        VkCommandPool commandPool;
+        if (vkCreateCommandPool(hmlDevice->device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+            std::cerr << "Failed to create CommandPool.\n";
+            return VK_NULL_HANDLE;
+        }
+
+        return commandPool;
+    }
+
+
+    VkCommandBuffer beginSingleTimeCommands() {
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = commandPoolOnetime;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(hmlDevice->device, &allocInfo, &commandBuffer);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+        return commandBuffer;
+    }
+
+
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+        // Errors of recording are reported only here
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            std::cerr << "::> There wa a problem recording a one-time command buffer.\n";
+            return;
+        }
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        vkQueueSubmit(onetimeQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(onetimeQueue);
+        // We also could have waited for completion using the vkWaitForFences and
+        // specifying a fence as the last argument to the submit call. This could
+        // be better if we had multiple transfers to wait on.
+
+        vkFreeCommandBuffers(hmlDevice->device, commandPoolOnetime, 1, &commandBuffer);
+    }
+    // ========================================================================
+    // ========================================================================
+    // ========================================================================
+};
+
+#endif

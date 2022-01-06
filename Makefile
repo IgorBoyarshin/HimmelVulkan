@@ -11,7 +11,7 @@ mainFileName = main
 # Files that have .h and .cpp versions
 classFiles =
 # Files that only have the .h version
-justHeaderFiles = HmlResourceManager HmlRenderer HmlModel HmlCommands HmlPipeline HmlWindow HmlDevice HmlSwapchain Himmel util
+justHeaderFiles = HmlResourceManager HmlRenderer HmlModel HmlCommands HmlPipeline HmlWindow HmlDevice HmlSwapchain Himmel
 # Compilation flags
 OPTIMIZATION_FLAG = -O0
 LANGUAGE_LEVEL = -std=c++20

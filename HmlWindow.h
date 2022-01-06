@@ -19,8 +19,8 @@ struct HmlWindow {
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // disable OpenGL
-        // glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         HmlWindow* hmlWindow = new HmlWindow;
         hmlWindow->name = name;
@@ -63,8 +63,9 @@ struct HmlWindow {
     }
 
 
-
-
+    bool shouldClose() const noexcept {
+        return glfwWindowShouldClose(window);
+    }
 };
 
 #endif

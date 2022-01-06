@@ -7,7 +7,6 @@
 #include <set>
 
 #include "HmlWindow.h"
-#include "util.h"
 
 
 struct HmlDevice {

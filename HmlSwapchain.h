@@ -1,26 +1,28 @@
 #ifndef HML_SWAPCHAIN
 #define HML_SWAPCHAIN
 
+#include <optional>
+
 #include "HmlWindow.h"
 #include "HmlDevice.h"
 #include "HmlResourceManager.h"
-#include "util.h"
 
 
 struct HmlSwapchain {
     VkSwapchainKHR swapchain;
     VkFormat imageFormat;
     VkExtent2D extent;
+
     std::vector<VkImageView> imageViews;
     std::vector<VkFramebuffer> framebuffers;
+
     VkImage depthImage;
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
+
     VkRenderPass renderPass;
 
 
-    // Is stored in order to lighten the recreation later
-    std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
 
@@ -29,17 +31,17 @@ struct HmlSwapchain {
     static std::unique_ptr<HmlSwapchain> create(
             std::shared_ptr<HmlWindow> hmlWindow,
             std::shared_ptr<HmlDevice> hmlDevice,
-            std::shared_ptr<HmlResourceManager> hmlResourceManager) {
+            std::shared_ptr<HmlResourceManager> hmlResourceManager,
+            std::optional<VkSwapchainKHR>&& oldSwapchain) {
         auto hmlSwapchain = std::make_unique<HmlSwapchain>();
         hmlSwapchain->hmlDevice = hmlDevice;
-        hmlSwapchain->hmlWindow = hmlWindow;
         hmlSwapchain->hmlResourceManager = hmlResourceManager;
 
         const auto swapChainSupportDetails = HmlDevice::querySwapChainSupport(hmlDevice->physicalDevice, hmlDevice->surface);
 
         auto surfaceFormat = chooseSwapSurfaceFormat(swapChainSupportDetails.formats);
         hmlSwapchain->imageFormat = surfaceFormat.format;
-        hmlSwapchain->extent = hmlSwapchain->chooseSwapExtent(swapChainSupportDetails.capabilities);
+        hmlSwapchain->extent = hmlSwapchain->chooseSwapExtent(swapChainSupportDetails.capabilities, hmlWindow->getFramebufferSize());
         VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupportDetails.presentModes);
 
         // NOTE for current use the logic can be simplified
@@ -78,12 +80,20 @@ struct HmlSwapchain {
         createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // ignore, no blending
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE; // clip pixels that are obscured by other windows
-        createInfo.oldSwapchain = VK_NULL_HANDLE; // for when resizing happens
+        createInfo.oldSwapchain = oldSwapchain ? (*oldSwapchain) : VK_NULL_HANDLE; // for when resizing happens
 
-        if (vkCreateSwapchainKHR(hmlDevice->device, &createInfo, nullptr, &(hmlSwapchain->swapchain)) != VK_SUCCESS) {
+        auto res = vkCreateSwapchainKHR(hmlDevice->device, &createInfo, nullptr, &(hmlSwapchain->swapchain));
+        if (res == VK_ERROR_NATIVE_WINDOW_IN_USE_KHR) {
+            std::cout << "yes" << '\n';
+        }
+        if (res != VK_SUCCESS) {
             std::cerr << "::> Failed to create Swapchain.\n";
             return { nullptr };
         }
+        // if (vkCreateSwapchainKHR(hmlDevice->device, &createInfo, nullptr, &(hmlSwapchain->swapchain)) != VK_SUCCESS) {
+        //     std::cerr << "::> Failed to create Swapchain.\n";
+        //     return { nullptr };
+        // }
 
         hmlSwapchain->imageViews = hmlSwapchain->createSwapchainImageViews();
         if (hmlSwapchain->imageViews.empty()) {
@@ -199,18 +209,18 @@ struct HmlSwapchain {
     }
 
 
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+    static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities,
+            const std::pair<uint32_t, uint32_t>& framebufferSize) {
         if (capabilities.currentExtent.width == UINT32_MAX) {
             // The window manager allows us to differ from the resolution of the window
 
-            const auto size = hmlWindow->getFramebufferSize();
             const auto minWidth  = capabilities.minImageExtent.width;
             const auto maxWidth  = capabilities.maxImageExtent.width;
             const auto minHeight = capabilities.minImageExtent.height;
             const auto maxHeight = capabilities.maxImageExtent.height;
             return {
-                std::clamp(size.first, minWidth, maxWidth),
-                std::clamp(size.second, minHeight, maxHeight)
+                std::clamp(framebufferSize.first, minWidth, maxWidth),
+                std::clamp(framebufferSize.second, minHeight, maxHeight)
             };
         } else {
             // Must match the size of the actual OS window

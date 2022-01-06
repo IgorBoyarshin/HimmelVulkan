@@ -8,6 +8,7 @@ int main() {
     {
         Himmel himmel;
         himmel.init();
+        himmel.run();
     }
     std::cout << "====================================  END  ============================\n";
 }

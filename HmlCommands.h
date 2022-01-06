@@ -79,6 +79,11 @@ struct HmlCommands {
     }
 
 
+    void resetGeneralCommandPool() {
+        vkResetCommandPool(hmlDevice->device, commandPoolGeneral, 0);
+    }
+
+
     // TODO maybe specify pool type as argument
     std::vector<VkCommandBuffer> allocate(size_t count) {
         std::vector<VkCommandBuffer> commandBuffers(count);

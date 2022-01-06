@@ -18,10 +18,12 @@ struct HmlCommands {
     VkCommandPool commandPoolGeneral;
     // TODO do not recreate a one-time command each time, just rerecord it
     VkCommandPool commandPoolOnetime;
+    VkCommandPool commandPoolOnetimeFrames;
     VkQueue generalQueue;
     VkQueue onetimeQueue;
     uint32_t generalQueueIndex;
     uint32_t onetimeQueueIndex;
+    uint32_t onetimeFrameQueueIndex;
 
     // Cleaned automatically upon CommandPool destruction
     // std::vector<VkCommandBuffer> commandBuffers;
@@ -37,14 +39,20 @@ struct HmlCommands {
         hmlCommands->generalQueue = hmlDevice->graphicsQueue; // XXX queue type
         hmlCommands->generalQueueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX queue type
         hmlCommands->commandPoolGeneral = hmlCommands->createCommandPool(hmlCommands->generalQueueIndex,
-                static_cast<VkCommandPoolCreateFlagBits>(0));
+            static_cast<VkCommandPoolCreateFlagBits>(0));
         if (!hmlCommands->commandPoolGeneral) return { nullptr };
 
         hmlCommands->onetimeQueue = hmlDevice->graphicsQueue; // XXX queue type
         hmlCommands->onetimeQueueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX queue type
         hmlCommands->commandPoolOnetime = hmlCommands->createCommandPool(hmlCommands->onetimeQueueIndex,
-                VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
+            VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
         if (!hmlCommands->commandPoolOnetime) return { nullptr };
+
+        hmlCommands->onetimeQueue = hmlDevice->graphicsQueue; // XXX queue type
+        hmlCommands->onetimeFrameQueueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX queue type
+        hmlCommands->commandPoolOnetimeFrames = hmlCommands->createCommandPool(hmlCommands->onetimeFrameQueueIndex,
+            static_cast<VkCommandPoolCreateFlagBits>(VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+        if (!hmlCommands->commandPoolOnetimeFrames) return { nullptr };
 
         return hmlCommands;
     }
@@ -54,6 +62,7 @@ struct HmlCommands {
         std::cout << ":> Destroying HmlCommands...\n";
         vkDestroyCommandPool(hmlDevice->device, commandPoolOnetime, nullptr);
         vkDestroyCommandPool(hmlDevice->device, commandPoolGeneral, nullptr);
+        vkDestroyCommandPool(hmlDevice->device, commandPoolOnetimeFrames, nullptr);
     }
 
 
@@ -84,13 +93,12 @@ struct HmlCommands {
     }
 
 
-    // TODO maybe specify pool type as argument
-    std::vector<VkCommandBuffer> allocate(size_t count) {
+    std::vector<VkCommandBuffer> allocate(size_t count, VkCommandPool commandPool) {
         std::vector<VkCommandBuffer> commandBuffers(count);
 
         VkCommandBufferAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = commandPoolGeneral;
+        allocInfo.commandPool = commandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
 
@@ -103,8 +111,7 @@ struct HmlCommands {
     }
 
 
-    // TODO pass flags as argument
-    void beginRecording(VkCommandBuffer commandBuffer) {
+    void beginRecording(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags) {
         VkCommandBufferBeginInfo beginInfo = {};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         // flags:
@@ -114,7 +121,7 @@ struct HmlCommands {
         // command buffer that will be entirely within a single render pass;
         // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: The command buffer can
         // be resubmitted while it is also already pending execution.
-        beginInfo.flags = 0; // Optional
+        beginInfo.flags = flags;
         beginInfo.pInheritanceInfo = nullptr; // Optional
 
         // This call implicitly resets the buffer

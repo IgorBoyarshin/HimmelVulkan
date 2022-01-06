@@ -22,19 +22,125 @@ struct Himmel {
 
 
     // Sync objects
-    uint32_t maxFramesInFlight = 2; // TODO make a part of SimpleRenderer creation
+    uint32_t maxFramesInFlight = 2; // TODO make a part of SimpleRenderer creation TODO ????
     std::vector<VkSemaphore> imageAvailableSemaphores; // for each frame in flight
     std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
     std::vector<VkFence> inFlightFences;               // for each frame in flight
     std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
 
+    // NOTE Later it will probably be a hashmap from model name
+    std::vector<std::shared_ptr<HmlModelResource>> models;
+
+    std::vector<std::shared_ptr<HmlSimpleEntity>> entities;
+
+
+    bool init() {
+        const char* windowName = "Planes game";
+
+        hmlWindow = HmlWindow::create(1920, 1080, windowName);
+        if (!hmlWindow) return false;
+
+        hmlDevice = HmlDevice::create(hmlWindow);
+        if (!hmlDevice) return false;
+
+        hmlCommands = HmlCommands::create(hmlDevice);
+        if (!hmlCommands) return false;
+
+        hmlResourceManager = HmlResourceManager::create(hmlDevice, hmlCommands);
+        if (!hmlResourceManager) return false;
+
+        hmlSwapchain = HmlSwapchain::create(hmlWindow, hmlDevice, hmlResourceManager, std::nullopt);
+        if (!hmlSwapchain) return false;
+
+        hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager);
+        if (!hmlRenderer) return false;
+
+
+        {
+            {
+                // auto flat = std::make_shared<HmlSimpleModel>();
+                // HmlSimpleModel flat;
+
+                std::vector<HmlSimpleModel::Vertex> vertices;
+                vertices.push_back(HmlSimpleModel::Vertex{
+                    .pos = {-0.5f, -0.5f, 0.0f},
+                    .color = {1.0f, 0.0f, 0.0f},
+                    .texCoord = {1.0f, 0.0f}
+                });
+                vertices.push_back(HmlSimpleModel::Vertex{
+                    .pos = {0.5f, -0.5f, 0.0f},
+                    .color = {0.0f, 1.0f, 0.0f},
+                    .texCoord = {0.0f, 0.0f}
+                });
+                vertices.push_back(HmlSimpleModel::Vertex{
+                    .pos = {0.5f, 0.5f, 0.0f},
+                    .color = {0.0f, 0.0f, 1.0f},
+                    .texCoord = {0.0f, 1.0f}
+                });
+                vertices.push_back(HmlSimpleModel::Vertex{
+                    .pos = {-0.5f, 0.5f, 0.0f},
+                    .color = {1.0f, 1.0f, 1.0f},
+                    .texCoord = {1.0f, 1.0f}
+                });
+
+                std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0 };
+                // flat.indices = { 0, 1, 2, 2, 3, 0 };
+
+                const auto model = hmlResourceManager->newModel(vertices.data(), sizeof(vertices[0]) * vertices.size(), indices);
+                models.push_back(model);
+            }
+
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+
+            hmlRenderer->specifyEntitiesToRender(entities);
+
+            // hmlRenderer->bakeCommandBuffers();
+        }
+
+        createSyncObjects();
+
+        return true;
+    }
+
+
     void run() {
+        static auto startTime = std::chrono::high_resolution_clock::now();
         while (!hmlWindow->shouldClose()) {
             glfwPollEvents();
             drawFrame();
+
+            static auto mark = startTime;
+            const auto newMark = std::chrono::high_resolution_clock::now();
+            const auto sinceLast = std::chrono::duration_cast<std::chrono::microseconds>(newMark - mark).count();
+            const auto sinceStart = std::chrono::duration_cast<std::chrono::microseconds>(newMark - startTime).count();
+            const float deltaSeconds = static_cast<float>(sinceLast) / 1'000'000.0f;
+            const float sinceStartSeconds = static_cast<float>(sinceStart) / 1'000'000.0f;
+            mark = newMark;
+
+            update(deltaSeconds, sinceStartSeconds);
+
+            // const auto fps = 1.0 / deltaSeconds;
+            // std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]\n";
         }
         vkDeviceWaitIdle(hmlDevice->device);
+    }
+
+
+    void update(float delta, float sinceStart) {
+        int index = 0;
+        for (auto& entity : entities) {
+            const float dir = (index % 2) ? 1.0f : -1.0f;
+            auto matrix = glm::mat4(1.0f);
+            matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            matrix = glm::translate(matrix, glm::vec3{0.0f, 0.0f, -index * 0.1f + 0.7f * glm::sin(sinceStart)});
+            entity->modelMatrix = matrix;
+
+            index++;
+        }
     }
 
 
@@ -86,14 +192,13 @@ struct Himmel {
 
         // Once we know what image we work with...
         // Takes care of screen resizing
-        static auto startTime = std::chrono::high_resolution_clock::now();
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+        // static auto startTime = std::chrono::high_resolution_clock::now();
+        // auto currentTime = std::chrono::high_resolution_clock::now();
+        // float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
         const float aspect_w_h = hmlSwapchain->extentAspect();
         const float near = 0.1f;
         const float far = 10.0f;
         HmlRenderer::SimpleUniformBufferObject ubo{
-            .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
             .view = glm::lookAt(
                 glm::vec3(0.0f, 1.0f, 1.0f), // position in Worls space
                 glm::vec3(0.0f, 0.0f, 0.0f), // where to look
@@ -104,13 +209,8 @@ struct Himmel {
         hmlResourceManager->updateUniformBuffer(imageIndex, &ubo, sizeof(ubo));
 
 
-        // XXX
-        // XXX
-        // Only this part depends on a Renderer (commandBuffers)
-        //
-        // Maybe combine commandBuffers from all renderers here
-        // XXX
-        // XXX
+        // NOTE Only this part depends on a Renderer (commandBuffers)
+        // NOTE Maybe combine commandBuffers from all renderers here for a unified submission
         {
             VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
             VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
@@ -122,7 +222,7 @@ struct Himmel {
             submitInfo.pWaitSemaphores = waitSemaphores;
             submitInfo.pWaitDstStageMask = waitStages;
             submitInfo.commandBufferCount = 1;
-            submitInfo.pCommandBuffers = &hmlRenderer->commandBuffers[imageIndex]; // XXX
+            submitInfo.pCommandBuffers = hmlRenderer->draw(imageIndex); // XXX
             submitInfo.signalSemaphoreCount = 1;
             submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -180,91 +280,9 @@ struct Himmel {
         // TODO foreach Renderer
         hmlRenderer->replaceSwapchain(hmlSwapchain);
         // TODO maybe store this as as flag inside the Renderer so that it knows automatically
-        hmlRenderer->bakeCommandBuffers();
+        // hmlRenderer->bakeCommandBuffers();
 
         std::cout << '\n';
-    }
-
-
-
-    bool init() {
-        const char* windowName = "Planes game";
-
-        hmlWindow = HmlWindow::create(1920, 1080, windowName);
-        if (!hmlWindow) return false;
-
-        hmlDevice = HmlDevice::create(hmlWindow);
-        if (!hmlDevice) return false;
-
-        hmlCommands = HmlCommands::create(hmlDevice);
-        if (!hmlCommands) return false;
-
-        hmlResourceManager = HmlResourceManager::create(hmlDevice, hmlCommands);
-        if (!hmlResourceManager) return false;
-
-        hmlSwapchain = HmlSwapchain::create(hmlWindow, hmlDevice, hmlResourceManager, std::nullopt);
-        if (!hmlSwapchain) return false;
-
-        hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager);
-        if (!hmlRenderer) return false;
-
-
-        {
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, -0.5f, 0.0f},
-                .color = {1.0f, 0.0f, 0.0f},
-                .texCoord = {1.0f, 0.0f}
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, -0.5f, 0.0f},
-                .color = {0.0f, 1.0f, 0.0f},
-                .texCoord = {0.0f, 0.0f}
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, 0.5f, 0.0f},
-                .color = {0.0f, 0.0f, 1.0f},
-                .texCoord = {0.0f, 1.0f}
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, 0.5f, 0.0f},
-                .color = {1.0f, 1.0f, 1.0f},
-                .texCoord = {1.0f, 1.0f}
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, -0.5f, -1.0f},
-                .color = {1.0f, 0.0f, 0.0f},
-                .texCoord = {1.0f, 0.0f}
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, -0.5f, -1.0f},
-                .color = {0.0f, 1.0f, 0.0f},
-                .texCoord = {0.0f, 0.0f}
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, 0.5f, -1.0f},
-                .color = {0.0f, 0.0f, 1.0f},
-                .texCoord = {0.0f, 1.0f}
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, 0.5f, -1.0f},
-                .color = {1.0f, 1.0f, 1.0f},
-                .texCoord = {1.0f, 1.0f}
-            });
-
-            const std::vector<uint16_t> indices = {
-                0, 1, 2, 2, 3, 0,
-                4, 5, 6, 6, 7, 4,
-            };
-
-            hmlRenderer->addEntity(vertices.data(), vertices.size() * sizeof(HmlSimpleModel::Vertex), indices);
-
-            hmlRenderer->bakeCommandBuffers();
-        }
-
-        createSyncObjects();
-
-        return true;
     }
 
 

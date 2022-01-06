@@ -18,6 +18,27 @@
 // TODO
 
 
+struct HmlModelResource {
+    // using Id = uint32_t;
+    // Id id;
+
+    uint32_t indicesCount;
+
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+
+    // static HmlModelResource create() : id(newId()) {}
+
+    // private:
+    // static Id newId() {
+    //     static Id id = 0;
+    //     return id++;
+    // }
+};
+
+
 struct HmlResourceManager {
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
@@ -32,11 +53,16 @@ struct HmlResourceManager {
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
 
+    // NOTE We store the models ourselves as well (despite the fact that they
+    // are shared_ptr) because there may be a time when there are no Entities
+    // of this particular model at a given time, but there will be later.
+    std::vector<std::shared_ptr<HmlModelResource>> models;
+
     // TODO make vectors
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer indexBuffer;
-    VkDeviceMemory indexBufferMemory;
+    // VkBuffer vertexBuffer;
+    // VkDeviceMemory vertexBufferMemory;
+    // VkBuffer indexBuffer;
+    // VkDeviceMemory indexBufferMemory;
 
 
     static std::unique_ptr<HmlResourceManager> create(
@@ -54,10 +80,12 @@ struct HmlResourceManager {
         vkDestroyImage(hmlDevice->device, textureImage, nullptr);
         vkFreeMemory(hmlDevice->device, textureImageMemory, nullptr);
 
-        vkDestroyBuffer(hmlDevice->device, indexBuffer, nullptr);
-        vkFreeMemory(hmlDevice->device, indexBufferMemory, nullptr);
-        vkDestroyBuffer(hmlDevice->device, vertexBuffer, nullptr);
-        vkFreeMemory(hmlDevice->device, vertexBufferMemory, nullptr);
+        for (const auto& model : models) {
+            vkDestroyBuffer(hmlDevice->device, model->indexBuffer, nullptr);
+            vkFreeMemory(hmlDevice->device, model->indexBufferMemory, nullptr);
+            vkDestroyBuffer(hmlDevice->device, model->vertexBuffer, nullptr);
+            vkFreeMemory(hmlDevice->device, model->vertexBufferMemory, nullptr);
+        }
 
         // TODO range
         for (size_t i = 0; i < uniformBuffers.size(); i++) {
@@ -90,17 +118,31 @@ struct HmlResourceManager {
         textureSampler = createTextureSampler();
     }
 
-    // TODO return (smart_ptr?) ID
-    int newVertexBuffer(const void* vertices, size_t sizeBytes) {
-        createVertexBufferThroughStaging(vertexBuffer, vertexBufferMemory, vertices, sizeBytes);
-        return 0;
+
+    std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint16_t>& indices) {
+        // auto model = HmlResourceManager::create();
+        auto model = std::make_shared<HmlModelResource>();
+        model->indicesCount = indices.size();
+
+        createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
+        createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);
+
+        models.push_back(model);
+        return model;
     }
 
-    // TODO return (smart_ptr?) ID
-    int newIndexBuffer(const std::vector<uint16_t>& indices) {
-        createIndexBufferThroughStaging(indexBuffer, indexBufferMemory, indices);
-        return 0;
-    }
+
+    // // TODO return (smart_ptr?) ID
+    // int newVertexBuffer(const void* vertices, size_t sizeBytes) {
+    //     createVertexBufferThroughStaging(vertexBuffer, vertexBufferMemory, vertices, sizeBytes);
+    //     return 0;
+    // }
+    //
+    // // TODO return (smart_ptr?) ID
+    // int newIndexBuffer(const std::vector<uint16_t>& indices) {
+    //     createIndexBufferThroughStaging(indexBuffer, indexBufferMemory, indices);
+    //     return 0;
+    // }
     // ========================================================================
     // ========================================================================
     // ========================================================================

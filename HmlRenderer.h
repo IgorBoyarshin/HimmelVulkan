@@ -12,6 +12,21 @@
 #include "HmlResourceManager.h"
 
 
+struct HmlSimpleEntity {
+    // NOTE We prefer to access the modelResource via a pointer rather than by
+    // id because it allows for O(1) access speed.
+    std::shared_ptr<HmlModelResource> modelResource;
+    // HmlResourceManager::HmlModelResource::Id modelId;
+    glm::mat4 modelMatrix;
+
+
+    HmlSimpleEntity(std::shared_ptr<HmlModelResource> modelResource)
+        : modelResource(modelResource) {}
+    HmlSimpleEntity(std::shared_ptr<HmlModelResource> modelResource, const glm::mat4& modelMatrix)
+        : modelResource(modelResource), modelMatrix(modelMatrix) {}
+};
+
+
 struct HmlShaderLayoutItem {
     VkDescriptorType descriptorType;
     uint32_t binding;
@@ -62,9 +77,13 @@ struct HmlShaderLayout {
 // TODO
 struct HmlRenderer {
     struct SimpleUniformBufferObject {
-        alignas(16) glm::mat4 model;
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
+    };
+
+
+    struct SimplePushConstant {
+        alignas(16) glm::mat4 model;
     };
 
 
@@ -82,7 +101,7 @@ struct HmlRenderer {
     VkDescriptorSetLayout descriptorSetLayout;
 
 
-    std::vector<uint32_t> entitiesIndicesCount;
+    std::vector<std::shared_ptr<HmlSimpleEntity>> entitiesToRender;
 
 
     // TODO where to store them??
@@ -104,7 +123,9 @@ struct HmlRenderer {
             .polygoneMode = VK_POLYGON_MODE_FILL,
             .cullMode = VK_CULL_MODE_BACK_BIT,
             .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            .descriptorSetLayout = descriptorSetLayout
+            .descriptorSetLayout = descriptorSetLayout,
+            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT,
+            .pushConstantsSizeBytes = sizeof(SimplePushConstant)
         };
 
         auto hmlPipeline = HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -147,7 +168,7 @@ struct HmlRenderer {
         hmlRenderer->descriptorSets = hmlRenderer->createDescriptorSets();
         if (hmlRenderer->descriptorSets.empty()) return { nullptr };
 
-        hmlRenderer->commandBuffers = hmlCommands->allocate(hmlSwapchain->imagesCount());
+        hmlRenderer->commandBuffers = hmlCommands->allocate(hmlSwapchain->imagesCount(), hmlCommands->commandPoolOnetimeFrames);
 
         // TODO will be moved from here
         hmlResourceManager->newUniformBuffer(hmlSwapchain->imagesCount(), sizeof(SimpleUniformBufferObject));
@@ -170,21 +191,15 @@ struct HmlRenderer {
     }
 
 
-    // TODO in future return ID
-    void addEntity(const void* vertices, size_t verticesSizeBytes, const std::vector<uint16_t>& indices) {
-        // TODO handle IDs
-        auto id1 = hmlResourceManager->newVertexBuffer(vertices, verticesSizeBytes);
-        auto id2 = hmlResourceManager->newIndexBuffer(indices);
-        id1 = id2; id2 = id1;
-
-        entitiesIndicesCount.push_back(indices.size());
-    }
-
-
     // TODO
     // void reassignTexture() {
-    //     updateDescriptorSets(3); // TODO count
+    //     updateDescriptorSets(3);
     // }
+
+
+    void specifyEntitiesToRender(const std::vector<std::shared_ptr<HmlSimpleEntity>>& entities) {
+        entitiesToRender = entities;
+    }
 
 
     // TODO new texture index via argument
@@ -255,48 +270,57 @@ struct HmlRenderer {
     }
 
 
-    // TODO handle multiple Entities
-    void bakeCommandBuffers() {
-        for (size_t i = 0; i < hmlSwapchain->imagesCount(); i++) {
-            hmlCommands->beginRecording(commandBuffers[i]);
+    // TODO optimization: sort by model and bind each model only once
+    VkCommandBuffer* draw(uint32_t imageIndex) {
+        hmlCommands->beginRecording(commandBuffers[imageIndex], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
 
-            VkRenderPassBeginInfo renderPassInfo = {};
-            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassInfo.renderPass = hmlSwapchain->renderPass;
-            renderPassInfo.framebuffer = hmlSwapchain->framebuffers[i];
-            renderPassInfo.renderArea.offset = {0, 0};
-            renderPassInfo.renderArea.extent = hmlSwapchain->extent;
+        VkRenderPassBeginInfo renderPassInfo = {};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = hmlSwapchain->renderPass;
+        renderPassInfo.framebuffer = hmlSwapchain->framebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = hmlSwapchain->extent;
 
-            // Used for VK_ATTACHMENT_LOAD_OP_CLEAR
-            std::array<VkClearValue, 2> clearValues{};
-            // The order (indexing) must be the same as in attachments!
-            clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-            clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
-            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-            renderPassInfo.pClearValues = clearValues.data();
+        // Used for VK_ATTACHMENT_LOAD_OP_CLEAR
+        std::array<VkClearValue, 2> clearValues{};
+        // The order (indexing) must be the same as in attachments!
+        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
 
-            // Last argument to vkCmdBeginRenderPass:
-            // VK_SUBPASS_CONTENTS_INLINE: The render pass commands will be embedded in the
-            // primary command buffer itself and no secondary command buffers will be executed;
-            // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: The render pass commands
-            // will be executed from secondary command buffers.
-            vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-            vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
+        // Last argument to vkCmdBeginRenderPass:
+        // VK_SUBPASS_CONTENTS_INLINE: The render pass commands will be embedded in the
+        // primary command buffer itself and no secondary command buffers will be executed;
+        // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: The render pass commands
+        // will be executed from secondary command buffers.
+        vkCmdBeginRenderPass(commandBuffers[imageIndex], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindPipeline(commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
-            VkBuffer vertexBuffers[] = { hmlResourceManager->vertexBuffer };
+        // Descriptors are not unique to graphics pipelines, unlike Vertex
+        // and Index buffers, so we specify where to bind: graphics or compute
+        vkCmdBindDescriptorSets(commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                hmlPipeline->layout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
+
+        for (const auto& entity : entitiesToRender) {
+            const auto& model = entity->modelResource;
+
+            VkBuffer vertexBuffers[] = { model->vertexBuffer };
             VkDeviceSize offsets[] = { 0 };
             // NOTE advanced usage world have a single VkBuffer for both
             // VertexBuffer and IndexBuffer and specify different offsets into it.
             // Second and third arguments specify the offset and number of bindings
             // we're going to specify VertexBuffers for.
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+            vkCmdBindVertexBuffers(commandBuffers[imageIndex], 0, 1, vertexBuffers, offsets);
             // XXX Indices type is specified here:
-            vkCmdBindIndexBuffer(commandBuffers[i], hmlResourceManager->indexBuffer, 0, VK_INDEX_TYPE_UINT16); // 0 is offset
-            // Descriptors are not unique to graphics pipelines, unlike Vertex
-            // and Index buffers, so we specify where to bind: graphics or compute
-            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    hmlPipeline->layout, 0, 1, &descriptorSets[i], 0, nullptr);
+            vkCmdBindIndexBuffer(commandBuffers[imageIndex], model->indexBuffer, 0, VK_INDEX_TYPE_UINT16); // 0 is offset
+
+            SimplePushConstant pushConstant{
+                .model = entity->modelMatrix
+            };
+            vkCmdPushConstants(commandBuffers[imageIndex], hmlPipeline->layout,
+                hmlPipeline->pushConstantsStages, 0, sizeof(SimplePushConstant), &pushConstant);
 
             // NOTE could use firstInstance to supply a single integer to gl_BaseInstance
             const uint32_t instanceCount = 1;
@@ -305,15 +329,23 @@ struct HmlRenderer {
             const uint32_t offsetToAddToIndices = 0;
             // const uint32_t vertexCount = vertices.size();
             // const uint32_t firstVertex = 0;
-            // vkCmdDraw(commandBuffers[i], vertexCount, instanceCount, firstVertex, firstInstance);
-            vkCmdDrawIndexed(commandBuffers[i], entitiesIndicesCount[0], // TODO XXX count
+            // vkCmdDraw(commandBuffers[imageIndex], vertexCount, instanceCount, firstVertex, firstInstance);
+            vkCmdDrawIndexed(commandBuffers[imageIndex], model->indicesCount,
                 instanceCount, firstIndex, offsetToAddToIndices, firstInstance);
-            vkCmdEndRenderPass(commandBuffers[i]);
-
-
-            hmlCommands->endRecording(commandBuffers[i]);
         }
+
+        vkCmdEndRenderPass(commandBuffers[imageIndex]);
+
+        hmlCommands->endRecording(commandBuffers[imageIndex]);
+
+        return &commandBuffers[imageIndex];
     }
+
+
+    // void bakeCommandBuffers() {
+    //     for (size_t i = 0; i < hmlSwapchain->imagesCount(); i++) {
+    //     }
+    // }
 
 
     std::vector<VkDescriptorSet> createDescriptorSets() {

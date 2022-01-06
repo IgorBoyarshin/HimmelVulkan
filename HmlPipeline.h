@@ -46,6 +46,10 @@ struct HmlGraphicsPipelineConfig {
     VkFrontFace frontFace;
     // TODO will be a vector in the future
     VkDescriptorSetLayout descriptorSetLayout;
+
+    // TODO Later will probably be an optional
+    VkShaderStageFlags pushConstantsStages;
+    uint32_t pushConstantsSizeBytes;
 };
 
 
@@ -53,12 +57,15 @@ struct HmlPipeline {
     VkPipelineLayout layout;
     VkPipeline pipeline;
 
+    VkShaderStageFlags pushConstantsStages;
+
     std::shared_ptr<HmlDevice> hmlDevice;
 
 
     static std::unique_ptr<HmlPipeline> createGraphics(std::shared_ptr<HmlDevice> hmlDevice,
             HmlGraphicsPipelineConfig&& hmlPipelineConfig) {
         auto hmlPipeline = std::make_unique<HmlPipeline>();
+        hmlPipeline->pushConstantsStages = hmlPipelineConfig.pushConstantsStages;
         hmlPipeline->hmlDevice = hmlDevice;
 
         // --------- FIXED: Vertex input ----------
@@ -200,13 +207,23 @@ struct HmlPipeline {
         // dynamicState.dynamicStateCount = 2;
         // dynamicState.pDynamicStates = dynamicStates;
 
+        // --------- Push constants --------
+        // NOTE We use unified push constants (across all stages) because there
+        // would be no particular benefit (e.g. with regards to max size) to have
+        // separate push constants for each stage, but it would add complexity
+        // to the setup.
+        VkPushConstantRange pushConstant;
+        pushConstant.offset = 0;
+        pushConstant.size = hmlPipelineConfig.pushConstantsSizeBytes;
+        pushConstant.stageFlags = hmlPipelineConfig.pushConstantsStages;
+
         // ------------- Pipeline layout (uniforms in shaders) ----------
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1; // TODO will be vector.size() in the future
         pipelineLayoutInfo.pSetLayouts = &hmlPipelineConfig.descriptorSetLayout;
-        // pipelineLayoutInfo.pushConstantRangeCount = 0;
-        // pipelineLayoutInfo.pPushConstantRanges = nullptr;
+        pipelineLayoutInfo.pushConstantRangeCount = 1;
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
         if (vkCreatePipelineLayout(hmlDevice->device, &pipelineLayoutInfo, nullptr, &(hmlPipeline->layout)) != VK_SUCCESS) {
             std::cerr << "::> Failed to create PipelineLayout.\n";
             return { nullptr };

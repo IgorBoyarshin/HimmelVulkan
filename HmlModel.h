@@ -62,6 +62,12 @@ struct HmlSimpleModel {
             return attributeDescriptions;
         }
     };
+
+
+    // NOTE There is no reason to keep storing this model data after creation.
+    // NOTE We only need the indices count.
+    // std::vector<Vertex> vertices;
+    // std::vector<uint16_t> indices;
 };
 
 

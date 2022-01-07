@@ -172,7 +172,7 @@ struct HmlRenderer {
 
         // TODO will be moved from here
         hmlResourceManager->newUniformBuffer(hmlSwapchain->imagesCount(), sizeof(SimpleUniformBufferObject));
-        hmlResourceManager->newTexture("girl.png");
+        hmlResourceManager->newTexture("viking_room.png");
 
         hmlRenderer->updateDescriptorSets();
 
@@ -314,7 +314,7 @@ struct HmlRenderer {
             // we're going to specify VertexBuffers for.
             vkCmdBindVertexBuffers(commandBuffers[imageIndex], 0, 1, vertexBuffers, offsets);
             // XXX Indices type is specified here:
-            vkCmdBindIndexBuffer(commandBuffers[imageIndex], model->indexBuffer, 0, VK_INDEX_TYPE_UINT16); // 0 is offset
+            vkCmdBindIndexBuffer(commandBuffers[imageIndex], model->indexBuffer, 0, VK_INDEX_TYPE_UINT32); // 0 is offset
 
             SimplePushConstant pushConstant{
                 .model = entity->modelMatrix

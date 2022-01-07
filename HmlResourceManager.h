@@ -119,7 +119,7 @@ struct HmlResourceManager {
     }
 
 
-    std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint16_t>& indices) {
+    std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) {
         // auto model = HmlResourceManager::create();
         auto model = std::make_shared<HmlModelResource>();
         model->indicesCount = indices.size();
@@ -130,19 +130,6 @@ struct HmlResourceManager {
         models.push_back(model);
         return model;
     }
-
-
-    // // TODO return (smart_ptr?) ID
-    // int newVertexBuffer(const void* vertices, size_t sizeBytes) {
-    //     createVertexBufferThroughStaging(vertexBuffer, vertexBufferMemory, vertices, sizeBytes);
-    //     return 0;
-    // }
-    //
-    // // TODO return (smart_ptr?) ID
-    // int newIndexBuffer(const std::vector<uint16_t>& indices) {
-    //     createIndexBufferThroughStaging(indexBuffer, indexBufferMemory, indices);
-    //     return 0;
-    // }
     // ========================================================================
     // ========================================================================
     // ========================================================================
@@ -204,7 +191,7 @@ struct HmlResourceManager {
 
 
     void createIndexBufferThroughStaging(VkBuffer& indexBuffer,
-            VkDeviceMemory& indexBufferMemory, const std::vector<uint16_t>& indices) {
+            VkDeviceMemory& indexBufferMemory, const std::vector<uint32_t>& indices) {
         size_t sizeBytes = sizeof(indices[0]) * indices.size();
 
         VkBuffer stagingBuffer;

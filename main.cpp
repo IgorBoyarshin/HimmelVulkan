@@ -1,5 +1,7 @@
 #include <iostream>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+
 #include "Himmel.h"
 
 

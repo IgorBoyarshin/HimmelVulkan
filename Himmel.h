@@ -10,6 +10,7 @@
 #include "HmlResourceManager.h"
 #include "HmlRenderer.h"
 #include "HmlModel.h"
+#include "HmlCamera.h"
 
 
 struct Himmel {
@@ -19,6 +20,10 @@ struct Himmel {
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
     std::shared_ptr<HmlRenderer> hmlRenderer;
+
+    HmlCamera camera;
+    glm::mat4 proj;
+    std::pair<int32_t, int32_t> cursor;
 
 
     // Sync objects
@@ -56,12 +61,13 @@ struct Himmel {
         hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager);
         if (!hmlRenderer) return false;
 
+        camera = HmlCamera{{ 0.0f, 0.0f, 2.0f }};
+        cursor = hmlWindow->getCursor();
+        proj = projFrom(hmlSwapchain->extentAspect());
+
 
         {
             {
-                // auto flat = std::make_shared<HmlSimpleModel>();
-                // HmlSimpleModel flat;
-
                 std::vector<HmlSimpleModel::Vertex> vertices;
                 vertices.push_back(HmlSimpleModel::Vertex{
                     .pos = {-0.5f, -0.5f, 0.0f},
@@ -84,17 +90,27 @@ struct Himmel {
                     .texCoord = {1.0f, 1.0f}
                 });
 
-                std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0 };
-                // flat.indices = { 0, 1, 2, 2, 3, 0 };
+                std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
 
-                const auto model = hmlResourceManager->newModel(vertices.data(), sizeof(vertices[0]) * vertices.size(), indices);
+                const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
                 models.push_back(model);
             }
 
-            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
-            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
-            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
-            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            {
+                std::vector<HmlSimpleModel::Vertex> vertices;
+                std::vector<uint32_t> indices;
+                if (!loadSimpleModel("viking_room.obj", vertices, indices)) return false;
+
+                const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+                models.push_back(model);
+            }
+
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[1]));
+            // entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            // entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            // entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
 
             hmlRenderer->specifyEntitiesToRender(entities);
 
@@ -130,17 +146,59 @@ struct Himmel {
     }
 
 
-    void update(float delta, float sinceStart) {
-        int index = 0;
-        for (auto& entity : entities) {
-            const float dir = (index % 2) ? 1.0f : -1.0f;
-            auto matrix = glm::mat4(1.0f);
-            matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            matrix = glm::translate(matrix, glm::vec3{0.0f, 0.0f, -index * 0.1f + 0.7f * glm::sin(sinceStart)});
-            entity->modelMatrix = matrix;
+    void update(float dt, float sinceStart) {
+        // int index = 0;
+        // for (auto& entity : entities) {
+        //     const float dir = (index % 2) ? 1.0f : -1.0f;
+        //     auto matrix = glm::mat4(1.0f);
+        //     matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        //     matrix = glm::translate(matrix, glm::vec3{0.0f, 0.0f, -index * 0.1f + 0.7f * glm::sin(sinceStart)});
+        //     entity->modelMatrix = matrix;
+        //
+        //     index++;
+        // }
 
-            index++;
+        {
+            const auto newCursor = hmlWindow->getCursor();
+            const int32_t dx = newCursor.first - cursor.first;
+            const int32_t dy = newCursor.second - cursor.second;
+            cursor = newCursor;
+            if (dx || dy) camera.rotateDir(-dy, dx);
         }
+        {
+            constexpr float movementSpeed = 5.0f;
+            constexpr float boostUp = 4.0f;
+            constexpr float boostDown = 0.2f;
+            float length = movementSpeed * dt;
+            if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+                length *= boostUp;
+            } else if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
+                length *= boostDown;
+            }
+
+            if (glfwGetKey(hmlWindow->window, GLFW_KEY_W) == GLFW_PRESS) {
+                camera.forward(length);
+            }
+            if (glfwGetKey(hmlWindow->window, GLFW_KEY_S) == GLFW_PRESS) {
+                camera.forward(-length);
+            }
+            if (glfwGetKey(hmlWindow->window, GLFW_KEY_D) == GLFW_PRESS) {
+                camera.right(length);
+            }
+            if (glfwGetKey(hmlWindow->window, GLFW_KEY_A) == GLFW_PRESS) {
+                camera.right(-length);
+            }
+            if (glfwGetKey(hmlWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+                camera.lift(length);
+            }
+            if (glfwGetKey(hmlWindow->window, GLFW_KEY_C) == GLFW_PRESS) {
+                camera.lift(-length);
+            }
+        }
+
+
+        // entities[0]->modelMatrix = glm::mat4(1.0f);
+        entities[0]->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 0.0f, -1.0f});
     }
 
 
@@ -197,12 +255,9 @@ struct Himmel {
         // float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
         const float aspect_w_h = hmlSwapchain->extentAspect();
         const float near = 0.1f;
-        const float far = 10.0f;
+        const float far = 1000.0f;
         HmlRenderer::SimpleUniformBufferObject ubo{
-            .view = glm::lookAt(
-                glm::vec3(0.0f, 1.0f, 1.0f), // position in Worls space
-                glm::vec3(0.0f, 0.0f, 0.0f), // where to look
-                glm::vec3(0.0f, 1.0f, 0.0f)), // where the head is
+            .view = camera.view(),
             .proj = glm::perspective(glm::radians(45.0f), aspect_w_h, near, far)
         };
         ubo.proj[1][1] *= -1; // fix the inverted Y axis of GLM
@@ -282,6 +337,8 @@ struct Himmel {
         // TODO maybe store this as as flag inside the Renderer so that it knows automatically
         // hmlRenderer->bakeCommandBuffers();
 
+        proj = projFrom(hmlSwapchain->extentAspect());
+
         std::cout << '\n';
     }
 
@@ -319,6 +376,15 @@ struct Himmel {
             vkDestroySemaphore(hmlDevice->device, imageAvailableSemaphores[i], nullptr);
             vkDestroyFence(hmlDevice->device, inFlightFences[i], nullptr);
         }
+    }
+
+
+    static glm::mat4 projFrom(float aspect_w_h) {
+        const float near = 0.1f;
+        const float far = 10.0f;
+        glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect_w_h, near, far);
+        proj[1][1] *= -1; // fix the inverted Y axis of GLM
+        return proj;
     }
     // ========================================================================
     // ========================================================================

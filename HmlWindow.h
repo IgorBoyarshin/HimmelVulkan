@@ -26,19 +26,20 @@ struct HmlWindow {
         hmlWindow->name = name;
         hmlWindow->window = glfwCreateWindow(width, height, name, nullptr, nullptr);
 
-        // glfwSetWindowOpacity(window, 0.7f);
+        // glfwSetWindowOpacity(hmlWindow->window, 0.7f);
         glfwSetWindowUserPointer(hmlWindow->window, hmlWindow); // to be used inside resizeCallback
         glfwSetFramebufferSizeCallback(hmlWindow->window, resizeCallback);
-        // glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+        // glfwSetInputMode(hmlWindow->window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+        glfwSetInputMode(hmlWindow->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         return std::unique_ptr<HmlWindow>{ hmlWindow };
     }
 
 
-    std::pair<float, float> getCursor() noexcept {
+    std::pair<int32_t, int32_t> getCursor() noexcept {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
-        return std::make_pair( static_cast<float>(xpos), static_cast<float>(ypos) );
+        return std::make_pair( static_cast<int32_t>(xpos), static_cast<int32_t>(ypos) );
     }
 
 

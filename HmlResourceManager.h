@@ -13,29 +13,41 @@
 // is no londer needed the respective resources are freed.
 //
 // Or maybe store resources here, but upon the creation return a smart_ptr with
-// the ID, so that when a renderer dies, its ptr dies, and the resources is freed
+// the ID, so that when a renderer dies, its ptr dies, and the resources are freed
 // automatically.
 // TODO
 
 
 struct HmlModelResource {
-    // using Id = uint32_t;
-    // Id id;
+    using Id = uint32_t;
+    Id id;
 
     uint32_t indicesCount;
 
-    VkBuffer vertexBuffer;
+    VkBuffer       vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
-    VkBuffer indexBuffer;
+    VkBuffer       indexBuffer;
     VkDeviceMemory indexBufferMemory;
 
-    // static HmlModelResource create() : id(newId()) {}
+    bool hasTexture = false;
+    // TODO in future will be multiple textures (for materials)
+    VkImage        textureImage;
+    VkDeviceMemory textureImageMemory;
+    VkImageView    textureImageView;
+    // TODO move sampler to Renderer and make it shared
+    VkSampler      textureSampler;
 
-    // private:
-    // static Id newId() {
-    //     static Id id = 0;
-    //     return id++;
+    HmlModelResource() : id(newId()) {}
+
+    // static HmlModelResource create() {
+    //     return HmlModelResource{};
     // }
+
+    private:
+    static Id newId() {
+        static Id id = 0;
+        return id++;
+    }
 };
 
 
@@ -43,13 +55,7 @@ struct HmlResourceManager {
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
 
-    // TODO make vectors
-    VkImage textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView textureImageView;
-    VkSampler textureSampler;
-
-    // TODO make vectors
+    // TODO make vectors of vectors
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
 
@@ -57,12 +63,6 @@ struct HmlResourceManager {
     // are shared_ptr) because there may be a time when there are no Entities
     // of this particular model at a given time, but there will be later.
     std::vector<std::shared_ptr<HmlModelResource>> models;
-
-    // TODO make vectors
-    // VkBuffer vertexBuffer;
-    // VkDeviceMemory vertexBufferMemory;
-    // VkBuffer indexBuffer;
-    // VkDeviceMemory indexBufferMemory;
 
 
     static std::unique_ptr<HmlResourceManager> create(
@@ -75,12 +75,14 @@ struct HmlResourceManager {
 
 
     ~HmlResourceManager() {
-        vkDestroySampler(hmlDevice->device, textureSampler, nullptr);
-        vkDestroyImageView(hmlDevice->device, textureImageView, nullptr);
-        vkDestroyImage(hmlDevice->device, textureImage, nullptr);
-        vkFreeMemory(hmlDevice->device, textureImageMemory, nullptr);
-
         for (const auto& model : models) {
+            if (model->hasTexture) {
+                vkDestroySampler(hmlDevice->device, model->textureSampler, nullptr);
+                vkDestroyImageView(hmlDevice->device, model->textureImageView, nullptr);
+                vkDestroyImage(hmlDevice->device, model->textureImage, nullptr);
+                vkFreeMemory(hmlDevice->device, model->textureImageMemory, nullptr);
+            }
+
             vkDestroyBuffer(hmlDevice->device, model->indexBuffer, nullptr);
             vkFreeMemory(hmlDevice->device, model->indexBufferMemory, nullptr);
             vkDestroyBuffer(hmlDevice->device, model->vertexBuffer, nullptr);
@@ -105,27 +107,46 @@ struct HmlResourceManager {
 
     // TODO return ID
     // TODO make vectors
-    void newUniformBuffer(size_t count, size_t sizeBytes) {
+    void newUniformBuffers(size_t count, size_t sizeBytes) {
         createUniformBuffers(uniformBuffers, uniformBuffersMemory, count, sizeBytes);
     }
 
 
     // TODO return ID
     // TODO make vectors
-    void newTexture(const char* fileName) {
-        createTextureImage(textureImage, textureImageMemory, fileName);
-        textureImageView = createTextureImageView(textureImage);
-        textureSampler = createTextureSampler();
-    }
+    // void newTexture(const char* fileName) {
+    //     createTextureImage(textureImage, textureImageMemory, fileName);
+    //     textureImageView = createTextureImageView(textureImage);
+    //     textureSampler = createTextureSampler();
+    // }
 
 
+    // Model with color
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) {
-        // auto model = HmlResourceManager::create();
         auto model = std::make_shared<HmlModelResource>();
         model->indicesCount = indices.size();
+        model->hasTexture = false;
 
         createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
         createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);
+
+        models.push_back(model);
+        return model;
+    }
+
+
+    // Model with texture
+    std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices, const char* textureFileName) {
+        auto model = std::make_shared<HmlModelResource>();
+        model->indicesCount = indices.size();
+        model->hasTexture = true;
+
+        createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
+        createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);
+
+        createTextureImage(model->textureImage, model->textureImageMemory, textureFileName);
+        model->textureImageView = createTextureImageView(model->textureImage);
+        model->textureSampler = createTextureSampler();
 
         models.push_back(model);
         return model;

@@ -44,8 +44,7 @@ struct HmlGraphicsPipelineConfig {
     // VK_FRONT_FACE_COUNTER_CLOCKWISE
     // VK_FRONT_FACE_CLOCKWISE
     VkFrontFace frontFace;
-    // TODO will be a vector in the future
-    VkDescriptorSetLayout descriptorSetLayout;
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 
     // TODO Later will probably be an optional
     VkShaderStageFlags pushConstantsStages;
@@ -220,8 +219,8 @@ struct HmlPipeline {
         // ------------- Pipeline layout (uniforms in shaders) ----------
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 1; // TODO will be vector.size() in the future
-        pipelineLayoutInfo.pSetLayouts = &hmlPipelineConfig.descriptorSetLayout;
+        pipelineLayoutInfo.setLayoutCount = hmlPipelineConfig.descriptorSetLayouts.size();
+        pipelineLayoutInfo.pSetLayouts = hmlPipelineConfig.descriptorSetLayouts.data();
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
         if (vkCreatePipelineLayout(hmlDevice->device, &pipelineLayoutInfo, nullptr, &(hmlPipeline->layout)) != VK_SUCCESS) {

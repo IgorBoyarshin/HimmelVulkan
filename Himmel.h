@@ -58,8 +58,13 @@ struct Himmel {
         hmlSwapchain = HmlSwapchain::create(hmlWindow, hmlDevice, hmlResourceManager, std::nullopt);
         if (!hmlSwapchain) return false;
 
-        hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager);
+        hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, maxFramesInFlight);
         if (!hmlRenderer) return false;
+
+
+        // TODO In future specify for Renderer which UBO is used for its internal works
+        hmlResourceManager->newUniformBuffers(maxFramesInFlight, sizeof(HmlRenderer::SimpleUniformBufferObject));
+
 
         camera = HmlCamera{{ 0.0f, 0.0f, 2.0f }};
         cursor = hmlWindow->getCursor();
@@ -99,22 +104,52 @@ struct Himmel {
 
             {
                 std::vector<HmlSimpleModel::Vertex> vertices;
+                vertices.push_back(HmlSimpleModel::Vertex{
+                    .pos = {-0.5f, -0.5f, 0.0f},
+                    .color = {1.0f, 0.0f, 0.0f},
+                    .texCoord = {1.0f, 0.0f}
+                });
+                vertices.push_back(HmlSimpleModel::Vertex{
+                    .pos = {0.5f, -0.5f, 0.0f},
+                    .color = {0.0f, 1.0f, 0.0f},
+                    .texCoord = {0.0f, 0.0f}
+                });
+                vertices.push_back(HmlSimpleModel::Vertex{
+                    .pos = {0.5f, 0.5f, 0.0f},
+                    .color = {0.0f, 0.0f, 1.0f},
+                    .texCoord = {0.0f, 1.0f}
+                });
+                vertices.push_back(HmlSimpleModel::Vertex{
+                    .pos = {-0.5f, 0.5f, 0.0f},
+                    .color = {1.0f, 1.0f, 1.0f},
+                    .texCoord = {1.0f, 1.0f}
+                });
+
+                std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
+
+                const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "girl.png");
+                models.push_back(model);
+            }
+
+            {
+                std::vector<HmlSimpleModel::Vertex> vertices;
                 std::vector<uint32_t> indices;
                 if (!loadSimpleModel("viking_room.obj", vertices, indices)) return false;
 
                 const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "viking_room.png");
                 models.push_back(model);
             }
 
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[2]));
             entities.push_back(std::make_shared<HmlSimpleEntity>(models[1]));
-            // entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
-            // entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
-            // entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[0]));
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[1]));
+            entities.push_back(std::make_shared<HmlSimpleEntity>(models[2]));
 
             hmlRenderer->specifyEntitiesToRender(entities);
-
-            // hmlRenderer->bakeCommandBuffers();
         }
 
         createSyncObjects();
@@ -147,16 +182,16 @@ struct Himmel {
 
 
     void update(float dt, float sinceStart) {
-        // int index = 0;
-        // for (auto& entity : entities) {
-        //     const float dir = (index % 2) ? 1.0f : -1.0f;
-        //     auto matrix = glm::mat4(1.0f);
-        //     matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        //     matrix = glm::translate(matrix, glm::vec3{0.0f, 0.0f, -index * 0.1f + 0.7f * glm::sin(sinceStart)});
-        //     entity->modelMatrix = matrix;
-        //
-        //     index++;
-        // }
+        int index = 0;
+        for (auto& entity : entities) {
+            const float dir = (index % 2) ? 1.0f : -1.0f;
+            auto matrix = glm::mat4(1.0f);
+            matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            matrix = glm::translate(matrix, glm::vec3{0.0f, 0.0f, -index * 2.0f + 1.0f * glm::sin(sinceStart)});
+            entity->modelMatrix = matrix;
+
+            index++;
+        }
 
         {
             const auto newCursor = hmlWindow->getCursor();
@@ -198,7 +233,7 @@ struct Himmel {
 
 
         // entities[0]->modelMatrix = glm::mat4(1.0f);
-        entities[0]->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 0.0f, -1.0f});
+        // entities[0]->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 0.0f, -1.0f});
     }
 
 
@@ -249,35 +284,31 @@ struct Himmel {
         imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
         // Once we know what image we work with...
-        // Takes care of screen resizing
-        // static auto startTime = std::chrono::high_resolution_clock::now();
-        // auto currentTime = std::chrono::high_resolution_clock::now();
-        // float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-        const float aspect_w_h = hmlSwapchain->extentAspect();
-        const float near = 0.1f;
-        const float far = 1000.0f;
+
         HmlRenderer::SimpleUniformBufferObject ubo{
             .view = camera.view(),
-            .proj = glm::perspective(glm::radians(45.0f), aspect_w_h, near, far)
+            .proj = proj
         };
-        ubo.proj[1][1] *= -1; // fix the inverted Y axis of GLM
-        hmlResourceManager->updateUniformBuffer(imageIndex, &ubo, sizeof(ubo));
+        hmlResourceManager->updateUniformBuffer(currentFrame, &ubo, sizeof(ubo));
 
 
         // NOTE Only this part depends on a Renderer (commandBuffers)
-        // NOTE Maybe combine commandBuffers from all renderers here for a unified submission
+        // TODO combine commandBuffers from all renderers here for a unified submission
         {
             VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
             VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
             VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
+
+            std::vector<VkCommandBuffer> commandBuffers;
+            commandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex)); // XXX
 
             VkSubmitInfo submitInfo = {};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             submitInfo.waitSemaphoreCount = 1;
             submitInfo.pWaitSemaphores = waitSemaphores;
             submitInfo.pWaitDstStageMask = waitStages;
-            submitInfo.commandBufferCount = 1;
-            submitInfo.pCommandBuffers = hmlRenderer->draw(imageIndex); // XXX
+            submitInfo.commandBufferCount = commandBuffers.size();
+            submitInfo.pCommandBuffers = commandBuffers.data();
             submitInfo.signalSemaphoreCount = 1;
             submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -381,7 +412,7 @@ struct Himmel {
 
     static glm::mat4 projFrom(float aspect_w_h) {
         const float near = 0.1f;
-        const float far = 10.0f;
+        const float far = 1000.0f;
         glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect_w_h, near, far);
         proj[1][1] *= -1; // fix the inverted Y axis of GLM
         return proj;

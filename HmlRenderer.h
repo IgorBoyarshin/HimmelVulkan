@@ -151,8 +151,8 @@ struct HmlRenderer {
             .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
             .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
             .hmlShaders = HmlShaders()
-                .addVertex("vertex.spv")
-                .addFragment("fragment.spv"), // TODO rename to "simple"
+                .addVertex("shaders/out/simple.vert.spv")
+                .addFragment("shaders/out/simple.frag.spv"),
             .renderPass = renderPass,
             .swapchainExtent = extent,
             .polygoneMode = VK_POLYGON_MODE_FILL,

@@ -16,8 +16,10 @@ layout(location = 0) out vec4 outColor;
 
 void main() {
     if (0 <= push.textureIndex) {
-        outColor = vec4(texture(texSamplers[push.textureIndex], fragTexCoord).rgb, 1.0);
+        /* outColor = vec4(texture(texSamplers[push.textureIndex], fragTexCoord).rgb, 1.0); */
+        outColor = texture(texSamplers[push.textureIndex], fragTexCoord);
     } else {
         outColor = vec4(fragColor, 1.0);
     }
+    if (outColor.a < 0.1) discard;
 }

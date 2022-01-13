@@ -42,11 +42,11 @@ $(mainFileName): $(filesObj)
 
 # Utils
 clean:
-	rm -f a.out *.o *.gch .*.gch $(mainFileName) *.spv
+	rm -f a.out *.o *.gch .*.gch $(mainFileName) shaders/out/*.spv
 
 cleanExe:
 	rm -f $(mainFileName)
 
-compileShaders: shader.vert shader.frag
-	glslc shader.vert -o vertex.spv
-	glslc shader.frag -o fragment.spv
+compileShaders: shaders/simple.vert shaders/simple.frag
+	glslc shaders/simple.vert -o shaders/out/simple.vert.spv
+	glslc shaders/simple.frag -o shaders/out/simple.frag.spv

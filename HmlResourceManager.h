@@ -5,7 +5,7 @@
 #include "HmlCommands.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "libs/stb_image.h"
 
 
 // TODO
@@ -136,7 +136,7 @@ struct HmlResourceManager {
 
 
     // Model with texture
-    std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices, const char* textureFileName) {
+    std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices, const char* textureFileName, VkFilter filter) {
         auto model = std::make_shared<HmlModelResource>();
         model->indicesCount = indices.size();
         model->hasTexture = true;
@@ -146,7 +146,7 @@ struct HmlResourceManager {
 
         createTextureImage(model->textureImage, model->textureImageMemory, textureFileName);
         model->textureImageView = createTextureImageView(model->textureImage);
-        model->textureSampler = createTextureSampler();
+        model->textureSampler = createTextureSampler(filter, filter);
 
         models.push_back(model);
         return model;
@@ -300,15 +300,16 @@ struct HmlResourceManager {
     }
 
 
-    VkSampler createTextureSampler() {
+    VkSampler createTextureSampler(VkFilter magFilter, VkFilter minFilter) {
         // For anisotropic filtering
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(hmlDevice->physicalDevice, &properties);
 
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        // VK_FILTER_LINEAR
+        samplerInfo.magFilter = magFilter;
+        samplerInfo.minFilter = minFilter;
         // VK_SAMPLER_ADDRESS_MODE_REPEAT
         // VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT
         // VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE

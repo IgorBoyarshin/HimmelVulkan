@@ -128,17 +128,17 @@ struct Himmel {
                 std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
 
                 const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "girl.png");
+                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "models/girl.png", VK_FILTER_LINEAR);
                 models.push_back(model);
             }
 
             {
                 std::vector<HmlSimpleModel::Vertex> vertices;
                 std::vector<uint32_t> indices;
-                if (!loadSimpleModel("viking_room.obj", vertices, indices)) return false;
+                if (!loadSimpleModel("models/viking_room.obj", vertices, indices)) return false;
 
                 const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "viking_room.png");
+                const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "models/viking_room.png", VK_FILTER_LINEAR);
                 models.push_back(model);
             }
 

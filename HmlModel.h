@@ -10,7 +10,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
-#include "tiny_obj_loader.h"
+#include "libs/tiny_obj_loader.h"
 
 #include <unordered_map>
 

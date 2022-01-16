@@ -5,25 +5,38 @@
 
 #include "HmlWindow.h"
 #include "HmlDevice.h"
+#include "HmlDescriptors.h"
 #include "HmlCommands.h"
 #include "HmlSwapchain.h"
 #include "HmlResourceManager.h"
 #include "HmlRenderer.h"
+#include "HmlSnowParticleRenderer.h"
 #include "HmlModel.h"
 #include "HmlCamera.h"
 
 
 struct Himmel {
+    // TODO rename
+    struct SimpleUniformBufferObject {
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 proj;
+    };
+
     std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
+    std::shared_ptr<HmlDescriptors> hmlDescriptors;
     std::shared_ptr<HmlCommands> hmlCommands;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
     std::shared_ptr<HmlRenderer> hmlRenderer;
+    std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
 
     HmlCamera camera;
     glm::mat4 proj;
     std::pair<int32_t, int32_t> cursor;
+
+
+    std::vector<VkCommandBuffer> commandBuffers;
 
 
     // Sync objects
@@ -32,6 +45,13 @@ struct Himmel {
     std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
     std::vector<VkFence> inFlightFences;               // for each frame in flight
     std::vector<VkFence> imagesInFlight;               // for each swapChainImage
+
+    std::vector<std::unique_ptr<HmlUniformBuffer>> viewProjUniformBuffers;
+
+
+    VkDescriptorPool generalDescriptorPool;
+    VkDescriptorSetLayout generalDescriptorSetLayout;
+    std::vector<VkDescriptorSet> generalDescriptorSet_0_perImage;
 
 
     // NOTE Later it will probably be a hashmap from model name
@@ -49,6 +69,9 @@ struct Himmel {
         hmlDevice = HmlDevice::create(hmlWindow);
         if (!hmlDevice) return false;
 
+        hmlDescriptors = HmlDescriptors::create(hmlDevice);
+        if (!hmlDescriptors) return false;
+
         hmlCommands = HmlCommands::create(hmlDevice);
         if (!hmlCommands) return false;
 
@@ -58,12 +81,57 @@ struct Himmel {
         hmlSwapchain = HmlSwapchain::create(hmlWindow, hmlDevice, hmlResourceManager, std::nullopt);
         if (!hmlSwapchain) return false;
 
-        hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, maxFramesInFlight);
+
+        commandBuffers = hmlCommands->allocate(hmlSwapchain->imagesCount(), hmlCommands->commandPoolOnetimeFrames);
+
+
+        for (size_t i = 0; i < hmlSwapchain->imagesCount(); i++) {
+            const auto size = sizeof(SimpleUniformBufferObject);
+            auto ubo = hmlResourceManager->createUniformBuffer(size);
+            ubo->map();
+            viewProjUniformBuffers.push_back(std::move(ubo)); // TODO move because cannot copy ??
+        }
+
+
+        generalDescriptorPool = hmlDescriptors->buildDescriptorPool()
+            .withUniformBuffers(hmlSwapchain->imagesCount())
+            .maxSets(hmlSwapchain->imagesCount())
+            .build(hmlDevice);
+        if (!generalDescriptorPool) return false;
+
+        generalDescriptorSetLayout = hmlDescriptors->buildDescriptorSetLayout()
+            .withUniformBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT)
+            .build(hmlDevice);
+        if (!generalDescriptorSetLayout) return false;
+
+        generalDescriptorSet_0_perImage = hmlDescriptors->createDescriptorSets(
+            hmlSwapchain->imagesCount(), generalDescriptorSetLayout, generalDescriptorPool);
+        if (generalDescriptorSet_0_perImage.empty()) return false;
+        for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imagesCount(); imageIndex++) {
+            const auto set = generalDescriptorSet_0_perImage[imageIndex];
+            const auto buffer = viewProjUniformBuffers[imageIndex]->uniformBuffer;
+            const auto size = sizeof(SimpleUniformBufferObject);
+            HmlSetUpdater(set).uniformBufferAt(0, buffer, size).update(hmlDevice);
+        }
+
+
+        hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands,
+            hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
         if (!hmlRenderer) return false;
 
 
-        // TODO In future specify for Renderer which UBO is used for its internal works
-        hmlResourceManager->newUniformBuffers(maxFramesInFlight, sizeof(HmlRenderer::SimpleUniformBufferObject));
+        const auto snowCount = 4000;
+        const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
+            .xMin = -10.0f,
+            .xMax = +10.0f,
+            .yMin = -10.0f,
+            .yMax = +10.0f,
+            .zMin = -10.0f,
+            .zMax = +10.0f
+        };
+        hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlWindow,
+            hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
+        if (!hmlSnowRenderer) return false;
 
 
         camera = HmlCamera{{ 0.0f, 0.0f, 2.0f }};
@@ -162,7 +230,6 @@ struct Himmel {
         static auto startTime = std::chrono::high_resolution_clock::now();
         while (!hmlWindow->shouldClose()) {
             glfwPollEvents();
-            drawFrame();
 
             static auto mark = startTime;
             const auto newMark = std::chrono::high_resolution_clock::now();
@@ -171,8 +238,9 @@ struct Himmel {
             const float deltaSeconds = static_cast<float>(sinceLast) / 1'000'000.0f;
             const float sinceStartSeconds = static_cast<float>(sinceStart) / 1'000'000.0f;
             mark = newMark;
-
             update(deltaSeconds, sinceStartSeconds);
+
+            drawFrame();
 
             // const auto fps = 1.0 / deltaSeconds;
             // std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]\n";
@@ -232,8 +300,7 @@ struct Himmel {
         }
 
 
-        // entities[0]->modelMatrix = glm::mat4(1.0f);
-        // entities[0]->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 0.0f, -1.0f});
+        hmlSnowRenderer->updateForDt(dt);
     }
 
 
@@ -285,30 +352,37 @@ struct Himmel {
 
         // Once we know what image we work with...
 
-        HmlRenderer::SimpleUniformBufferObject ubo{
+        SimpleUniformBufferObject ubo{
             .view = camera.view(),
             .proj = proj
         };
-        hmlResourceManager->updateUniformBuffer(currentFrame, &ubo, sizeof(ubo));
+        viewProjUniformBuffers[imageIndex]->update(&ubo);
+
+        hmlSnowRenderer->updateForImage(imageIndex);
 
 
         // NOTE Only this part depends on a Renderer (commandBuffers)
-        // TODO combine commandBuffers from all renderers here for a unified submission
         {
+            recordDrawBegin(commandBuffers[imageIndex], imageIndex);
+
+            std::vector<VkCommandBuffer> secondaryCommandBuffers;
+            secondaryCommandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
+            secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
+            vkCmdExecuteCommands(commandBuffers[imageIndex], secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
+
+            recordDrawEnd(commandBuffers[imageIndex]);
+
             VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
             VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
             VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
-
-            std::vector<VkCommandBuffer> commandBuffers;
-            commandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex)); // XXX
 
             VkSubmitInfo submitInfo = {};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             submitInfo.waitSemaphoreCount = 1;
             submitInfo.pWaitSemaphores = waitSemaphores;
             submitInfo.pWaitDstStageMask = waitStages;
-            submitInfo.commandBufferCount = commandBuffers.size();
-            submitInfo.pCommandBuffers = commandBuffers.data();
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
             submitInfo.signalSemaphoreCount = 1;
             submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -346,6 +420,35 @@ struct Himmel {
     }
 
 
+    void recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+        hmlCommands->beginRecording(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+        VkRenderPassBeginInfo renderPassInfo = {};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = hmlSwapchain->renderPass;
+        renderPassInfo.framebuffer = hmlSwapchain->framebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = hmlSwapchain->extent;
+
+        // Used for VK_ATTACHMENT_LOAD_OP_CLEAR
+        std::array<VkClearValue, 2> clearValues{};
+        // The order (indexing) must be the same as in attachments!
+        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+
+        // vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    }
+
+
+    void recordDrawEnd(VkCommandBuffer commandBuffer) {
+        vkCmdEndRenderPass(commandBuffer);
+        hmlCommands->endRecording(commandBuffer);
+    }
+
+
     void recreateSwapchain() {
         std::cout << ":> Recreating the Swapchain.\n";
 
@@ -361,10 +464,19 @@ struct Himmel {
         hmlSwapchain = HmlSwapchain::create(hmlWindow, hmlDevice, hmlResourceManager, { hmlSwapchain->swapchain });
 
         // Because they have to be rerecorder, and for that they need to be reset first
-        hmlCommands->resetGeneralCommandPool();
+        hmlCommands->resetCommandPool(hmlCommands->commandPoolGeneral);
+
+        // NOTE they are not freed, so don't reallocate
+        // commandBuffersDrawBegin = hmlCommands->allocate(hmlSwapchain->imagesCount(), hmlCommands->commandPoolGeneral);
+        // commandBuffersDrawEnd   = hmlCommands->allocate(hmlSwapchain->imagesCount(), hmlCommands->commandPoolGeneral);
+        // for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imagesCount(); imageIndex++) {
+        //     recordDrawBegin(commandBuffersDrawBegin[imageIndex], imageIndex);
+        //     recordDrawEnd  (commandBuffersDrawEnd  [imageIndex]);
+        // }
 
         // TODO foreach Renderer
         hmlRenderer->replaceSwapchain(hmlSwapchain);
+        hmlSnowRenderer->replaceSwapchain(hmlSwapchain);
         // TODO maybe store this as as flag inside the Renderer so that it knows automatically
         // hmlRenderer->bakeCommandBuffers();
 
@@ -407,6 +519,12 @@ struct Himmel {
             vkDestroySemaphore(hmlDevice->device, imageAvailableSemaphores[i], nullptr);
             vkDestroyFence(hmlDevice->device, inFlightFences[i], nullptr);
         }
+
+        // NOTE depends on swapchain recreation, but because it only depends on the
+        // NOTE number of images, which most likely will not change, we ignore it.
+        // DescriptorSets are freed automatically upon the deletion of the pool
+        vkDestroyDescriptorPool(hmlDevice->device, generalDescriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(hmlDevice->device, generalDescriptorSetLayout, nullptr);
     }
 
 

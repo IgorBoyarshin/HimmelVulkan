@@ -70,11 +70,14 @@ struct HmlPipeline {
         // --------- FIXED: Vertex input ----------
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(hmlPipelineConfig.bindingDescriptions.size());
-        vertexInputInfo.pVertexBindingDescriptions = hmlPipelineConfig.bindingDescriptions.data();
-        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(hmlPipelineConfig.attributeDescriptions.size());
-        vertexInputInfo.pVertexAttributeDescriptions = hmlPipelineConfig.attributeDescriptions.data();
-
+        if (!hmlPipelineConfig.bindingDescriptions.empty()) {
+            vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(hmlPipelineConfig.bindingDescriptions.size());
+            vertexInputInfo.pVertexBindingDescriptions = hmlPipelineConfig.bindingDescriptions.data();
+        }
+        if (!hmlPipelineConfig.attributeDescriptions.empty()) {
+            vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(hmlPipelineConfig.attributeDescriptions.size());
+            vertexInputInfo.pVertexAttributeDescriptions = hmlPipelineConfig.attributeDescriptions.data();
+        }
         // --------- FIXED: Input assembly ----------
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -164,21 +167,21 @@ struct HmlPipeline {
             VK_COLOR_COMPONENT_G_BIT |
             VK_COLOR_COMPONENT_B_BIT |
             VK_COLOR_COMPONENT_A_BIT;
-        colorBlendAttachment.blendEnable = VK_FALSE;
-        colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-        colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-        colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-        colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-        colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-        colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+        // colorBlendAttachment.blendEnable = VK_FALSE;
+        // colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+        // colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+        // colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+        // colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+        // colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+        // colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
         // To implement opacity:
-        // colorBlendAttachment.blendEnable = VK_TRUE;
-        // colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-        // colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-        // colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-        // colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        // colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        // colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+        colorBlendAttachment.blendEnable = VK_TRUE;
+        colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         // You can find all of the possible operations in the VkBlendFactor and
         // VkBlendOp enumerations in the specification.
 
@@ -221,8 +224,10 @@ struct HmlPipeline {
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = hmlPipelineConfig.descriptorSetLayouts.size();
         pipelineLayoutInfo.pSetLayouts = hmlPipelineConfig.descriptorSetLayouts.data();
-        pipelineLayoutInfo.pushConstantRangeCount = 1;
-        pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
+        if (hmlPipelineConfig.pushConstantsSizeBytes) {
+            pipelineLayoutInfo.pushConstantRangeCount = 1;
+            pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
+        }
         if (vkCreatePipelineLayout(hmlDevice->device, &pipelineLayoutInfo, nullptr, &(hmlPipeline->layout)) != VK_SUCCESS) {
             std::cerr << "::> Failed to create PipelineLayout.\n";
             return { nullptr };

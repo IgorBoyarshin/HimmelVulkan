@@ -33,7 +33,8 @@ struct HmlSimpleModel {
             // VK_VERTEX_INPUT_RATE_VERTEX -- move to the next entry after each Vertex
             // VK_VERTEX_INPUT_RATE_INSTANCE -- move to the next entry after each Instance
             bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-            bindingDescriptions.push_back(std::move(bindingDescription));
+
+            bindingDescriptions.push_back(bindingDescription);
 
             return bindingDescriptions;
         }
@@ -133,5 +134,16 @@ bool loadSimpleModel(const char* objPath, std::vector<HmlSimpleModel::Vertex>& v
 
 // XXX Other Models will have an inner Vertex struct as well
 
+
+struct HmlSnowModel {
+    struct Vertex {
+        static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
+            return {};
+        }
+        static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+            return {};
+        }
+    };
+};
 
 #endif

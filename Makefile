@@ -11,7 +11,8 @@ mainFileName = main
 # Files that have .h and .cpp versions
 classFiles =
 # Files that only have the .h version
-justHeaderFiles = HmlCamera HmlResourceManager HmlRenderer HmlModel HmlCommands HmlPipeline HmlWindow HmlDevice HmlSwapchain Himmel
+justHeaderFiles = HmlShaderLayout HmlCamera HmlResourceManager HmlRenderer HmlModel HmlCommands HmlPipeline HmlWindow HmlDevice HmlSwapchain Himmel
+# justHeaderFiles = HmlDescriptor HmlSnowParticleRenderer HmlShaderLayout HmlCamera HmlResourceManager HmlRenderer HmlModel HmlCommands HmlPipeline HmlWindow HmlDevice HmlSwapchain Himmel
 # Compilation flags
 OPTIMIZATION_FLAG = -O0
 LANGUAGE_LEVEL = -std=c++20
@@ -47,6 +48,8 @@ clean:
 cleanExe:
 	rm -f $(mainFileName)
 
-compileShaders: shaders/simple.vert shaders/simple.frag
+compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag
 	glslc shaders/simple.vert -o shaders/out/simple.vert.spv
 	glslc shaders/simple.frag -o shaders/out/simple.frag.spv
+	glslc shaders/snow.vert -o shaders/out/snow.vert.spv
+	glslc shaders/snow.frag -o shaders/out/snow.frag.spv

@@ -18,9 +18,30 @@
 // TODO
 
 
+struct HmlTextureResource {
+    std::shared_ptr<HmlDevice> hmlDevice;
+
+    VkImage        textureImage;
+    VkDeviceMemory textureImageMemory;
+    VkImageView    textureImageView;
+    VkSampler      textureSampler;
+
+    ~HmlTextureResource() {
+        std::cout << ":> Destroying HmlTextureResource.\n";
+
+        vkDestroySampler(hmlDevice->device, textureSampler, nullptr);
+        vkDestroyImageView(hmlDevice->device, textureImageView, nullptr);
+        vkDestroyImage(hmlDevice->device, textureImage, nullptr);
+        vkFreeMemory(hmlDevice->device, textureImageMemory, nullptr);
+    }
+};
+
+
 struct HmlModelResource {
     using Id = uint32_t;
     Id id;
+
+    std::shared_ptr<HmlDevice> hmlDevice;
 
     uint32_t indicesCount;
 
@@ -29,6 +50,7 @@ struct HmlModelResource {
     VkBuffer       indexBuffer;
     VkDeviceMemory indexBufferMemory;
 
+    // TODO probably extract TextureResource
     bool hasTexture = false;
     // TODO in future will be multiple textures (for materials)
     VkImage        textureImage;
@@ -39,9 +61,21 @@ struct HmlModelResource {
 
     HmlModelResource() : id(newId()) {}
 
-    // static HmlModelResource create() {
-    //     return HmlModelResource{};
-    // }
+    ~HmlModelResource() {
+        std::cout << ":> Destroying HmlModelResource.\n";
+
+        vkDestroyBuffer(hmlDevice->device, indexBuffer, nullptr);
+        vkFreeMemory(hmlDevice->device, indexBufferMemory, nullptr);
+        vkDestroyBuffer(hmlDevice->device, vertexBuffer, nullptr);
+        vkFreeMemory(hmlDevice->device, vertexBufferMemory, nullptr);
+
+        if (hasTexture) {
+            vkDestroySampler(hmlDevice->device, textureSampler, nullptr);
+            vkDestroyImageView(hmlDevice->device, textureImageView, nullptr);
+            vkDestroyImage(hmlDevice->device, textureImage, nullptr);
+            vkFreeMemory(hmlDevice->device, textureImageMemory, nullptr);
+        }
+    }
 
     private:
     static Id newId() {
@@ -51,13 +85,42 @@ struct HmlModelResource {
 };
 
 
+struct HmlUniformBuffer {
+    std::shared_ptr<HmlDevice> hmlDevice;
+
+    VkDeviceSize sizeBytes;
+    VkBuffer       uniformBuffer;
+    VkDeviceMemory uniformBufferMemory;
+    void* mappedPtr = nullptr;
+
+    void map() {
+        if (!mappedPtr) vkMapMemory(hmlDevice->device, uniformBufferMemory, 0, sizeBytes, 0, &mappedPtr);
+    }
+
+    void unmap() {
+        if (mappedPtr) vkUnmapMemory(hmlDevice->device, uniformBufferMemory);
+        mappedPtr = nullptr;
+    }
+
+    void update(void* newData) {
+        if (mappedPtr) memcpy(mappedPtr, newData, sizeBytes);
+    }
+
+    // HmlUniformBuffer(const HmlUniformBuffer&) = delete;
+    // HmlUniformBuffer& operator=(const HmlUniformBuffer&) = delete;
+
+    ~HmlUniformBuffer() {
+        std::cout << ":> Destroying HmlUniformBuffer.\n";
+        unmap();
+        vkDestroyBuffer(hmlDevice->device, uniformBuffer, nullptr);
+        vkFreeMemory(hmlDevice->device, uniformBufferMemory, nullptr);
+    }
+};
+
+
 struct HmlResourceManager {
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
-
-    // TODO make vectors of vectors
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
 
     // NOTE We store the models ourselves as well (despite the fact that they
     // are shared_ptr) because there may be a time when there are no Entities
@@ -75,41 +138,26 @@ struct HmlResourceManager {
 
 
     ~HmlResourceManager() {
-        for (const auto& model : models) {
-            if (model->hasTexture) {
-                vkDestroySampler(hmlDevice->device, model->textureSampler, nullptr);
-                vkDestroyImageView(hmlDevice->device, model->textureImageView, nullptr);
-                vkDestroyImage(hmlDevice->device, model->textureImage, nullptr);
-                vkFreeMemory(hmlDevice->device, model->textureImageMemory, nullptr);
-            }
-
-            vkDestroyBuffer(hmlDevice->device, model->indexBuffer, nullptr);
-            vkFreeMemory(hmlDevice->device, model->indexBufferMemory, nullptr);
-            vkDestroyBuffer(hmlDevice->device, model->vertexBuffer, nullptr);
-            vkFreeMemory(hmlDevice->device, model->vertexBufferMemory, nullptr);
-        }
-
-        // TODO range
-        for (size_t i = 0; i < uniformBuffers.size(); i++) {
-            vkDestroyBuffer(hmlDevice->device, uniformBuffers[i], nullptr);
-            vkFreeMemory(hmlDevice->device, uniformBuffersMemory[i], nullptr);
-        }
+        std::cout << ":> Destroying HmlResourceManager.\n";
     }
 
 
-    void updateUniformBuffer(uint32_t uboIndex, const void* newData, size_t sizeBytes) {
-        void* data;
-        vkMapMemory(hmlDevice->device, uniformBuffersMemory[uboIndex], 0, sizeBytes, 0, &data);
-            memcpy(data, newData, sizeBytes);
-        vkUnmapMemory(hmlDevice->device, uniformBuffersMemory[uboIndex]);
+    std::unique_ptr<HmlUniformBuffer> createUniformBuffer(VkDeviceSize sizeBytes) {
+        auto ubo = std::make_unique<HmlUniformBuffer>();
+        ubo->hmlDevice = hmlDevice;
+        ubo->sizeBytes = sizeBytes;
+        createBuffer(sizeBytes, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            ubo->uniformBuffer, ubo->uniformBufferMemory);
+        return ubo;
     }
 
 
     // TODO return ID
     // TODO make vectors
-    void newUniformBuffers(size_t count, size_t sizeBytes) {
-        createUniformBuffers(uniformBuffers, uniformBuffersMemory, count, sizeBytes);
-    }
+    // void newUniformBuffers(size_t count, size_t sizeBytes) {
+    //     createUniformBuffers(uniformBuffers, uniformBuffersMemory, count, sizeBytes);
+    // }
 
 
     // TODO return ID
@@ -120,10 +168,20 @@ struct HmlResourceManager {
     //     textureSampler = createTextureSampler();
     // }
 
+    std::unique_ptr<HmlTextureResource> newTextureResource(const char* fileName, VkFilter filter) {
+        auto textureResource = std::make_unique<HmlTextureResource>();
+        textureResource->hmlDevice = hmlDevice;
+        createTextureImage(textureResource->textureImage, textureResource->textureImageMemory, fileName);
+        textureResource->textureImageView = createTextureImageView(textureResource->textureImage);
+        textureResource->textureSampler = createTextureSampler(filter, filter);
+        return textureResource;
+    }
+
 
     // Model with color
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) {
         auto model = std::make_shared<HmlModelResource>();
+        model->hmlDevice = hmlDevice;
         model->indicesCount = indices.size();
         model->hasTexture = false;
 
@@ -138,6 +196,7 @@ struct HmlResourceManager {
     // Model with texture
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices, const char* textureFileName, VkFilter filter) {
         auto model = std::make_shared<HmlModelResource>();
+        model->hmlDevice = hmlDevice;
         model->indicesCount = indices.size();
         model->hasTexture = true;
 
@@ -236,18 +295,18 @@ struct HmlResourceManager {
     }
 
 
-    void createUniformBuffers(std::vector<VkBuffer>& uniformBuffers,
-            std::vector<VkDeviceMemory>& uniformBuffersMemory, size_t count, size_t sizeBytes) {
-        uniformBuffers.resize(count);
-        uniformBuffersMemory.resize(count);
-
-        for (size_t i = 0; i < count; i++) {
-            // We'll be updating it every frame, so makes sense to store it in Host memory
-            createBuffer(sizeBytes, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                uniformBuffers[i], uniformBuffersMemory[i]);
-        }
-    }
+    // void createUniformBuffers(std::vector<VkBuffer>& uniformBuffers,
+    //         std::vector<VkDeviceMemory>& uniformBuffersMemory, size_t count, size_t sizeBytes) {
+    //     uniformBuffers.resize(count);
+    //     uniformBuffersMemory.resize(count);
+    //
+    //     for (size_t i = 0; i < count; i++) {
+    //         // We'll be updating it every frame, so makes sense to store it in Host memory
+    //         createBuffer(sizeBytes, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    //             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    //             uniformBuffers[i], uniformBuffersMemory[i]);
+    //     }
+    // }
     // ========================================================================
     // ========================================================================
     // ========================================================================

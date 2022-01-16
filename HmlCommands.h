@@ -88,18 +88,18 @@ struct HmlCommands {
     }
 
 
-    void resetGeneralCommandPool() {
-        vkResetCommandPool(hmlDevice->device, commandPoolGeneral, 0);
+    void resetCommandPool(VkCommandPool commandPool) {
+        vkResetCommandPool(hmlDevice->device, commandPool, 0);
     }
 
 
-    std::vector<VkCommandBuffer> allocate(size_t count, VkCommandPool commandPool) {
+    std::vector<VkCommandBuffer> allocate(size_t count, VkCommandPool commandPool, bool primary = true) {
         std::vector<VkCommandBuffer> commandBuffers(count);
 
         VkCommandBufferAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = commandPool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.level = primary ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
         allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
 
         if (vkAllocateCommandBuffers(hmlDevice->device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
@@ -111,7 +111,8 @@ struct HmlCommands {
     }
 
 
-    void beginRecording(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags) {
+    void beginRecording(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags,
+            const VkCommandBufferInheritanceInfo* inheritanceInfo = VK_NULL_HANDLE) {
         VkCommandBufferBeginInfo beginInfo = {};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         // flags:
@@ -122,7 +123,7 @@ struct HmlCommands {
         // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: The command buffer can
         // be resubmitted while it is also already pending execution.
         beginInfo.flags = flags;
-        beginInfo.pInheritanceInfo = nullptr; // Optional
+        beginInfo.pInheritanceInfo = inheritanceInfo;
 
         // This call implicitly resets the buffer
         if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
@@ -181,9 +182,6 @@ struct HmlCommands {
 
         vkFreeCommandBuffers(hmlDevice->device, commandPoolOnetime, 1, &commandBuffer);
     }
-    // ========================================================================
-    // ========================================================================
-    // ========================================================================
 };
 
 #endif

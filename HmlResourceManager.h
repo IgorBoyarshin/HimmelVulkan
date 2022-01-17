@@ -106,14 +106,41 @@ struct HmlUniformBuffer {
         if (mappedPtr) memcpy(mappedPtr, newData, sizeBytes);
     }
 
-    // HmlUniformBuffer(const HmlUniformBuffer&) = delete;
-    // HmlUniformBuffer& operator=(const HmlUniformBuffer&) = delete;
-
     ~HmlUniformBuffer() {
         std::cout << ":> Destroying HmlUniformBuffer.\n";
         unmap();
         vkDestroyBuffer(hmlDevice->device, uniformBuffer, nullptr);
         vkFreeMemory(hmlDevice->device, uniformBufferMemory, nullptr);
+    }
+};
+
+
+struct HmlStorageBuffer {
+    std::shared_ptr<HmlDevice> hmlDevice;
+
+    VkDeviceSize sizeBytes;
+    VkBuffer       storageBuffer;
+    VkDeviceMemory storageBufferMemory;
+    void* mappedPtr = nullptr;
+
+    void map() {
+        if (!mappedPtr) vkMapMemory(hmlDevice->device, storageBufferMemory, 0, sizeBytes, 0, &mappedPtr);
+    }
+
+    void unmap() {
+        if (mappedPtr) vkUnmapMemory(hmlDevice->device, storageBufferMemory);
+        mappedPtr = nullptr;
+    }
+
+    void update(void* newData) {
+        if (mappedPtr) memcpy(mappedPtr, newData, sizeBytes);
+    }
+
+    ~HmlStorageBuffer() {
+        std::cout << ":> Destroying HmlStorageBuffer.\n";
+        unmap();
+        vkDestroyBuffer(hmlDevice->device, storageBuffer, nullptr);
+        vkFreeMemory(hmlDevice->device, storageBufferMemory, nullptr);
     }
 };
 
@@ -153,20 +180,16 @@ struct HmlResourceManager {
     }
 
 
-    // TODO return ID
-    // TODO make vectors
-    // void newUniformBuffers(size_t count, size_t sizeBytes) {
-    //     createUniformBuffers(uniformBuffers, uniformBuffersMemory, count, sizeBytes);
-    // }
-
-
-    // TODO return ID
-    // TODO make vectors
-    // void newTexture(const char* fileName) {
-    //     createTextureImage(textureImage, textureImageMemory, fileName);
-    //     textureImageView = createTextureImageView(textureImage);
-    //     textureSampler = createTextureSampler();
-    // }
+    // TODO add options for VERTEX_INPUT etc.
+    std::unique_ptr<HmlStorageBuffer> createStorageBuffer(VkDeviceSize sizeBytes) {
+        auto ssbo = std::make_unique<HmlStorageBuffer>();
+        ssbo->hmlDevice = hmlDevice;
+        ssbo->sizeBytes = sizeBytes;
+        createBuffer(sizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            ssbo->storageBuffer, ssbo->storageBufferMemory);
+        return ssbo;
+    }
 
     std::unique_ptr<HmlTextureResource> newTextureResource(const char* fileName, VkFilter filter) {
         auto textureResource = std::make_unique<HmlTextureResource>();

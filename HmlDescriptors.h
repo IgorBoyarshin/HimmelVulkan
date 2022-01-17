@@ -66,6 +66,18 @@ struct HmlDescriptors {
 
 
     struct HmlDescriptorSetLayoutBuilder {
+        HmlDescriptorSetLayoutBuilder& withStorageBufferAt(uint32_t binding, VkShaderStageFlags stages) {
+            bindings.push_back(VkDescriptorSetLayoutBinding{
+                .binding = binding,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .descriptorCount = 1,
+                .stageFlags = stages,
+                .pImmutableSamplers = nullptr
+            });
+            return *this;
+        }
+
+
         HmlDescriptorSetLayoutBuilder& withUniformBufferAt(uint32_t binding, VkShaderStageFlags stages) {
             bindings.push_back(VkDescriptorSetLayoutBinding{
                 .binding = binding,
@@ -139,6 +151,7 @@ struct HmlDescriptors {
     struct HmlDescriptorPoolBuilder {
         uint32_t textureCount = 0;
         uint32_t uboCount = 0;
+        uint32_t ssboCount = 0;
         uint32_t descriptorSetCount = 0;
 
         HmlDescriptorPoolBuilder& withTextures(uint32_t count) {
@@ -148,6 +161,11 @@ struct HmlDescriptors {
 
         HmlDescriptorPoolBuilder& withUniformBuffers(uint32_t count) {
             uboCount = count;
+            return *this;
+        }
+
+        HmlDescriptorPoolBuilder& withStorageBuffers(uint32_t count) {
+            ssboCount = count;
             return *this;
         }
 
@@ -168,6 +186,12 @@ struct HmlDescriptors {
                 poolSizes.push_back(VkDescriptorPoolSize{
                     .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                     .descriptorCount = textureCount
+                });
+            }
+            if (ssboCount) {
+                poolSizes.push_back(VkDescriptorPoolSize{
+                    .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    .descriptorCount = ssboCount
                 });
             }
 

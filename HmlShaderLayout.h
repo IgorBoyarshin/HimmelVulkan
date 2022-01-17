@@ -18,6 +18,30 @@ struct HmlSetUpdater {
     HmlSetUpdater(VkDescriptorSet descriptorSet) : descriptorSet(descriptorSet) {}
 
 
+    HmlSetUpdater& storageBufferAt(uint32_t binding, VkBuffer buffer, VkDeviceSize sizeBytes) {
+        bufferInfos.push_back(VkDescriptorBufferInfo{
+            .buffer = buffer,
+            .offset = 0,
+            .range = sizeBytes
+        });
+
+        descriptorWrites.push_back(VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = descriptorSet,
+            .dstBinding = binding,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pImageInfo       = nullptr,
+            .pBufferInfo      = &bufferInfos.back(),
+            .pTexelBufferView = nullptr
+        });
+
+        return *this;
+    }
+
+
     HmlSetUpdater& uniformBufferAt(uint32_t binding, VkBuffer buffer, VkDeviceSize sizeBytes) {
         bufferInfos.push_back(VkDescriptorBufferInfo{
             .buffer = buffer,

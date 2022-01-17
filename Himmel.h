@@ -89,7 +89,7 @@ struct Himmel {
             const auto size = sizeof(SimpleUniformBufferObject);
             auto ubo = hmlResourceManager->createUniformBuffer(size);
             ubo->map();
-            viewProjUniformBuffers.push_back(std::move(ubo)); // TODO move because cannot copy ??
+            viewProjUniformBuffers.push_back(std::move(ubo));
         }
 
 
@@ -120,7 +120,7 @@ struct Himmel {
         if (!hmlRenderer) return false;
 
 
-        const auto snowCount = 4000;
+        const auto snowCount = 100000;
         const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
             .xMin = -10.0f,
             .xMax = +10.0f,

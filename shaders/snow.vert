@@ -6,15 +6,9 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 proj;
 } ubo;
 
-#define MAX_SNOW_COUNT 4000
-layout(set = 2, binding = 0) uniform SnowInstancesUniformBuffers {
-    vec4 positions[MAX_SNOW_COUNT]; // vec3 pos + float rotation
-    /* int textureIndex[]; */
+layout(std140, set = 2, binding = 0) readonly buffer SnowInstancesUniformBuffers {
+    vec4 positions[]; // vec3 pos + float rotation
 } snowData;
-/* layout(set = 2, binding = 1) uniform UniformBufferObjectSnow2 { */
-    /* vec4 position[]; // vec3 pos + float rotation */
-    /* int textureIndex[]; */
-/* } snowData2; */
 
 layout(location = 0)      out vec2 outTexCoord;
 layout(location = 1) flat out int  outTextureIndex;
@@ -24,7 +18,7 @@ layout(location = 1) flat out int  outTextureIndex;
 mat4 model(vec3 pos, float rotation) {
     /* mat4 res = mat4(1.0); */
     /* res[3] = vec4(pos, 1.0 + rotation); */
-    const float scale = 0.07;
+    const float scale = 0.04;
     /* const float scale = 1.0; */
     /* res[0][0] = scale; */
     /* res[1][1] = scale; */

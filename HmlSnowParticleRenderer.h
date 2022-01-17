@@ -18,17 +18,7 @@
 
 
 struct HmlSnowParticleRenderer {
-    static constexpr size_t MAX_SNOW_COUNT = 4000;
-
-
-    struct SnowBounds {
-        float xMin;
-        float xMax;
-        float yMin;
-        float yMax;
-        float zMin;
-        float zMax;
-    };
+    // static constexpr size_t MAX_SNOW_COUNT = 4000;
 
 
     // float, double, long double
@@ -71,8 +61,16 @@ struct HmlSnowParticleRenderer {
     };
     std::vector<SnowInstance> snowInstances;
     std::vector<glm::vec3> snowVelocities;
-    std::vector<std::unique_ptr<HmlUniformBuffer>> snowInstancesUniformBuffers;
+    std::vector<std::unique_ptr<HmlStorageBuffer>> snowInstancesStorageBuffers;
 
+    struct SnowBounds {
+        float xMin;
+        float xMax;
+        float yMin;
+        float yMax;
+        float zMin;
+        float zMax;
+    };
     SnowBounds snowBounds;
     std::vector<std::unique_ptr<HmlTextureResource>> snowTextureResources;
 
@@ -119,17 +117,17 @@ struct HmlSnowParticleRenderer {
         hmlRenderer->hmlSwapchain = hmlSwapchain;
         hmlRenderer->hmlResourceManager = hmlResourceManager;
         hmlRenderer->hmlDescriptors = hmlDescriptors;
-        if (snowCount > MAX_SNOW_COUNT) {
-            std::cout << "::> Exceeded MAX_SNOW_COUNT while creating HmlSnowParticleRenderer.\n";
-            return { nullptr };
-        }
+        // if (snowCount > MAX_SNOW_COUNT) {
+        //     std::cout << "::> Exceeded MAX_SNOW_COUNT while creating HmlSnowParticleRenderer.\n";
+        //     return { nullptr };
+        // }
         hmlRenderer->createSnow(snowCount, snowBounds);
 
         for (size_t i = 0; i < hmlSwapchain->imagesCount(); i++) {
-            const auto size = MAX_SNOW_COUNT * 4 * sizeof(float);
-            auto ubo = hmlResourceManager->createUniformBuffer(size);
-            ubo->map();
-            hmlRenderer->snowInstancesUniformBuffers.push_back(std::move(ubo)); // TODO move because cannot copy ??
+            const auto size = snowCount * 4 * sizeof(float);
+            auto ssbo = hmlResourceManager->createStorageBuffer(size);
+            ssbo->map();
+            hmlRenderer->snowInstancesStorageBuffers.push_back(std::move(ssbo));
         }
 
 
@@ -139,7 +137,7 @@ struct HmlSnowParticleRenderer {
 
         hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
             .withTextures(hmlRenderer->snowTextureResources.size())
-            .withUniformBuffers(hmlSwapchain->imagesCount())
+            .withStorageBuffers(hmlSwapchain->imagesCount())
             .maxSets(hmlSwapchain->imagesCount() + 1)
             .build(hmlDevice);
         if (!hmlRenderer->descriptorPool) return { nullptr };
@@ -154,7 +152,7 @@ struct HmlSnowParticleRenderer {
         hmlRenderer->descriptorSetLayoutsSelf.push_back(descriptorSetLayoutTextures);
 
         const auto descriptorSetLayoutInstances = hmlDescriptors->buildDescriptorSetLayout()
-            .withUniformBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT)
+            .withStorageBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT)
             .build(hmlDevice);
         if (!descriptorSetLayoutInstances) return { nullptr };
         hmlRenderer->descriptorSetLayouts.push_back(descriptorSetLayoutInstances);
@@ -179,9 +177,9 @@ struct HmlSnowParticleRenderer {
 
         for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imagesCount(); imageIndex++) {
             const auto set = hmlRenderer->descriptorSet_instances_2_perImage[imageIndex];
-            const auto buffer = hmlRenderer->snowInstancesUniformBuffers[imageIndex]->uniformBuffer;
-            const auto size = hmlRenderer->snowInstancesUniformBuffers[imageIndex]->sizeBytes;
-            HmlSetUpdater(set).uniformBufferAt(0, buffer, size).update(hmlDevice);
+            const auto buffer = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->storageBuffer;
+            const auto size = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->sizeBytes;
+            HmlSetUpdater(set).storageBufferAt(0, buffer, size).update(hmlDevice);
         }
 
 
@@ -255,7 +253,7 @@ struct HmlSnowParticleRenderer {
 
 
     void updateForImage(uint32_t imageIndex) {
-        snowInstancesUniformBuffers[imageIndex]->update(snowInstances.data());
+        snowInstancesStorageBuffers[imageIndex]->update(snowInstances.data());
     }
 
 

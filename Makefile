@@ -9,9 +9,9 @@ VULKAN_SDK_PATH_LAYER = /usr/share/vulkan/explicit_layer.d
 # The name of the main file and executable
 mainFileName = main
 # Files that have .h and .cpp versions
-classFiles =
+classFiles = Himmel HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer
 # Files that only have the .h version
-justHeaderFiles = HmlCamera HmlResourceManager HmlRenderer HmlModel HmlCommands HmlPipeline HmlWindow HmlDevice HmlSwapchain Himmel
+# justHeaderFiles =
 # Compilation flags
 OPTIMIZATION_FLAG = -O0
 LANGUAGE_LEVEL = -std=c++20
@@ -21,7 +21,45 @@ LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvul
 
 # Auxiliary
 filesObj = $(addsuffix .o, $(mainFileName) $(classFiles))
-filesH = $(addsuffix .h, $(classFiles) $(justHeaderFiles))
+# filesH = $(addsuffix .h, $(classFiles) $(justHeaderFiles))
+
+
+
+Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlCamera.o: HmlCamera.cpp HmlCamera.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlDescriptors.o: HmlDescriptors.cpp HmlDescriptors.h HmlModel.h HmlDevice.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlCommands.o: HmlCommands.cpp HmlCommands.h HmlDevice.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlDevice.o: HmlDevice.cpp HmlDevice.h HmlWindow.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlModel.o: HmlModel.cpp HmlModel.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlPipeline.o: HmlPipeline.cpp HmlPipeline.h HmlDevice.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlRenderer.o: HmlRenderer.cpp HmlRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlSwapchain.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlResourceManager.o: HmlResourceManager.cpp HmlResourceManager.h HmlDevice.h HmlCommands.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlSnowParticleRenderer.o: HmlSnowParticleRenderer.cpp HmlSnowParticleRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlSwapchain.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlSwapchain.o: HmlSwapchain.cpp HmlSwapchain.h HmlWindow.h HmlDevice.h HmlResourceManager.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlWindow.o: HmlWindow.cpp HmlWindow.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 
 all: cleanExe $(mainFileName)
@@ -32,8 +70,8 @@ run: all compileShaders
 
 
 # Compiler
-%.o: %.cpp $(filesH)
-	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+# %.o: %.cpp $(filesH)
+# 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 # Linker
 $(mainFileName): $(filesObj)

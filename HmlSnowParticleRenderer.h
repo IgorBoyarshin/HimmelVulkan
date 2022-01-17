@@ -12,7 +12,6 @@
 #include "HmlSwapchain.h"
 #include "HmlCommands.h"
 #include "HmlModel.h"
-#include "HmlShaderLayout.h"
 #include "HmlResourceManager.h"
 #include "HmlDescriptors.h"
 
@@ -179,17 +178,17 @@ struct HmlSnowParticleRenderer {
             const auto set = hmlRenderer->descriptorSet_instances_2_perImage[imageIndex];
             const auto buffer = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->storageBuffer;
             const auto size = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->sizeBytes;
-            HmlSetUpdater(set).storageBufferAt(0, buffer, size).update(hmlDevice);
+            HmlDescriptorSetUpdater(set).storageBufferAt(0, buffer, size).update(hmlDevice);
         }
 
 
         std::vector<VkSampler> samplers;
         std::vector<VkImageView> imageViews;
         for (const auto& resource : hmlRenderer->snowTextureResources) {
-            samplers.push_back(resource->textureSampler);
-            imageViews.push_back(resource->textureImageView);
+            samplers.push_back(resource->sampler);
+            imageViews.push_back(resource->imageView);
         }
-        HmlSetUpdater(hmlRenderer->descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
+        HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
 
 
         return hmlRenderer;

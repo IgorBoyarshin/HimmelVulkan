@@ -11,7 +11,6 @@
 #include "HmlSwapchain.h"
 #include "HmlCommands.h"
 #include "HmlModel.h"
-#include "HmlShaderLayout.h"
 #include "HmlResourceManager.h"
 #include "HmlDescriptors.h"
 
@@ -161,7 +160,7 @@ struct HmlRenderer {
             const auto id = model->id;
             if (!textureIndexFor.contains(id)) {
                 entitiesToRenderForModel[id] = {};
-                if (model->hasTexture) {
+                if (model->textureResource) {
                     if (!anyModelWithTexture) anyModelWithTexture = model;
                     textureIndexFor[id] = nextFreeTextureIndex++;
                 } else {
@@ -188,8 +187,8 @@ struct HmlRenderer {
         if (mustDefaultInit) {
             mustDefaultInit = false;
             for (uint32_t i = nextFreeTextureIndex; i < MAX_TEXTURES_COUNT; i++) {
-                samplers[i] = anyModelWithTexture->textureSampler;
-                imageViews[i] = anyModelWithTexture->textureImageView;
+                samplers[i] = anyModelWithTexture->textureResource->sampler;
+                imageViews[i] = anyModelWithTexture->textureResource->imageView;
             }
         }
 
@@ -197,12 +196,12 @@ struct HmlRenderer {
         for (const auto& [modelId, textureIndex] : textureIndexFor) {
             // Pick any Model with this texture
             const auto& model = entitiesToRenderForModel[modelId][0]->modelResource;
-            if (!model->hasTexture) continue;
-            samplers[textureIndex] = model->textureSampler;
-            imageViews[textureIndex] = model->textureImageView;
+            if (!model->textureResource) continue;
+            samplers[textureIndex] = model->textureResource->sampler;
+            imageViews[textureIndex] = model->textureResource->imageView;
         }
 
-        HmlSetUpdater(descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
+        HmlDescriptorSetUpdater(descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
     }
 
 
@@ -247,7 +246,7 @@ struct HmlRenderer {
                 // NOTE Yes, in theory having a textureIndex per Entity is redundant
                 SimplePushConstant pushConstant{
                     .model = entity->modelMatrix,
-                    .textureIndex = model->hasTexture ? textureIndexFor[modelId] : NO_TEXTURE_MARK
+                    .textureIndex = model->textureResource ? textureIndexFor[modelId] : NO_TEXTURE_MARK
                 };
                 vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
                     hmlPipeline->pushConstantsStages, 0, sizeof(SimplePushConstant), &pushConstant);

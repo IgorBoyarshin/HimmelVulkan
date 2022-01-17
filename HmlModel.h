@@ -134,16 +134,4 @@ bool loadSimpleModel(const char* objPath, std::vector<HmlSimpleModel::Vertex>& v
 
 // XXX Other Models will have an inner Vertex struct as well
 
-
-struct HmlSnowModel {
-    struct Vertex {
-        static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
-            return {};
-        }
-        static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-            return {};
-        }
-    };
-};
-
 #endif

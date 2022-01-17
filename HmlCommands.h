@@ -1,6 +1,8 @@
 #ifndef HML_COMMANDS
 #define HML_COMMANDS
 
+#include "HmlDevice.h"
+
 
 struct HmlCommands {
     // Reasons to use a command pool:

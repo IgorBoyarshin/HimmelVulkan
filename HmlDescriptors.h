@@ -2,12 +2,144 @@
 #define HML_DESCRIPTORS
 
 #include <memory>
+#include <vector>
+#include <cassert>
 
 #include "HmlDevice.h"
 #include "HmlModel.h"
-#include "HmlShaderLayout.h"
 
 
+
+// NOTE
+// NOTE
+// This could be a global class that manages all possible sets.
+// For each "pipeline" it creates it and maps it to a vector of Sets, so that we
+// can access sets[0].
+// NOTE
+// NOTE
+
+
+struct HmlDescriptorSetUpdater {
+    VkDescriptorSet descriptorSet;
+
+    std::vector<VkDescriptorBufferInfo> bufferInfos;
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    std::vector<VkWriteDescriptorSet> descriptorWrites;
+
+
+    HmlDescriptorSetUpdater(VkDescriptorSet descriptorSet) : descriptorSet(descriptorSet) {}
+
+
+    HmlDescriptorSetUpdater& storageBufferAt(uint32_t binding, VkBuffer buffer, VkDeviceSize sizeBytes) {
+        bufferInfos.push_back(VkDescriptorBufferInfo{
+            .buffer = buffer,
+            .offset = 0,
+            .range = sizeBytes
+        });
+
+        descriptorWrites.push_back(VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = descriptorSet,
+            .dstBinding = binding,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pImageInfo       = nullptr,
+            .pBufferInfo      = &bufferInfos.back(),
+            .pTexelBufferView = nullptr
+        });
+
+        return *this;
+    }
+
+
+    HmlDescriptorSetUpdater& uniformBufferAt(uint32_t binding, VkBuffer buffer, VkDeviceSize sizeBytes) {
+        bufferInfos.push_back(VkDescriptorBufferInfo{
+            .buffer = buffer,
+            .offset = 0,
+            .range = sizeBytes
+        });
+
+        descriptorWrites.push_back(VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = descriptorSet,
+            .dstBinding = binding,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pImageInfo       = nullptr,
+            .pBufferInfo      = &bufferInfos.back(),
+            .pTexelBufferView = nullptr
+        });
+
+        return *this;
+    }
+
+
+    HmlDescriptorSetUpdater& textureAt(uint32_t binding, VkSampler textureSampler, VkImageView textureImageView) {
+        imageInfos.push_back(VkDescriptorImageInfo{
+            .sampler = textureSampler,
+            .imageView = textureImageView,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        });
+
+        descriptorWrites.push_back(VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = descriptorSet,
+            .dstBinding = binding,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo       = &imageInfos.back(),
+            .pBufferInfo      = nullptr,
+            .pTexelBufferView = nullptr
+        });
+
+        return *this;
+    }
+
+
+    HmlDescriptorSetUpdater& textureArrayAt(uint32_t binding, const std::vector<VkSampler>& textureSamplers, const std::vector<VkImageView>& textureImageViews) {
+        assert((textureSamplers.size() == textureImageViews.size()) && "::> Passed vector size while updating textures array do not match.");
+        const auto count = textureSamplers.size();
+
+        for (size_t i = 0; i < count; i++) {
+            imageInfos.push_back(VkDescriptorImageInfo{
+                .sampler = textureSamplers[i],
+                .imageView = textureImageViews[i],
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            });
+        }
+
+        descriptorWrites.push_back(VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = descriptorSet,
+            .dstBinding = binding,
+            .dstArrayElement = 0,
+            .descriptorCount = static_cast<uint32_t>(count),
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo       = &(*(imageInfos.cend() - count)), // TODO simplify??
+            .pBufferInfo      = nullptr,
+            .pTexelBufferView = nullptr
+        });
+
+        return *this;
+    }
+
+
+    void update(std::shared_ptr<HmlDevice> hmlDevice) const noexcept {
+        vkUpdateDescriptorSets(hmlDevice->device,
+            static_cast<uint32_t>(descriptorWrites.size()),
+            descriptorWrites.data(), 0, nullptr);
+    }
+};
+// ============================================================================
+// ============================================================================
+// ============================================================================
 struct HmlDescriptors {
     std::shared_ptr<HmlDevice> hmlDevice;
 

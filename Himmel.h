@@ -1,4 +1,4 @@
-#include <memory> // shaded_ptr
+#include <memory>
 #include <vector>
 #include <chrono>
 #include <optional>
@@ -17,7 +17,7 @@
 
 struct Himmel {
     // TODO rename
-    struct SimpleUniformBufferObject {
+    struct GeneralUbo {
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
     };
@@ -86,7 +86,7 @@ struct Himmel {
 
 
         for (size_t i = 0; i < hmlSwapchain->imagesCount(); i++) {
-            const auto size = sizeof(SimpleUniformBufferObject);
+            const auto size = sizeof(GeneralUbo);
             auto ubo = hmlResourceManager->createUniformBuffer(size);
             ubo->map();
             viewProjUniformBuffers.push_back(std::move(ubo));
@@ -110,8 +110,8 @@ struct Himmel {
         for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imagesCount(); imageIndex++) {
             const auto set = generalDescriptorSet_0_perImage[imageIndex];
             const auto buffer = viewProjUniformBuffers[imageIndex]->uniformBuffer;
-            const auto size = sizeof(SimpleUniformBufferObject);
-            HmlSetUpdater(set).uniformBufferAt(0, buffer, size).update(hmlDevice);
+            const auto size = sizeof(GeneralUbo);
+            HmlDescriptorSetUpdater(set).uniformBufferAt(0, buffer, size).update(hmlDevice);
         }
 
 
@@ -352,7 +352,7 @@ struct Himmel {
 
         // Once we know what image we work with...
 
-        SimpleUniformBufferObject ubo{
+        GeneralUbo ubo{
             .view = camera.view(),
             .proj = proj
         };
@@ -466,14 +466,6 @@ struct Himmel {
         // Because they have to be rerecorder, and for that they need to be reset first
         hmlCommands->resetCommandPool(hmlCommands->commandPoolGeneral);
 
-        // NOTE they are not freed, so don't reallocate
-        // commandBuffersDrawBegin = hmlCommands->allocate(hmlSwapchain->imagesCount(), hmlCommands->commandPoolGeneral);
-        // commandBuffersDrawEnd   = hmlCommands->allocate(hmlSwapchain->imagesCount(), hmlCommands->commandPoolGeneral);
-        // for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imagesCount(); imageIndex++) {
-        //     recordDrawBegin(commandBuffersDrawBegin[imageIndex], imageIndex);
-        //     recordDrawEnd  (commandBuffersDrawEnd  [imageIndex]);
-        // }
-
         // TODO foreach Renderer
         hmlRenderer->replaceSwapchain(hmlSwapchain);
         hmlSnowRenderer->replaceSwapchain(hmlSwapchain);
@@ -535,7 +527,4 @@ struct Himmel {
         proj[1][1] *= -1; // fix the inverted Y axis of GLM
         return proj;
     }
-    // ========================================================================
-    // ========================================================================
-    // ========================================================================
 };

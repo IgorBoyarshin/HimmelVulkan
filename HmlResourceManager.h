@@ -21,18 +21,19 @@
 struct HmlTextureResource {
     std::shared_ptr<HmlDevice> hmlDevice;
 
-    VkImage        textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView    textureImageView;
-    VkSampler      textureSampler;
+    VkImage        image;
+    VkDeviceMemory imageMemory;
+    VkImageView    imageView;
+    // TODO move sampler to Renderer and make it shared
+    VkSampler      sampler;
 
     ~HmlTextureResource() {
         std::cout << ":> Destroying HmlTextureResource.\n";
 
-        vkDestroySampler(hmlDevice->device, textureSampler, nullptr);
-        vkDestroyImageView(hmlDevice->device, textureImageView, nullptr);
-        vkDestroyImage(hmlDevice->device, textureImage, nullptr);
-        vkFreeMemory(hmlDevice->device, textureImageMemory, nullptr);
+        vkDestroySampler(hmlDevice->device, sampler, nullptr);
+        vkDestroyImageView(hmlDevice->device, imageView, nullptr);
+        vkDestroyImage(hmlDevice->device, image, nullptr);
+        vkFreeMemory(hmlDevice->device, imageMemory, nullptr);
     }
 };
 
@@ -50,14 +51,8 @@ struct HmlModelResource {
     VkBuffer       indexBuffer;
     VkDeviceMemory indexBufferMemory;
 
-    // TODO probably extract TextureResource
-    bool hasTexture = false;
-    // TODO in future will be multiple textures (for materials)
-    VkImage        textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView    textureImageView;
-    // TODO move sampler to Renderer and make it shared
-    VkSampler      textureSampler;
+
+    std::unique_ptr<HmlTextureResource> textureResource;
 
     HmlModelResource() : id(newId()) {}
 
@@ -68,13 +63,6 @@ struct HmlModelResource {
         vkFreeMemory(hmlDevice->device, indexBufferMemory, nullptr);
         vkDestroyBuffer(hmlDevice->device, vertexBuffer, nullptr);
         vkFreeMemory(hmlDevice->device, vertexBufferMemory, nullptr);
-
-        if (hasTexture) {
-            vkDestroySampler(hmlDevice->device, textureSampler, nullptr);
-            vkDestroyImageView(hmlDevice->device, textureImageView, nullptr);
-            vkDestroyImage(hmlDevice->device, textureImage, nullptr);
-            vkFreeMemory(hmlDevice->device, textureImageMemory, nullptr);
-        }
     }
 
     private:
@@ -194,9 +182,9 @@ struct HmlResourceManager {
     std::unique_ptr<HmlTextureResource> newTextureResource(const char* fileName, VkFilter filter) {
         auto textureResource = std::make_unique<HmlTextureResource>();
         textureResource->hmlDevice = hmlDevice;
-        createTextureImage(textureResource->textureImage, textureResource->textureImageMemory, fileName);
-        textureResource->textureImageView = createTextureImageView(textureResource->textureImage);
-        textureResource->textureSampler = createTextureSampler(filter, filter);
+        createTextureImage(textureResource->image, textureResource->imageMemory, fileName);
+        textureResource->imageView = createTextureImageView(textureResource->image);
+        textureResource->sampler = createTextureSampler(filter, filter);
         return textureResource;
     }
 
@@ -206,7 +194,7 @@ struct HmlResourceManager {
         auto model = std::make_shared<HmlModelResource>();
         model->hmlDevice = hmlDevice;
         model->indicesCount = indices.size();
-        model->hasTexture = false;
+        model->textureResource = { nullptr };
 
         createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
         createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);
@@ -221,14 +209,10 @@ struct HmlResourceManager {
         auto model = std::make_shared<HmlModelResource>();
         model->hmlDevice = hmlDevice;
         model->indicesCount = indices.size();
-        model->hasTexture = true;
+        model->textureResource = newTextureResource(textureFileName, filter);
 
         createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
         createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);
-
-        createTextureImage(model->textureImage, model->textureImageMemory, textureFileName);
-        model->textureImageView = createTextureImageView(model->textureImage);
-        model->textureSampler = createTextureSampler(filter, filter);
 
         models.push_back(model);
         return model;

@@ -6,6 +6,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 proj;
 } ubo;
 
+// XXX sync with Fragment shader
 layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 color;

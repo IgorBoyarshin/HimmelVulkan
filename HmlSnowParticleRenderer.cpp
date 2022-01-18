@@ -148,7 +148,7 @@ void HmlSnowParticleRenderer::createSnow(uint32_t count, const SnowBounds& bound
         snowInstances[i].position[0] = getRandomUniformFloat(snowBounds.xMin, snowBounds.xMax);
         snowInstances[i].position[1] = getRandomUniformFloat(snowBounds.yMin, snowBounds.yMax);
         snowInstances[i].position[2] = getRandomUniformFloat(snowBounds.zMin, snowBounds.zMax);
-        snowInstances[i].rotation = 0.0f; // TODO
+        snowInstances[i].angleRadians = getRandomUniformFloat(0.0f, 2.0f);
     }
 }
 
@@ -172,7 +172,7 @@ void HmlSnowParticleRenderer::updateForDt(float dt) noexcept {
     static const float rotationVelocity = 1.5f;
     for (size_t i = 0; i < snowVelocities.size(); i++) {
         snowInstances[i].position += dt * snowVelocities[i];
-        snowInstances[i].rotation += dt * rotationVelocity;
+        snowInstances[i].angleRadians += dt * rotationVelocity;
         bound(snowBounds, snowInstances[i].position);
     }
 }

@@ -4,6 +4,7 @@
 #define MAX_TEXTURES_COUNT 32
 layout(set = 1, binding = 0) uniform sampler2D texSamplers[MAX_TEXTURES_COUNT];
 
+// XXX sync with Vertex shader
 layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 color;

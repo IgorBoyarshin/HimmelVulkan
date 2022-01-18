@@ -56,7 +56,7 @@ struct HmlSnowParticleRenderer {
 
     struct SnowInstance {
         glm::vec3 position;
-        float rotation;
+        float angleRadians;
     };
     std::vector<SnowInstance> snowInstances;
     std::vector<glm::vec3> snowVelocities;

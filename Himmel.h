@@ -21,6 +21,8 @@ struct Himmel {
     struct GeneralUbo {
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
+        glm::vec3 globalLightDir;
+        float ambientStrength;
     };
 
     std::shared_ptr<HmlWindow> hmlWindow;

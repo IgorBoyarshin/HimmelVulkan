@@ -11,17 +11,17 @@ layout(push_constant) uniform PushConstants {
     int textureIndex;
 } push;
 
-layout(location = 0) in vec3 fragColor;
+layout(location = 0) in float inFragIllumIntensity;
 layout(location = 1) in vec2 fragTexCoord;
 
 layout(location = 0) out vec4 outColor;
 
 void main() {
     if (0 <= push.textureIndex) {
-        /* outColor = vec4(texture(texSamplers[push.textureIndex], fragTexCoord).rgb, 1.0); */
-        outColor = texture(texSamplers[push.textureIndex], fragTexCoord);
+        vec4 c = texture(texSamplers[push.textureIndex], fragTexCoord);
+        outColor = vec4(c.rgb * inFragIllumIntensity, c.a);
     } else {
-        outColor = vec4(fragColor, 1.0);
+        outColor = vec4(push.color.rgb * inFragIllumIntensity, 1.0);
     }
-    if (outColor.a < 0.1) discard;
+    // if (outColor.a < 0.1) discard;
 }

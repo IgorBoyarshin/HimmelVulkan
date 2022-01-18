@@ -26,17 +26,17 @@ std::vector<VkVertexInputAttributeDescription> HmlSimpleModel::Vertex::getAttrib
         .format = VK_FORMAT_R32G32B32_SFLOAT,
         .offset = offsetof(Vertex, pos)
     });
-    // attributeDescriptions.push_back(VkVertexInputAttributeDescription{
-    //     .location = 1, // as in shader
-    //     .binding = 0,
-    //     .format = VK_FORMAT_R32G32B32_SFLOAT,
-    //     .offset = offsetof(Vertex, color)
-    // });
     attributeDescriptions.push_back(VkVertexInputAttributeDescription{
         .location = 1, // as in shader
         .binding = 0,
         .format = VK_FORMAT_R32G32_SFLOAT,
         .offset = offsetof(Vertex, texCoord)
+    });
+    attributeDescriptions.push_back(VkVertexInputAttributeDescription{
+        .location = 2, // as in shader
+        .binding = 0,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex, normal)
     });
     // Formats:
     // float: VK_FORMAT_R32_SFLOAT
@@ -74,7 +74,12 @@ bool HmlSimpleModel::load(const char* objPath, std::vector<HmlSimpleModel::Verte
                 .texCoord = {
                     withTexture ? (       attrib.texcoords[2 * index.texcoord_index + 0]) : 0.0f,
                     withTexture ? (1.0f - attrib.texcoords[2 * index.texcoord_index + 1]) : 0.0f
-                }
+                },
+                .normal = {
+                    attrib.normals[3 * index.normal_index + 0],
+                    attrib.normals[3 * index.normal_index + 1],
+                    attrib.normals[3 * index.normal_index + 2]
+                },
             };
 
             if (uniqueVertices.count(vertex) == 0) {

@@ -4,7 +4,8 @@
 layout(set = 1, binding = 0) uniform sampler2D heightmap;
 layout(set = 1, binding = 1) uniform sampler2D grass;
 
-layout(location = 0) in vec2 inTexCoord;
+layout(location = 0) in vec2  inTexCoord;
+layout(location = 1) in float inFragIllumIntensity;
 layout(location = 0) out vec4 outColor;
 
 void main() {
@@ -12,4 +13,5 @@ void main() {
     float height = heightColor.r + 0.3;
     if (height > 1.0) height = 1.0;
     outColor = mix(texture(grass, inTexCoord), heightColor, height);
+    outColor.rgb *= inFragIllumIntensity;
 }

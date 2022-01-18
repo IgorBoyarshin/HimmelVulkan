@@ -62,8 +62,8 @@ bool Himmel::init() noexcept {
 
 
     const auto SIZE = 100.0f;
-    const auto HEIGHT = 25.0f;
-    const auto snowCount = 400000;
+    const auto HEIGHT = 25;
+    const auto snowCount = 40000;
     const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
         .xMin = -SIZE,
         .xMax = +SIZE,
@@ -99,23 +99,23 @@ bool Himmel::init() noexcept {
             std::vector<HmlSimpleModel::Vertex> vertices;
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {-0.5f, -0.5f, 0.0f},
-                // .color = {1.0f, 0.0f, 0.0f},
-                .texCoord = {1.0f, 0.0f}
+                .texCoord = {1.0f, 0.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
             });
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {0.5f, -0.5f, 0.0f},
-                // .color = {0.0f, 1.0f, 0.0f},
-                .texCoord = {0.0f, 0.0f}
+                .texCoord = {0.0f, 0.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
             });
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {0.5f, 0.5f, 0.0f},
-                // .color = {0.0f, 0.0f, 1.0f},
-                .texCoord = {0.0f, 1.0f}
+                .texCoord = {0.0f, 1.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
             });
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {-0.5f, 0.5f, 0.0f},
-                // .color = {1.0f, 1.0f, 1.0f},
-                .texCoord = {1.0f, 1.0f}
+                .texCoord = {1.0f, 1.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
             });
 
             std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
@@ -129,23 +129,23 @@ bool Himmel::init() noexcept {
             std::vector<HmlSimpleModel::Vertex> vertices;
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {-0.5f, -0.5f, 0.0f},
-                // .color = {1.0f, 0.0f, 0.0f},
-                .texCoord = {1.0f, 0.0f}
+                .texCoord = {1.0f, 0.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
             });
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {0.5f, -0.5f, 0.0f},
-                // .color = {0.0f, 1.0f, 0.0f},
-                .texCoord = {0.0f, 0.0f}
+                .texCoord = {0.0f, 0.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
             });
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {0.5f, 0.5f, 0.0f},
-                // .color = {0.0f, 0.0f, 1.0f},
-                .texCoord = {0.0f, 1.0f}
+                .texCoord = {0.0f, 1.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
             });
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {-0.5f, 0.5f, 0.0f},
-                // .color = {1.0f, 1.0f, 1.0f},
-                .texCoord = {1.0f, 1.0f}
+                .texCoord = {1.0f, 1.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
             });
 
             std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
@@ -183,7 +183,7 @@ bool Himmel::init() noexcept {
         entities.push_back(std::make_shared<HmlRenderer::Entity>(models[0], glm::vec3{ 0.0f, 1.0f, 0.0f }));
         entities.push_back(std::make_shared<HmlRenderer::Entity>(models[1]));
         entities.push_back(std::make_shared<HmlRenderer::Entity>(models[2]));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[3], glm::vec3{ 0.0f, 0.0f, 1.0f }));
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[3], glm::vec3{ 0.8f, 0.2f, 0.5f }));
 
         hmlRenderer->specifyEntitiesToRender(entities);
     }
@@ -223,7 +223,8 @@ void Himmel::update(float dt, float sinceStart) noexcept {
         const float dir = (index % 2) ? 1.0f : -1.0f;
         auto matrix = glm::mat4(1.0f);
         // matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        matrix = glm::translate(matrix, glm::vec3{0.0f, 15.0f, dir * index * 8.0f + 5.0f * glm::sin(sinceStart)});
+        // matrix = glm::translate(matrix, glm::vec3{0.0f, 15.0f, dir * index * 8.0f + 5.0f * glm::sin(sinceStart)});
+        matrix = glm::translate(matrix, glm::vec3{0.0f, 15.0f, dir * index * 8.0f});
         entity->modelMatrix = matrix;
 
         index++;
@@ -237,7 +238,7 @@ void Himmel::update(float dt, float sinceStart) noexcept {
         if (dx || dy) camera.rotateDir(-dy, dx);
     }
     {
-        constexpr float movementSpeed = 5.0f;
+        constexpr float movementSpeed = 15.0f;
         constexpr float boostUp = 8.0f;
         constexpr float boostDown = 0.2f;
         float length = movementSpeed * dt;
@@ -323,7 +324,9 @@ void Himmel::drawFrame() noexcept {
 
     GeneralUbo ubo{
         .view = camera.view(),
-        .proj = proj
+        .proj = proj,
+        .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
+        .ambientStrength = 0.1f,
     };
     viewProjUniformBuffers[imageIndex]->update(&ubo);
 

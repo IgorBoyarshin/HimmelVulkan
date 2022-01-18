@@ -5,7 +5,9 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec4 globalLightDir_ambientStrength;
+    float fogDensity;
 } ubo;
+const float fogGradient = 1.8;
 
 // XXX sync with Fragment shader
 layout(push_constant) uniform PushConstants {
@@ -17,6 +19,7 @@ layout(set = 1, binding = 0) uniform sampler2D heightmap;
 
 layout(location = 0) out vec2  outTexCoord;
 layout(location = 1) out float outFragIllumIntensity;
+layout(location = 2) out float outVisibility;
 
 const vec2 posOffsetFor[6] = vec2[](
     vec2(0, 0),
@@ -69,7 +72,10 @@ void main() {
     vec3 lightDir         = ubo.globalLightDir_ambientStrength.xyz;
     float diffuseStrength = max(dot(normal, -lightDir), 0.0);
 
-    gl_Position = ubo.proj * ubo.view * vec4(v0, 1.0);
+    vec4 cameraPosition = ubo.view * vec4(v0, 1.0);
+    gl_Position = ubo.proj * cameraPosition;
     outTexCoord = mapCoord0;
     outFragIllumIntensity = ambientStrength + diffuseStrength;
+    float dist = length(cameraPosition.xyz);
+    outVisibility = clamp(exp(-pow((dist * ubo.fogDensity), fogGradient)), 0.0, 1.0);
 }

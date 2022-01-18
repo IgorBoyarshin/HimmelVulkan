@@ -63,7 +63,7 @@ bool Himmel::init() noexcept {
 
     const auto SIZE = 100.0f;
     const auto HEIGHT = 25;
-    const auto snowCount = 40000;
+    const auto snowCount = 400000;
     const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
         .xMin = -SIZE,
         .xMax = +SIZE,
@@ -327,6 +327,7 @@ void Himmel::drawFrame() noexcept {
         .proj = proj,
         .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
         .ambientStrength = 0.1f,
+        .fogDensity = 0.015,
     };
     viewProjUniformBuffers[imageIndex]->update(&ubo);
 
@@ -408,7 +409,7 @@ void Himmel::recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex)
     // Used for VK_ATTACHMENT_LOAD_OP_CLEAR
     std::array<VkClearValue, 2> clearValues{};
     // The order (indexing) must be the same as in attachments!
-    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    clearValues[0].color = {{FOG_COLOR.x, FOG_COLOR.y, FOG_COLOR.z, FOG_COLOR.w}};
     clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
     renderPassInfo.pClearValues = clearValues.data();

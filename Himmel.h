@@ -23,6 +23,7 @@ struct Himmel {
         alignas(16) glm::mat4 proj;
         glm::vec3 globalLightDir;
         float ambientStrength;
+        float fogDensity;
     };
 
     std::shared_ptr<HmlWindow> hmlWindow;
@@ -41,6 +42,9 @@ struct Himmel {
 
 
     std::vector<VkCommandBuffer> commandBuffers;
+
+
+    const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
 
 
     // Sync objects

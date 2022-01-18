@@ -5,6 +5,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec4 globalLightDir_ambientStrength;
+    float fogDensity;
 } ubo;
 
 layout(std140, set = 2, binding = 0) readonly buffer SnowInstancesUniformBuffers {

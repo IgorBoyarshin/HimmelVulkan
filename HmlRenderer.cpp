@@ -177,7 +177,8 @@ VkCommandBuffer HmlRenderer::draw(uint32_t frameIndex, uint32_t imageIndex, VkDe
             // NOTE Yes, in theory having a textureIndex per Entity is redundant
             SimplePushConstant pushConstant{
                 .model = entity->modelMatrix,
-                .textureIndex = model->textureResource ? textureIndexFor[modelId] : NO_TEXTURE_MARK
+                .color = glm::vec4(entity->color, 1.0f),
+                .textureIndex = model->textureResource ? textureIndexFor[modelId] : NO_TEXTURE_MARK,
             };
             vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
                 hmlPipeline->pushConstantsStages, 0, sizeof(SimplePushConstant), &pushConstant);

@@ -18,7 +18,7 @@ layout(location = 1) flat out int  outTextureIndex;
 mat4 model(vec3 pos, float rotation) {
     /* mat4 res = mat4(1.0); */
     /* res[3] = vec4(pos, 1.0 + rotation); */
-    const float scale = 0.04;
+    const float scale = 0.03;
     /* const float scale = 1.0; */
     /* res[0][0] = scale; */
     /* res[1][1] = scale; */

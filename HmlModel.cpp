@@ -26,14 +26,14 @@ std::vector<VkVertexInputAttributeDescription> HmlSimpleModel::Vertex::getAttrib
         .format = VK_FORMAT_R32G32B32_SFLOAT,
         .offset = offsetof(Vertex, pos)
     });
+    // attributeDescriptions.push_back(VkVertexInputAttributeDescription{
+    //     .location = 1, // as in shader
+    //     .binding = 0,
+    //     .format = VK_FORMAT_R32G32B32_SFLOAT,
+    //     .offset = offsetof(Vertex, color)
+    // });
     attributeDescriptions.push_back(VkVertexInputAttributeDescription{
         .location = 1, // as in shader
-        .binding = 0,
-        .format = VK_FORMAT_R32G32B32_SFLOAT,
-        .offset = offsetof(Vertex, color)
-    });
-    attributeDescriptions.push_back(VkVertexInputAttributeDescription{
-        .location = 2, // as in shader
         .binding = 0,
         .format = VK_FORMAT_R32G32_SFLOAT,
         .offset = offsetof(Vertex, texCoord)
@@ -60,6 +60,7 @@ bool HmlSimpleModel::load(const char* objPath, std::vector<HmlSimpleModel::Verte
         return false;
     }
 
+    const bool withTexture = !attrib.texcoords.empty();
     std::unordered_map<HmlSimpleModel::Vertex, uint32_t> uniqueVertices{};
     for (const auto& shape : shapes) {
         for (const auto& index : shape.mesh.indices) {
@@ -69,10 +70,10 @@ bool HmlSimpleModel::load(const char* objPath, std::vector<HmlSimpleModel::Verte
                     attrib.vertices[3 * index.vertex_index + 1],
                     attrib.vertices[3 * index.vertex_index + 2]
                 },
-                .color = { 1.0f, 1.0f, 1.0f },
+                // .color = { 1.0f, 1.0f, 1.0f },
                 .texCoord = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+                    withTexture ? (       attrib.texcoords[2 * index.texcoord_index + 0]) : 0.0f,
+                    withTexture ? (1.0f - attrib.texcoords[2 * index.texcoord_index + 1]) : 0.0f
                 }
             };
 

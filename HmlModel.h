@@ -20,14 +20,14 @@
 struct HmlSimpleModel {
     struct Vertex {
         glm::vec3 pos;
-        glm::vec3 color;
         glm::vec2 texCoord;
 
         static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() noexcept;
         static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() noexcept;
 
         inline bool operator==(const Vertex& other) const noexcept {
-            return (pos == other.pos) && (color == other.color) && (texCoord == other.texCoord);
+            // return (pos == other.pos) && (color == other.color) && (texCoord == other.texCoord);
+            return (pos == other.pos) && (texCoord == other.texCoord);
         }
     };
 
@@ -39,8 +39,8 @@ struct HmlSimpleModel {
 template<> struct std::hash<HmlSimpleModel::Vertex> {
     inline size_t operator()(const HmlSimpleModel::Vertex& vertex) const {
         return ((hash<glm::vec3>()(vertex.pos) ^
-                (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
-                (hash<glm::vec2>()(vertex.texCoord) << 1);
+                (hash<glm::vec2>()(vertex.texCoord) << 1)) >> 1); // ^
+                // (hash<glm::vec2>()(vertex.texCoord) << 1);
     }
 };
 

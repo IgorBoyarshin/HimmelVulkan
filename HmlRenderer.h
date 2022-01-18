@@ -24,6 +24,7 @@
 struct HmlRenderer {
     struct SimplePushConstant {
         alignas(16) glm::mat4 model;
+        glm::vec4 color;
         int32_t textureIndex;
     };
 
@@ -34,10 +35,13 @@ struct HmlRenderer {
         std::shared_ptr<HmlModelResource> modelResource;
         // HmlResourceManager::HmlModelResource::Id modelId;
         glm::mat4 modelMatrix;
+        glm::vec3 color = { 1.0f, 1.0f, 1.0f };
 
 
         inline Entity(std::shared_ptr<HmlModelResource> modelResource)
             : modelResource(modelResource) {}
+        inline Entity(std::shared_ptr<HmlModelResource> modelResource, const glm::vec3& color)
+            : modelResource(modelResource), color(color) {}
         inline Entity(std::shared_ptr<HmlModelResource> modelResource, const glm::mat4& modelMatrix)
             : modelResource(modelResource), modelMatrix(modelMatrix) {}
     };

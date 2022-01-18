@@ -62,7 +62,9 @@ HmlWindow.o: HmlWindow.cpp HmlWindow.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 
-all: cleanExe $(mainFileName)
+all: $(mainFileName)
+
+# all: cleanExe $(mainFileName)
 
 
 run: all compileShaders

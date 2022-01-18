@@ -14,6 +14,9 @@
 struct HmlTextureResource {
     std::shared_ptr<HmlDevice> hmlDevice;
 
+    uint32_t width;
+    uint32_t height;
+
     VkImage        image;
     VkDeviceMemory imageMemory;
     VkImageView    imageView;
@@ -112,7 +115,8 @@ struct HmlResourceManager {
     void createIndexBufferThroughStaging(VkBuffer& indexBuffer,
             VkDeviceMemory& indexBufferMemory, const std::vector<uint32_t>& indices) noexcept;
     // ========================================================================
-    bool createTextureImage(VkImage& textureImage, VkDeviceMemory& textureImageMemory, const char* fileName) noexcept;
+    std::optional<std::pair<uint32_t, uint32_t>> createTextureImage(
+        VkImage& textureImage, VkDeviceMemory& textureImageMemory, const char* fileName) noexcept;
     VkImageView createTextureImageView(VkImage textureImage) noexcept;
     VkSampler createTextureSampler(VkFilter magFilter, VkFilter minFilter) noexcept;
     // ========================================================================

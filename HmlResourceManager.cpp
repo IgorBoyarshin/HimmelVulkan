@@ -131,7 +131,10 @@ std::unique_ptr<HmlStorageBuffer> HmlResourceManager::createStorageBuffer(VkDevi
 std::unique_ptr<HmlTextureResource> HmlResourceManager::newTextureResource(const char* fileName, VkFilter filter) noexcept {
     auto textureResource = std::make_unique<HmlTextureResource>();
     textureResource->hmlDevice = hmlDevice;
-    createTextureImage(textureResource->image, textureResource->imageMemory, fileName);
+    const auto dimOpt = createTextureImage(textureResource->image, textureResource->imageMemory, fileName);
+    if (!dimOpt) return { nullptr };
+    textureResource->width = dimOpt->first;
+    textureResource->height = dimOpt->second;
     textureResource->imageView = createTextureImageView(textureResource->image);
     textureResource->sampler = createTextureSampler(filter, filter);
     return textureResource;
@@ -266,7 +269,8 @@ void HmlResourceManager::createIndexBufferThroughStaging(VkBuffer& indexBuffer,
 // ========================================================================
 // ========================================================================
 // ========================================================================
-bool HmlResourceManager::createTextureImage(VkImage& textureImage, VkDeviceMemory& textureImageMemory, const char* fileName) noexcept {
+std::optional<std::pair<uint32_t, uint32_t>> HmlResourceManager::createTextureImage(
+        VkImage& textureImage, VkDeviceMemory& textureImageMemory, const char* fileName) noexcept {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(fileName, &texWidth, &texHeight, &texChannels,
         STBI_rgb_alpha); // will force alpha even if it is not present
@@ -274,7 +278,7 @@ bool HmlResourceManager::createTextureImage(VkImage& textureImage, VkDeviceMemor
 
     if (!pixels) {
         std::cerr << "::> Failed to load texture image using stb library.\n";
-        return false;
+        return std::nullopt;
     }
 
     VkBuffer stagingBuffer;
@@ -300,18 +304,18 @@ bool HmlResourceManager::createTextureImage(VkImage& textureImage, VkDeviceMemor
     if (!transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
         // UNDEFINED because that's what the image was created with.
         // Can do this because we don't care about the contents before the copy.
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) return false;
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) return std::nullopt;
 
     copyBufferToImage(stagingBuffer, textureImage,
         static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
 
     if (!transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) return false;
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) return std::nullopt;
 
     vkDestroyBuffer(hmlDevice->device, stagingBuffer, nullptr);
     vkFreeMemory(hmlDevice->device, stagingBufferMemory, nullptr);
 
-    return true;
+    return { { texWidth, texHeight } };
 }
 
 

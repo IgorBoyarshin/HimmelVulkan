@@ -46,6 +46,8 @@ struct HmlCommands {
     void beginRecordingPrimaryOnetime(VkCommandBuffer commandBuffer) noexcept;
     void beginRecordingSecondaryOnetime(VkCommandBuffer commandBuffer,
             const VkCommandBufferInheritanceInfo* inheritanceInfo) noexcept;
+    void beginRecordingSecondary(VkCommandBuffer commandBuffer,
+            const VkCommandBufferInheritanceInfo* inheritanceInfo) noexcept;
     void endRecording(VkCommandBuffer commandBuffer) noexcept;
     VkCommandBuffer beginSingleTimeCommands() noexcept;
     void endSingleTimeCommands(VkCommandBuffer commandBuffer) noexcept;

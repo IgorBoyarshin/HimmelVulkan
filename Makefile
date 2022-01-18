@@ -9,7 +9,7 @@ VULKAN_SDK_PATH_LAYER = /usr/share/vulkan/explicit_layer.d
 # The name of the main file and executable
 mainFileName = main
 # Files that have .h and .cpp versions
-classFiles = Himmel HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer
+classFiles = Himmel HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer HmlTerrainRenderer
 # Files that only have the .h version
 # justHeaderFiles =
 # Compilation flags
@@ -24,8 +24,10 @@ filesObj = $(addsuffix .o, $(mainFileName) $(classFiles))
 # filesH = $(addsuffix .h, $(classFiles) $(justHeaderFiles))
 
 
+main.o: main.cpp Himmel.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h
+Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h HmlTerrainRenderer.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 HmlCamera.o: HmlCamera.cpp HmlCamera.h
@@ -53,6 +55,9 @@ HmlResourceManager.o: HmlResourceManager.cpp HmlResourceManager.h HmlDevice.h Hm
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 HmlSnowParticleRenderer.o: HmlSnowParticleRenderer.cpp HmlSnowParticleRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlSwapchain.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlTerrainRenderer.o: HmlTerrainRenderer.cpp HmlTerrainRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlSwapchain.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 HmlSwapchain.o: HmlSwapchain.cpp HmlSwapchain.h HmlWindow.h HmlDevice.h HmlResourceManager.h
@@ -87,8 +92,25 @@ clean:
 cleanExe:
 	rm -f $(mainFileName)
 
-compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag
+# SPVS=$(wildcard shaders/out/*.spv)
+
+# shaders: $(SPVS)
+
+# %.spv: %
+# 	glslc $^ -o $@
+
+# shaders/out/simple.vert.spv: shaders/simple.vert
+# 	glslc $^ -o $@
+
+
+compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag shaders/terrain.vert shaders/terrain.frag
 	glslc shaders/simple.vert -o shaders/out/simple.vert.spv
 	glslc shaders/simple.frag -o shaders/out/simple.frag.spv
 	glslc shaders/snow.vert -o shaders/out/snow.vert.spv
 	glslc shaders/snow.frag -o shaders/out/snow.frag.spv
+	glslc shaders/terrain.vert -o shaders/out/terrain.vert.spv
+	glslc shaders/terrain.frag -o shaders/out/terrain.frag.spv
+
+
+# %.spv: %
+# glslc $^ -o $@

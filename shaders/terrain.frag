@@ -1,0 +1,15 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+layout(set = 1, binding = 0) uniform sampler2D heightmap;
+layout(set = 1, binding = 1) uniform sampler2D grass;
+
+layout(location = 0) in vec2 inTexCoord;
+layout(location = 0) out vec4 outColor;
+
+void main() {
+    vec4 heightColor = texture(heightmap, inTexCoord);
+    float height = heightColor.r + 0.3;
+    if (height > 1.0) height = 1.0;
+    outColor = mix(texture(grass, inTexCoord), heightColor, height);
+}

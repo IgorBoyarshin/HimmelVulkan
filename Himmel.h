@@ -12,6 +12,7 @@
 #include "HmlResourceManager.h"
 #include "HmlRenderer.h"
 #include "HmlSnowParticleRenderer.h"
+#include "HmlTerrainRenderer.h"
 #include "HmlModel.h"
 #include "HmlCamera.h"
 
@@ -29,6 +30,7 @@ struct Himmel {
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
     std::shared_ptr<HmlRenderer> hmlRenderer;
+    std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
     std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
 
     HmlCamera camera;

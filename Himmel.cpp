@@ -61,18 +61,32 @@ bool Himmel::init() noexcept {
     if (!hmlRenderer) return false;
 
 
-    const auto snowCount = 100000;
+    const auto SIZE = 100.0f;
+    const auto HEIGHT = 25.0f;
+    const auto snowCount = 400000;
     const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
-        .xMin = -30.0f,
-        .xMax = +30.0f,
-        .yMin = -30.0f,
-        .yMax = +30.0f,
-        .zMin = -30.0f,
-        .zMax = +30.0f
+        .xMin = -SIZE,
+        .xMax = +SIZE,
+        .yMin = 0.0f,
+        .yMax = +2.0f * HEIGHT,
+        .zMin = -SIZE,
+        .zMax = +SIZE
     };
     hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlWindow,
         hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlSnowRenderer) return false;
+
+
+    const auto terrainBounds = HmlTerrainRenderer::Bounds{
+        .posStart = glm::vec2(-SIZE, -SIZE),
+        .posFinish = glm::vec2(SIZE, SIZE),
+        .height = HEIGHT,
+        .yOffset = 0,
+    };
+    hmlTerrainRenderer = HmlTerrainRenderer::create("models/heightmap.png", "models/grass3.png",
+        terrainBounds, generalDescriptorSet_0_perImage, hmlWindow,
+        hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
+    if (!hmlTerrainRenderer) return false;
 
 
     camera = HmlCamera{{ 0.0f, 0.0f, 2.0f }};
@@ -169,7 +183,7 @@ bool Himmel::init() noexcept {
         entities.push_back(std::make_shared<HmlRenderer::Entity>(models[0], glm::vec3{ 0.0f, 1.0f, 0.0f }));
         entities.push_back(std::make_shared<HmlRenderer::Entity>(models[1]));
         entities.push_back(std::make_shared<HmlRenderer::Entity>(models[2]));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[3]));
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[3], glm::vec3{ 0.0f, 0.0f, 1.0f }));
 
         hmlRenderer->specifyEntitiesToRender(entities);
     }
@@ -204,12 +218,12 @@ void Himmel::run() noexcept {
 
 
 void Himmel::update(float dt, float sinceStart) noexcept {
-    int index = 1;
+    int index = 0;
     for (auto& entity : entities) {
         const float dir = (index % 2) ? 1.0f : -1.0f;
         auto matrix = glm::mat4(1.0f);
-        matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        matrix = glm::translate(matrix, glm::vec3{0.0f, 0.0f, -index * 10.0f + 5.0f * glm::sin(sinceStart)});
+        // matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        matrix = glm::translate(matrix, glm::vec3{0.0f, 15.0f, dir * index * 8.0f + 5.0f * glm::sin(sinceStart)});
         entity->modelMatrix = matrix;
 
         index++;
@@ -224,7 +238,7 @@ void Himmel::update(float dt, float sinceStart) noexcept {
     }
     {
         constexpr float movementSpeed = 5.0f;
-        constexpr float boostUp = 4.0f;
+        constexpr float boostUp = 8.0f;
         constexpr float boostDown = 0.2f;
         float length = movementSpeed * dt;
         if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
@@ -321,6 +335,7 @@ void Himmel::drawFrame() noexcept {
         recordDrawBegin(commandBuffers[imageIndex], imageIndex);
 
         std::vector<VkCommandBuffer> secondaryCommandBuffers;
+        secondaryCommandBuffers.push_back(hmlTerrainRenderer->draw(imageIndex));
         secondaryCommandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
         secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
         vkCmdExecuteCommands(commandBuffers[imageIndex], secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
@@ -426,8 +441,9 @@ void Himmel::recreateSwapchain() noexcept {
     // TODO foreach Renderer
     hmlRenderer->replaceSwapchain(hmlSwapchain);
     hmlSnowRenderer->replaceSwapchain(hmlSwapchain);
+    hmlTerrainRenderer->replaceSwapchain(hmlSwapchain);
     // TODO maybe store this as as flag inside the Renderer so that it knows automatically
-    // hmlRenderer->bakeCommandBuffers();
+    hmlTerrainRenderer->bake(generalDescriptorSet_0_perImage);
 
     proj = projFrom(hmlSwapchain->extentAspect());
 

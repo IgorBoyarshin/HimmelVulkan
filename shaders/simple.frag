@@ -14,6 +14,7 @@ layout(push_constant) uniform PushConstants {
 layout(location = 0) in float inFragIllumIntensity;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in float inVisibility;
+layout(location = 3) in vec4 inFogColor; // NOTE pass through UBO in future
 
 layout(location = 0) out vec4 outColor;
 
@@ -24,7 +25,6 @@ void main() {
     } else {
         outColor = vec4(push.color.rgb * inFragIllumIntensity, 1.0);
     }
-    const vec4 fogColor = vec4(0.7, 0.7, 0.7, 1.0); // XXX
-    outColor = mix(fogColor, outColor, inVisibility);
+    outColor = mix(inFogColor, outColor, inVisibility);
     // if (outColor.a < 0.1) discard;
 }

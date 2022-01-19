@@ -2,16 +2,15 @@
 
 
 void HmlCamera::rotateDir(float dPitch, float dYaw) noexcept {
-    static const float rotateSpeed = 0.05f;
     static const float MIN_PITCH = -89.0f;
     static const float MAX_PITCH = +89.0f;
     static const float YAW_PERIOD = 360.0f;
 
-    pitch += dPitch * rotateSpeed;
+    pitch += dPitch;
     if (pitch < MIN_PITCH) pitch = MIN_PITCH;
     if (pitch > MAX_PITCH) pitch = MAX_PITCH;
 
-    yaw += dYaw * rotateSpeed;
+    yaw += dYaw;
     while (yaw < 0.0f)       yaw += YAW_PERIOD;
     while (YAW_PERIOD <= yaw) yaw -= YAW_PERIOD;
 

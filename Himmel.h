@@ -23,8 +23,15 @@ struct Himmel {
         alignas(16) glm::mat4 proj;
         glm::vec3 globalLightDir;
         float ambientStrength;
+        glm::vec3 fogColor;
         float fogDensity;
     };
+
+    struct Weather {
+        glm::vec3 fogColor;
+        float fogDensity;
+    };
+    Weather weather;
 
     std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
@@ -70,7 +77,8 @@ struct Himmel {
 
     bool init() noexcept;
     void run() noexcept;
-    void update(float dt, float sinceStart) noexcept;
+    void updateForDt(float dt, float sinceStart) noexcept;
+    void updateForImage(uint32_t imageIndex) noexcept;
     void drawFrame() noexcept;
     void recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex) noexcept;
     void recordDrawEnd(VkCommandBuffer commandBuffer) noexcept;

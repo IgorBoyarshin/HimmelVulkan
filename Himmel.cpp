@@ -56,6 +56,12 @@ bool Himmel::init() noexcept {
     }
 
 
+    weather = Weather{
+        .fogColor = glm::vec3(0.8, 0.8, 0.8),
+        .fogDensity = 0.013,
+    };
+
+
     hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands,
         hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlRenderer) return false;
@@ -63,7 +69,7 @@ bool Himmel::init() noexcept {
 
     const auto SIZE = 100.0f;
     const auto HEIGHT = 25;
-    const auto snowCount = 400000;
+    const auto snowCount = 40000;
     const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
         .xMin = -SIZE,
         .xMax = +SIZE,
@@ -89,7 +95,8 @@ bool Himmel::init() noexcept {
     if (!hmlTerrainRenderer) return false;
 
 
-    camera = HmlCamera{{ 0.0f, 0.0f, 2.0f }};
+    camera = HmlCamera{{ 25.0f, 30.0f, 35.0f }};
+    camera.rotateDir(-15.0f, -40.0f);
     cursor = hmlWindow->getCursor();
     proj = projFrom(hmlSwapchain->extentAspect());
 
@@ -206,7 +213,7 @@ void Himmel::run() noexcept {
         const float deltaSeconds = static_cast<float>(sinceLast) / 1'000'000.0f;
         const float sinceStartSeconds = static_cast<float>(sinceStart) / 1'000'000.0f;
         mark = newMark;
-        update(deltaSeconds, sinceStartSeconds);
+        updateForDt(deltaSeconds, sinceStartSeconds);
 
         drawFrame();
 
@@ -217,7 +224,7 @@ void Himmel::run() noexcept {
 }
 
 
-void Himmel::update(float dt, float sinceStart) noexcept {
+void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     int index = 0;
     for (auto& entity : entities) {
         const float dir = (index % 2) ? 1.0f : -1.0f;
@@ -235,7 +242,8 @@ void Himmel::update(float dt, float sinceStart) noexcept {
         const int32_t dx = newCursor.first - cursor.first;
         const int32_t dy = newCursor.second - cursor.second;
         cursor = newCursor;
-        if (dx || dy) camera.rotateDir(-dy, dx);
+        const float rotateSpeed = 0.05f;
+        if (dx || dy) camera.rotateDir(-dy * rotateSpeed, dx * rotateSpeed);
     }
     {
         constexpr float movementSpeed = 15.0f;
@@ -270,6 +278,21 @@ void Himmel::update(float dt, float sinceStart) noexcept {
 
 
     hmlSnowRenderer->updateForDt(dt);
+}
+
+
+void Himmel::updateForImage(uint32_t imageIndex) noexcept {
+    GeneralUbo ubo{
+        .view = camera.view(),
+        .proj = proj,
+        .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
+        .ambientStrength = 0.1f,
+        .fogColor = weather.fogColor,
+        .fogDensity = weather.fogDensity,
+    };
+    viewProjUniformBuffers[imageIndex]->update(&ubo);
+
+    hmlSnowRenderer->updateForImage(imageIndex);
 }
 
 
@@ -322,17 +345,7 @@ void Himmel::drawFrame() noexcept {
 
     // Once we know what image we work with...
 
-    GeneralUbo ubo{
-        .view = camera.view(),
-        .proj = proj,
-        .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
-        .ambientStrength = 0.1f,
-        .fogDensity = 0.015,
-    };
-    viewProjUniformBuffers[imageIndex]->update(&ubo);
-
-    hmlSnowRenderer->updateForImage(imageIndex);
-
+    updateForImage(imageIndex);
 
     // NOTE Only this part depends on a Renderer (commandBuffers)
     {
@@ -409,7 +422,8 @@ void Himmel::recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex)
     // Used for VK_ATTACHMENT_LOAD_OP_CLEAR
     std::array<VkClearValue, 2> clearValues{};
     // The order (indexing) must be the same as in attachments!
-    clearValues[0].color = {{FOG_COLOR.x, FOG_COLOR.y, FOG_COLOR.z, FOG_COLOR.w}};
+    // NOTE will be removed in favor of skyboxes
+    clearValues[0].color = {{weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0}};
     clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
     renderPassInfo.pClearValues = clearValues.data();

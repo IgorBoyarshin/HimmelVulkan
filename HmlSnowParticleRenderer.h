@@ -6,6 +6,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <optional>
+#include <variant>
 #include <random>
 
 #include "HmlWindow.h"
@@ -34,6 +35,17 @@ struct HmlSnowParticleRenderer {
     }
 
 
+    static constexpr float SNOW_MODE_BOX = +1.0f;
+    static constexpr float SNOW_MODE_CAMERA = -1.0f;
+    struct PushConstant {
+        glm::vec3 halfSize;
+        float time;
+        glm::vec3 velocity;
+        float snowMode;
+    };
+    float sinceStart;
+
+
     std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
@@ -60,9 +72,10 @@ struct HmlSnowParticleRenderer {
     };
     std::vector<SnowInstance> snowInstances;
     std::vector<glm::vec3> snowVelocities;
+    // NOTE for the case when we use SnowCameraBounds, having multiple buffers is redundant
     std::vector<std::unique_ptr<HmlStorageBuffer>> snowInstancesStorageBuffers;
 
-    struct SnowBounds {
+    struct SnowBoxBounds {
         float xMin;
         float xMax;
         float yMin;
@@ -70,6 +83,8 @@ struct HmlSnowParticleRenderer {
         float zMin;
         float zMax;
     };
+    using SnowCameraBounds = glm::vec3;
+    using SnowBounds = std::variant<SnowBoxBounds, SnowCameraBounds>;
     SnowBounds snowBounds;
     std::vector<std::unique_ptr<HmlTextureResource>> snowTextureResources;
 
@@ -78,7 +93,7 @@ struct HmlSnowParticleRenderer {
             VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
     static std::unique_ptr<HmlSnowParticleRenderer> createSnowRenderer(
             uint32_t snowCount,
-            const SnowBounds& snowBounds,
+            const std::variant<SnowBoxBounds, SnowCameraBounds>& snowBounds,
             std::shared_ptr<HmlWindow> hmlWindow,
             std::shared_ptr<HmlDevice> hmlDevice,
             std::shared_ptr<HmlCommands> hmlCommands,
@@ -89,7 +104,7 @@ struct HmlSnowParticleRenderer {
             uint32_t framesInFlight) noexcept;
     ~HmlSnowParticleRenderer() noexcept;
     void createSnow(uint32_t count, const SnowBounds& bounds) noexcept;
-    void updateForDt(float dt) noexcept;
+    void updateForDt(float dt, float timeSinceStart) noexcept;
     void updateForImage(uint32_t imageIndex) noexcept;
     VkCommandBuffer draw(uint32_t frameIndex, uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept;
 

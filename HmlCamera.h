@@ -22,13 +22,16 @@ struct HmlCamera {
         return cachedView;
     }
 
+    inline glm::vec3 getPos() const noexcept {
+        return pos;
+    }
+
     void rotateDir(float dPitch, float dYaw) noexcept;
     void forward(float length) noexcept;
     void right(float length) noexcept;
     void lift(float length) noexcept;
 
     void printStats() const noexcept;
-
 
     private:
     glm::vec3 pos;

@@ -57,6 +57,8 @@ bool Himmel::init() noexcept {
 
 
     weather = Weather{
+        // .fogColor = glm::vec3(0.0, 0.0, 0.0),
+        // .fogDensity = -1.0,
         .fogColor = glm::vec3(0.8, 0.8, 0.8),
         .fogDensity = 0.013,
     };
@@ -68,16 +70,17 @@ bool Himmel::init() noexcept {
 
 
     const auto SIZE = 100.0f;
+    const auto snowCount = 400000;
     const auto HEIGHT = 25;
-    const auto snowCount = 40000;
-    const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
-        .xMin = -SIZE,
-        .xMax = +SIZE,
-        .yMin = 0.0f,
-        .yMax = +2.0f * HEIGHT,
-        .zMin = -SIZE,
-        .zMax = +SIZE
-    };
+    // const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
+    //     .xMin = -SIZE,
+    //     .xMax = +SIZE,
+    //     .yMin = 0.0f,
+    //     .yMax = +2.0f * HEIGHT,
+    //     .zMin = -SIZE,
+    //     .zMax = +SIZE
+    // };
+    const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ SIZE, SIZE, SIZE };
     hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlWindow,
         hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlSnowRenderer) return false;
@@ -214,11 +217,15 @@ void Himmel::run() noexcept {
         const float sinceStartSeconds = static_cast<float>(sinceStart) / 1'000'000.0f;
         mark = newMark;
         updateForDt(deltaSeconds, sinceStartSeconds);
+        // const auto mark1 = std::chrono::high_resolution_clock::now();
+        // const auto updateMs = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(mark1 - newMark).count()) / 1'000.0f;
 
         drawFrame();
 
         // const auto fps = 1.0 / deltaSeconds;
-        // std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]\n";
+        // std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]"
+        //     << " Update = " << updateMs << "ms"
+        //     << '\n';
     }
     vkDeviceWaitIdle(hmlDevice->device);
 }
@@ -285,7 +292,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     }
 
 
-    hmlSnowRenderer->updateForDt(dt);
+    hmlSnowRenderer->updateForDt(dt, sinceStart);
 }
 
 
@@ -297,6 +304,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         .ambientStrength = 0.1f,
         .fogColor = weather.fogColor,
         .fogDensity = weather.fogDensity,
+        .cameraPos = camera.getPos(),
     };
     viewProjUniformBuffers[imageIndex]->update(&ubo);
 

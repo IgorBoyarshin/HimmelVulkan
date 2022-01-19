@@ -25,6 +25,7 @@ struct Himmel {
         float ambientStrength;
         glm::vec3 fogColor;
         float fogDensity;
+        glm::vec3 cameraPos;
     };
 
     struct Weather {

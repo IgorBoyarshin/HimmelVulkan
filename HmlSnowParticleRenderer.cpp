@@ -17,8 +17,8 @@ std::unique_ptr<HmlPipeline> HmlSnowParticleRenderer::createSnowPipeline(std::sh
         .cullMode = VK_CULL_MODE_NONE,
         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
         .descriptorSetLayouts = descriptorSetLayouts,
-        .pushConstantsStages = 0,
-        .pushConstantsSizeBytes = 0
+        .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT,
+        .pushConstantsSizeBytes = sizeof(PushConstant)
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -53,6 +53,9 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
         const auto size = snowCount * 4 * sizeof(float);
         auto ssbo = hmlResourceManager->createStorageBuffer(size);
         ssbo->map();
+        if (std::holds_alternative<SnowCameraBounds>(snowBounds)) {
+            ssbo->update(hmlRenderer->snowInstances.data());
+        }
         hmlRenderer->snowInstancesStorageBuffers.push_back(std::move(ssbo));
     }
 
@@ -137,49 +140,68 @@ HmlSnowParticleRenderer::~HmlSnowParticleRenderer() noexcept {
 
 void HmlSnowParticleRenderer::createSnow(uint32_t count, const SnowBounds& bounds) noexcept {
     snowBounds = bounds;
+
     snowInstances.resize(count);
-    snowVelocities.resize(count);
 
-    for (size_t i = 0; i < snowVelocities.size(); i++) {
-        snowVelocities[i] = 0.4f * glm::vec3(0.5f, -2.0f, -0.1f);
-    }
+    if (std::holds_alternative<SnowBoxBounds>(snowBounds)) {
+        snowVelocities.resize(count);
 
-    for (size_t i = 0; i < snowInstances.size(); i++) {
-        snowInstances[i].position[0] = getRandomUniformFloat(snowBounds.xMin, snowBounds.xMax);
-        snowInstances[i].position[1] = getRandomUniformFloat(snowBounds.yMin, snowBounds.yMax);
-        snowInstances[i].position[2] = getRandomUniformFloat(snowBounds.zMin, snowBounds.zMax);
-        snowInstances[i].angleRadians = getRandomUniformFloat(0.0f, 2.0f);
+        for (size_t i = 0; i < snowVelocities.size(); i++) {
+            snowVelocities[i] = 0.4f * glm::vec3(0.5f, -2.0f, -0.1f);
+        }
+
+        const auto& bounds = std::get<SnowBoxBounds>(snowBounds);
+        for (size_t i = 0; i < snowInstances.size(); i++) {
+            snowInstances[i].position[0] = getRandomUniformFloat(bounds.xMin, bounds.xMax);
+            snowInstances[i].position[1] = getRandomUniformFloat(bounds.yMin, bounds.yMax);
+            snowInstances[i].position[2] = getRandomUniformFloat(bounds.zMin, bounds.zMax);
+            snowInstances[i].angleRadians = getRandomUniformFloat(0.0f, 6.28f);
+        }
+    } else { // SnowCameraBounds
+        for (size_t i = 0; i < snowInstances.size(); i++) {
+            snowInstances[i].position[0] = getRandomUniformFloat(-1.0f, 1.0f);
+            snowInstances[i].position[1] = getRandomUniformFloat(-1.0f, 1.0f);
+            snowInstances[i].position[2] = getRandomUniformFloat(-1.0f, 1.0f);
+            snowInstances[i].angleRadians = getRandomUniformFloat(0.0f, 6.28f);
+        }
     }
 }
 
 
-void HmlSnowParticleRenderer::updateForDt(float dt) noexcept {
-    static const auto bound = [](const SnowBounds& snowBounds, glm::vec3& pos) {
-        const auto xRange = snowBounds.xMax - snowBounds.xMin;
-        const auto yRange = snowBounds.yMax - snowBounds.yMin;
-        const auto zRange = snowBounds.zMax - snowBounds.zMin;
-        auto& x = pos[0];
-        auto& y = pos[1];
-        auto& z = pos[2];
-        if      (x < snowBounds.xMin) x += xRange;
-        else if (x > snowBounds.xMax) x -= xRange;
-        if      (y < snowBounds.yMin) y += yRange;
-        else if (y > snowBounds.yMax) y -= yRange;
-        if      (z < snowBounds.zMin) z += zRange;
-        else if (z > snowBounds.zMax) z -= zRange;
-    };
+void HmlSnowParticleRenderer::updateForDt(float dt, float timeSinceStart) noexcept {
+    if (std::holds_alternative<SnowBoxBounds>(snowBounds)) {
+        const auto& bounds = std::get<SnowBoxBounds>(snowBounds);
+        static const auto bound = [](const SnowBoxBounds& bounds, glm::vec3& pos) {
+            const auto xRange = bounds.xMax - bounds.xMin;
+            const auto yRange = bounds.yMax - bounds.yMin;
+            const auto zRange = bounds.zMax - bounds.zMin;
+            auto& x = pos[0];
+            auto& y = pos[1];
+            auto& z = pos[2];
+            if      (x < bounds.xMin) x += xRange;
+            else if (x > bounds.xMax) x -= xRange;
+            if      (y < bounds.yMin) y += yRange;
+            else if (y > bounds.yMax) y -= yRange;
+            if      (z < bounds.zMin) z += zRange;
+            else if (z > bounds.zMax) z -= zRange;
+        };
 
-    static const float rotationVelocity = 1.5f;
-    for (size_t i = 0; i < snowVelocities.size(); i++) {
-        snowInstances[i].position += dt * snowVelocities[i];
-        snowInstances[i].angleRadians += dt * rotationVelocity;
-        bound(snowBounds, snowInstances[i].position);
+        static const float rotationVelocity = 1.5f;
+        for (size_t i = 0; i < snowVelocities.size(); i++) {
+            snowInstances[i].position += dt * snowVelocities[i];
+            snowInstances[i].angleRadians += dt * rotationVelocity;
+            bound(bounds, snowInstances[i].position);
+        }
+    } else { // SnowCameraBounds
+        sinceStart = timeSinceStart;
     }
 }
 
 
 void HmlSnowParticleRenderer::updateForImage(uint32_t imageIndex) noexcept {
-    snowInstancesStorageBuffers[imageIndex]->update(snowInstances.data());
+    if (std::holds_alternative<SnowCameraBounds>(snowBounds)) {
+        snowInstancesStorageBuffers[imageIndex]->update(snowInstances.data());
+    }
 }
 
 
@@ -204,6 +226,20 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(uint32_t frameIndex, uint32_t imag
     };
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+    if (!std::holds_alternative<SnowCameraBounds>(snowBounds)) {
+        std::cerr << "::> Unsupported SnowBounds type in SnowRenderer.\n";
+        return VK_NULL_HANDLE;
+    }
+    PushConstant pushConstant{
+        .halfSize = std::get<SnowCameraBounds>(snowBounds),
+        .time = sinceStart,
+        .velocity = 0.4f * glm::vec3(0.5f, -2.0f, -0.1f), // TODO make interesting
+        .snowMode = SNOW_MODE_CAMERA,
+    };
+    vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
+        hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
+
 
     const uint32_t instanceCount = snowInstances.size();
     const uint32_t firstInstance = 0;

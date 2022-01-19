@@ -1,5 +1,5 @@
 shaders/out
-models/viking*
 libs
 main
 *.o
+models/

@@ -7,6 +7,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 proj;
     vec4 globalLightDir_ambientStrength;
     vec4 fogColor_density;
+    vec3 cameraPos;
 } ubo;
 const float fogGradient = 1.8;
 

@@ -60,3 +60,8 @@ glm::vec3 HmlCamera::calcDirForward() const noexcept {
 glm::vec3 HmlCamera::calcDirRight() const noexcept {
     return glm::normalize(glm::cross(calcDirForward(), dirUp));
 }
+
+
+void HmlCamera::printStats() const noexcept {
+    std::cout << "Camera: [" << pos.x << ";" << pos.y << ";" << pos.z << "] pitch=" << pitch << " yaw =" << yaw << "\n";
+}

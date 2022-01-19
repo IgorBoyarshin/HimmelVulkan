@@ -1,6 +1,8 @@
 #ifndef HML_CAMERA
 #define HML_CAMERA
 
+#include <iostream>
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -24,6 +26,8 @@ struct HmlCamera {
     void forward(float length) noexcept;
     void right(float length) noexcept;
     void lift(float length) noexcept;
+
+    void printStats() const noexcept;
 
 
     private:

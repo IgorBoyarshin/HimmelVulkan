@@ -274,6 +274,14 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         if (glfwGetKey(hmlWindow->window, GLFW_KEY_C) == GLFW_PRESS) {
             camera.lift(-length);
         }
+
+        static bool pPressed = false;
+        if (!pPressed && glfwGetKey(hmlWindow->window, GLFW_KEY_P) == GLFW_PRESS) {
+            pPressed = true;
+            camera.printStats();
+        } else if (pPressed && glfwGetKey(hmlWindow->window, GLFW_KEY_P) == GLFW_RELEASE) {
+            pPressed = false;
+        }
     }
 
 

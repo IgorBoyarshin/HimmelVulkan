@@ -18,7 +18,8 @@ std::unique_ptr<HmlPipeline> HmlSnowParticleRenderer::createSnowPipeline(std::sh
         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
         .descriptorSetLayouts = descriptorSetLayouts,
         .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT,
-        .pushConstantsSizeBytes = sizeof(PushConstant)
+        .pushConstantsSizeBytes = sizeof(PushConstant),
+        .tessellationPatchPoints = 0,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -231,8 +232,9 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(uint32_t frameIndex, uint32_t imag
         std::cerr << "::> Unsupported SnowBounds type in SnowRenderer.\n";
         return VK_NULL_HANDLE;
     }
+    const float half = std::get<SnowCameraBounds>(snowBounds);
     PushConstant pushConstant{
-        .halfSize = std::get<SnowCameraBounds>(snowBounds),
+        .halfSize = glm::vec3(half, half, half),
         .time = sinceStart,
         .velocity = 0.4f * glm::vec3(0.5f, -2.0f, -0.1f), // TODO make interesting
         .snowMode = SNOW_MODE_CAMERA,

@@ -41,7 +41,8 @@ bool Himmel::init() noexcept {
     if (!generalDescriptorPool) return false;
 
     generalDescriptorSetLayout = hmlDescriptors->buildDescriptorSetLayout()
-        .withUniformBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT)
+        .withUniformBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT
+                | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
         .build(hmlDevice);
     if (!generalDescriptorSetLayout) return false;
 
@@ -58,9 +59,9 @@ bool Himmel::init() noexcept {
 
     weather = Weather{
         // .fogColor = glm::vec3(0.0, 0.0, 0.0),
-        // .fogDensity = -1.0,
         .fogColor = glm::vec3(0.8, 0.8, 0.8),
-        .fogDensity = 0.013,
+        // .fogDensity = -1.0,
+        .fogDensity = 0.011,
     };
 
 
@@ -69,9 +70,10 @@ bool Himmel::init() noexcept {
     if (!hmlRenderer) return false;
 
 
-    const auto SIZE = 100.0f;
+    const auto SIZE_MAP = 250.0f;
+    const auto SIZE_SNOW = 70.0f;
     const auto snowCount = 400000;
-    const auto HEIGHT = 25;
+    const auto HEIGHT_MAP = 70.0f;
     // const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
     //     .xMin = -SIZE,
     //     .xMax = +SIZE,
@@ -80,19 +82,20 @@ bool Himmel::init() noexcept {
     //     .zMin = -SIZE,
     //     .zMax = +SIZE
     // };
-    const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ SIZE, SIZE, SIZE };
+    const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ SIZE_SNOW };
     hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlWindow,
         hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlSnowRenderer) return false;
 
 
     const auto terrainBounds = HmlTerrainRenderer::Bounds{
-        .posStart = glm::vec2(-SIZE, -SIZE),
-        .posFinish = glm::vec2(SIZE, SIZE),
-        .height = HEIGHT,
-        .yOffset = 0,
+        .posStart = glm::vec2(-SIZE_MAP, -SIZE_MAP),
+        .posFinish = glm::vec2(SIZE_MAP, SIZE_MAP),
+        .height = HEIGHT_MAP,
+        .yOffset = 0.0f,
     };
-    hmlTerrainRenderer = HmlTerrainRenderer::create("models/heightmap.png", "models/grass3.png",
+    const uint32_t granularity = 3;
+    hmlTerrainRenderer = HmlTerrainRenderer::create("models/heightmap.png", granularity, "models/grass3.png",
         terrainBounds, generalDescriptorSet_0_perImage, hmlWindow,
         hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlTerrainRenderer) return false;
@@ -253,8 +256,8 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         if (dx || dy) camera.rotateDir(-dy * rotateSpeed, dx * rotateSpeed);
     }
     {
-        constexpr float movementSpeed = 15.0f;
-        constexpr float boostUp = 8.0f;
+        constexpr float movementSpeed = 16.0f;
+        constexpr float boostUp = 10.0f;
         constexpr float boostDown = 0.2f;
         float length = movementSpeed * dt;
         if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
@@ -293,6 +296,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 
     hmlSnowRenderer->updateForDt(dt, sinceStart);
+    hmlTerrainRenderer->update(camera.getPos());
 }
 
 
@@ -368,7 +372,7 @@ void Himmel::drawFrame() noexcept {
         recordDrawBegin(commandBuffers[imageIndex], imageIndex);
 
         std::vector<VkCommandBuffer> secondaryCommandBuffers;
-        secondaryCommandBuffers.push_back(hmlTerrainRenderer->draw(imageIndex));
+        secondaryCommandBuffers.push_back(hmlTerrainRenderer->draw(imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
         secondaryCommandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
         secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
         vkCmdExecuteCommands(commandBuffers[imageIndex], secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
@@ -477,7 +481,7 @@ void Himmel::recreateSwapchain() noexcept {
     hmlSnowRenderer->replaceSwapchain(hmlSwapchain);
     hmlTerrainRenderer->replaceSwapchain(hmlSwapchain);
     // TODO maybe store this as as flag inside the Renderer so that it knows automatically
-    hmlTerrainRenderer->bake(generalDescriptorSet_0_perImage);
+    // hmlTerrainRenderer->bake(generalDescriptorSet_0_perImage);
 
     proj = projFrom(hmlSwapchain->extentAspect());
 

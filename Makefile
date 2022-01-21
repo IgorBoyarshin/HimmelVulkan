@@ -103,13 +103,15 @@ cleanExe:
 # 	glslc $^ -o $@
 
 
-compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag shaders/terrain.vert shaders/terrain.frag
+compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag shaders/terrain.vert shaders/terrain.frag shaders/terrain.tesc shaders/terrain.tese
 	glslc shaders/simple.vert -o shaders/out/simple.vert.spv
 	glslc shaders/simple.frag -o shaders/out/simple.frag.spv
 	glslc shaders/snow.vert -o shaders/out/snow.vert.spv
 	glslc shaders/snow.frag -o shaders/out/snow.frag.spv
 	glslc shaders/terrain.vert -o shaders/out/terrain.vert.spv
 	glslc shaders/terrain.frag -o shaders/out/terrain.frag.spv
+	glslc shaders/terrain.tesc -o shaders/out/terrain.tesc.spv
+	glslc shaders/terrain.tese -o shaders/out/terrain.tese.spv
 
 
 # %.spv: %

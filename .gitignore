@@ -3,3 +3,4 @@ libs
 main
 *.o
 models/
+*.bckp

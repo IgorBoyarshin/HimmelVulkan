@@ -18,6 +18,18 @@ std::optional<std::pair<std::vector<VkShaderModule>, std::vector<VkPipelineShade
             shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_FRAGMENT_BIT, shaderModule));
         } else return std::nullopt;
     }
+    if (hmlShaders.tessellationControl) {
+        if (auto shaderModule = createShaderModule(readFile(hmlShaders.tessellationControl)); shaderModule) {
+            shaderModules.push_back(shaderModule);
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, shaderModule));
+        } else return std::nullopt;
+    }
+    if (hmlShaders.tessellationEvaluation) {
+        if (auto shaderModule = createShaderModule(readFile(hmlShaders.tessellationEvaluation)); shaderModule) {
+            shaderModules.push_back(shaderModule);
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, shaderModule));
+        } else return std::nullopt;
+    }
 
     return { std::make_pair(shaderModules, shaderStages) };
 }
@@ -205,23 +217,34 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
         }
         const auto& [shaderModules, shaderStages] = *shadersCreated;
 
-        VkGraphicsPipelineCreateInfo pipelineInfo = {};
-        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        pipelineInfo.stageCount = shaderStages.size();
-        pipelineInfo.pStages = shaderStages.data();
-        pipelineInfo.pVertexInputState = &vertexInputInfo;
-        pipelineInfo.pInputAssemblyState = &inputAssembly;
-        pipelineInfo.pViewportState = &viewportState;
-        pipelineInfo.pRasterizationState = &rasterizer;
-        pipelineInfo.pMultisampleState = &multisampling;
-        pipelineInfo.pDepthStencilState = &depthStencil;
-        pipelineInfo.pColorBlendState = &colorBlending;
-        pipelineInfo.pDynamicState = nullptr; // Optional
-        pipelineInfo.layout = hmlPipeline->layout;
-        pipelineInfo.renderPass = hmlPipelineConfig.renderPass;
-        pipelineInfo.subpass = 0;
-        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-        pipelineInfo.basePipelineIndex = -1; // Optional
+        const auto tessellation = VkPipelineTessellationStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+            .pNext = VK_NULL_HANDLE,
+            .flags = 0,
+            .patchControlPoints = hmlPipelineConfig.tessellationPatchPoints,
+        };
+
+        const auto pipelineInfo = VkGraphicsPipelineCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = VK_NULL_HANDLE,
+            .flags = 0,
+            .stageCount = static_cast<uint32_t>(shaderStages.size()),
+            .pStages = shaderStages.data(),
+            .pVertexInputState = &vertexInputInfo,
+            .pInputAssemblyState = &inputAssembly,
+            .pTessellationState = (hmlPipelineConfig.tessellationPatchPoints > 0) ? &tessellation : VK_NULL_HANDLE,
+            .pViewportState = &viewportState,
+            .pRasterizationState = &rasterizer,
+            .pMultisampleState = &multisampling,
+            .pDepthStencilState = &depthStencil,
+            .pColorBlendState = &colorBlending,
+            .pDynamicState = nullptr, // Optional
+            .layout = hmlPipeline->layout,
+            .renderPass = hmlPipelineConfig.renderPass,
+            .subpass = 0,
+            .basePipelineHandle = VK_NULL_HANDLE, // Optional
+            .basePipelineIndex = -1, // Optional
+        };
         if (vkCreateGraphicsPipelines(hmlDevice->device, VK_NULL_HANDLE, 1, &pipelineInfo,
                     nullptr, &(hmlPipeline->pipeline)) != VK_SUCCESS) {
             std::cerr << "::> Failed to create Pipeline.\n";

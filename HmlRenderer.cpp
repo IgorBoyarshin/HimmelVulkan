@@ -18,7 +18,8 @@ std::unique_ptr<HmlPipeline> HmlRenderer::createSimplePipeline(std::shared_ptr<H
         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
         .descriptorSetLayouts = descriptorSetLayouts,
         .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pushConstantsSizeBytes = sizeof(SimplePushConstant)
+        .pushConstantsSizeBytes = sizeof(SimplePushConstant),
+        .tessellationPatchPoints = 0,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));

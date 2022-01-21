@@ -83,7 +83,7 @@ struct HmlSnowParticleRenderer {
         float zMin;
         float zMax;
     };
-    using SnowCameraBounds = glm::vec3;
+    using SnowCameraBounds = float;
     using SnowBounds = std::variant<SnowBoxBounds, SnowCameraBounds>;
     SnowBounds snowBounds;
     std::vector<std::unique_ptr<HmlTextureResource>> snowTextureResources;

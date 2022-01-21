@@ -19,19 +19,73 @@
 
 
 struct HmlTerrainRenderer {
+    const uint32_t MAX_PATCHES = 1 + 1*4 + 4*4 + 4*4*4 + 4*4*4*4; // TODO make constexpr func
+    struct Patch {
+        Patch* leftUp    = nullptr;
+        Patch* rightUp   = nullptr;
+        Patch* leftDown  = nullptr;
+        Patch* rightDown = nullptr;
+
+        inline bool isParent() const noexcept { return leftUp != nullptr; }
+        inline bool isTerminal() const noexcept { return leftUp == nullptr; }
+        // inline Patch() noexcept {}
+        inline Patch(const glm::vec2& center, const glm::vec2& size,
+                const glm::vec2& texCoordStart, const glm::vec2& texCoordStep, int level, int tessPower) noexcept
+            : center(center), size(size), texCoordStart(texCoordStart), texCoordStep(texCoordStep), level(level), tessPower(tessPower) {}
+
+        glm::vec2 center;
+        glm::vec2 size;
+        glm::vec2 texCoordStart;
+        glm::vec2 texCoordStep;
+        int level; // 0 for root
+        int tessPower;
+        int tessPowerUp = 0;
+        int tessPowerDown = 0;
+        int tessPowerLeft = 0;
+        int tessPowerRight = 0;
+    };
+
+    struct SubTerrain {
+        glm::vec2 center;
+        glm::vec2 size;
+        glm::vec2 texCoordStart;
+        glm::vec2 texCoordStep;
+        std::vector<Patch> patches;
+        inline SubTerrain(const glm::vec2& center, const glm::vec2& size,
+                const glm::vec2& texCoordStart, const glm::vec2& texCoordStep) noexcept
+            : center(center), size(size), texCoordStart(texCoordStart), texCoordStep(texCoordStep) {}
+    };
+    std::vector<SubTerrain> subTerrains;
+    uint32_t granularity;
+
+    void doAll(Patch& patch) const noexcept;
+    int findUpFor(const Patch& patch) const noexcept;
+    int findDownFor(const Patch& patch) const noexcept;
+    int findLeftFor(const Patch& patch) const noexcept;
+    int findRightFor(const Patch& patch) const noexcept;
+    void propagateUpFor(Patch& patch, int tessPower) const noexcept;
+    void propagateDownFor(Patch& patch, int tessPower) const noexcept;
+    void propagateLeftFor(Patch& patch, int tessPower) const noexcept;
+    void propagateRightFor(Patch& patch, int tessPower) const noexcept;
+
     struct PushConstant {
-        glm::vec4 posStartFinish;
-        uint32_t dimX;
-        uint32_t dimY;
-        uint32_t dimZ;
-        uint32_t offsetY;
+        glm::vec2 center;
+        glm::vec2 size;
+        glm::vec2 texCoordStart;
+        glm::vec2 texCoordStep;
+        float tessLevelLeft;
+        float tessLevelDown;
+        float tessLevelRight;
+        float tessLevelUp;
+        float offsetY;
+        float maxHeight;
     };
 
     struct Bounds {
         glm::vec2 posStart;
         glm::vec2 posFinish;
-        uint32_t height;
-        uint32_t yOffset;
+        float height;
+        float yOffset;
     };
     Bounds bounds;
 
@@ -59,6 +113,7 @@ struct HmlTerrainRenderer {
             VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
     static std::unique_ptr<HmlTerrainRenderer> create(
             const char* heightmapFilename,
+            uint32_t granularity,
             const char* grassFilename,
             const Bounds& bounds,
             const std::vector<VkDescriptorSet>& descriptorSet_0_perImage,
@@ -71,8 +126,10 @@ struct HmlTerrainRenderer {
             VkDescriptorSetLayout viewProjDescriptorSetLayout,
             uint32_t framesInFlight) noexcept;
     ~HmlTerrainRenderer() noexcept;
-    void bake(const std::vector<VkDescriptorSet>& descriptorSet_0_perImage) noexcept;
-    VkCommandBuffer draw(uint32_t imageIndex) noexcept;
+    // void bake(const std::vector<VkDescriptorSet>& descriptorSet_0_perImage) noexcept;
+    void constructTree(SubTerrain& subTerrain, const glm::vec3& cameraPos) const noexcept;
+    void update(const glm::vec3& cameraPos) noexcept;
+    VkCommandBuffer draw(uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept;
 
     // TODO in order for each type of Renderer to properly replace its pipeline,
     // store a member in Renderer which specifies its type, and recreate the pipeline

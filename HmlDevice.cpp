@@ -423,7 +423,9 @@ VkDevice HmlDevice::createLogicalDevice(VkPhysicalDevice physicalDevice,
 
     // To be filled using PhysicalFeatures
     VkPhysicalDeviceFeatures deviceFeatures = {};
+    deviceFeatures.fillModeNonSolid = VK_TRUE;
     deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.tessellationShader = VK_TRUE;
 
     // VkDevice itself
     VkDeviceCreateInfo createInfo = {};

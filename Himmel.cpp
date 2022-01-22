@@ -42,7 +42,7 @@ bool Himmel::init() noexcept {
 
     generalDescriptorSetLayout = hmlDescriptors->buildDescriptorSetLayout()
         .withUniformBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT
-                | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+                | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT | VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
         .build(hmlDevice);
     if (!generalDescriptorSetLayout) return false;
 
@@ -60,8 +60,8 @@ bool Himmel::init() noexcept {
     weather = Weather{
         // .fogColor = glm::vec3(0.0, 0.0, 0.0),
         .fogColor = glm::vec3(0.8, 0.8, 0.8),
-        // .fogDensity = -1.0,
-        .fogDensity = 0.011,
+        .fogDensity = -1.0,
+        // .fogDensity = 0.011,
     };
 
 
@@ -94,8 +94,8 @@ bool Himmel::init() noexcept {
         .height = HEIGHT_MAP,
         .yOffset = 0.0f,
     };
-    const uint32_t granularity = 3;
-    hmlTerrainRenderer = HmlTerrainRenderer::create("models/heightmap.png", granularity, "models/grass3.png",
+    const uint32_t granularity = 4;
+    hmlTerrainRenderer = HmlTerrainRenderer::create("models/heightmap.png", granularity, "models/grass-small.png",
         terrainBounds, generalDescriptorSet_0_perImage, hmlWindow,
         hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlTerrainRenderer) return false;
@@ -223,7 +223,7 @@ void Himmel::run() noexcept {
         // const auto mark1 = std::chrono::high_resolution_clock::now();
         // const auto updateMs = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(mark1 - newMark).count()) / 1'000.0f;
 
-        drawFrame();
+        if (!drawFrame()) return;
 
         // const auto fps = 1.0 / deltaSeconds;
         // std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]"
@@ -321,7 +321,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
  * or already being rendered; but not finished rendering yet!
  * So, its commandBuffer has been submitted, but has not finished yet.
  * */
-void Himmel::drawFrame() noexcept {
+bool Himmel::drawFrame() noexcept {
     static uint32_t currentFrame = 0;
 
     // Wait for next-in-order frame to become rendered (for its commandBuffer
@@ -344,10 +344,10 @@ void Himmel::drawFrame() noexcept {
                 imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
             result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapchain();
-        return;
+        return true;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         std::cerr << "::> Failed to acquire swap chain image.\n";
-        return;
+        return false;
     }
 
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) [[likely]] {
@@ -397,7 +397,7 @@ void Himmel::drawFrame() noexcept {
         // The specified fence will get signaled when the command buffer finishes executing.
         if (vkQueueSubmit(hmlDevice->graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             std::cerr << "::> Failed to submit draw command buffer.\n";
-            return;
+            return false;
         }
     }
 
@@ -421,11 +421,12 @@ void Himmel::drawFrame() noexcept {
             recreateSwapchain();
         } else if (result != VK_SUCCESS) {
             std::cerr << "::> Failed to present swapchain image.\n";
-            return;
+            return false;
         }
     }
 
     currentFrame = (currentFrame + 1) % maxFramesInFlight;
+    return true;
 }
 
 

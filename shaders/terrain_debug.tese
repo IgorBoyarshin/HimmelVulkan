@@ -30,10 +30,7 @@ layout(set = 1, binding = 0) uniform sampler2D heightmap;
 layout(location = 0) in vec2  inTexCoord[];
 layout(location = 1) in float inSegments[];
 
-layout(location = 0) out vec2  outTexCoord;
-layout(location = 1) out float outFragIllumIntensity;
-layout(location = 2) out float outVisibility;
-/* layout(location = 2) out vec3  outNormal; */
+layout(location = 0) out vec3 outNormal;
 
 void main() {
     vec2 t = mix(
@@ -57,20 +54,6 @@ void main() {
     float hU = texture(heightmap, t + d.yx).r;
     vec3 normal = normalize(vec3(hL - hR, 16.0 * unit, hD - hU));
 
-    vec4 cameraPosition = ubo.view * v0;
-    gl_Position = ubo.proj * cameraPosition;
-
-    float ambientStrength = ubo.globalLightDir_ambientStrength.w;
-    vec3 lightDir         = ubo.globalLightDir_ambientStrength.xyz;
-    float diffuseStrength = max(dot(normal, -lightDir), 0.0);
-    outFragIllumIntensity = ambientStrength + diffuseStrength;
-
-    outTexCoord = t;
-    float fogDensity = ubo.fogColor_density.w;
-    if (fogDensity > 0) {
-        float dist = length(cameraPosition.xyz);
-        outVisibility = clamp(exp(-pow((dist * fogDensity), fogGradient)), 0.0, 1.0);
-    } else {
-        outVisibility = 1.0;
-    }
+    gl_Position = v0;
+    outNormal = normal;
 }

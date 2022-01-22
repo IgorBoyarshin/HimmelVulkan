@@ -103,7 +103,7 @@ cleanExe:
 # 	glslc $^ -o $@
 
 
-compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag shaders/terrain.vert shaders/terrain.frag shaders/terrain.tesc shaders/terrain.tese
+compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag shaders/terrain.vert shaders/terrain.frag shaders/terrain.tesc shaders/terrain.tese shaders/terrain_debug.geom shaders/terrain_debug.frag shaders/terrain_debug.tese
 	glslc shaders/simple.vert -o shaders/out/simple.vert.spv
 	glslc shaders/simple.frag -o shaders/out/simple.frag.spv
 	glslc shaders/snow.vert -o shaders/out/snow.vert.spv
@@ -112,6 +112,9 @@ compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shader
 	glslc shaders/terrain.frag -o shaders/out/terrain.frag.spv
 	glslc shaders/terrain.tesc -o shaders/out/terrain.tesc.spv
 	glslc shaders/terrain.tese -o shaders/out/terrain.tese.spv
+	glslc shaders/terrain_debug.geom -o shaders/out/terrain_debug.geom.spv
+	glslc shaders/terrain_debug.frag -o shaders/out/terrain_debug.frag.spv
+	glslc shaders/terrain_debug.tese -o shaders/out/terrain_debug.tese.spv
 
 
 # %.spv: %

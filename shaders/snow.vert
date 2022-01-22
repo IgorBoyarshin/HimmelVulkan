@@ -1,5 +1,4 @@
 #version 450
-#extension GL_ARB_separate_shader_objects : enable
 
 // XXX Sync across all shaders
 layout(set = 0, binding = 0) uniform UniformBufferObject {
@@ -81,6 +80,8 @@ void main() {
     outTextureIndex = gl_InstanceIndex % TEXTURES_COUNT;
     outTexCoord = texCoordFor[gl_VertexIndex];
     outAmbient = max(abs(sin(rotation)), ambientStrength);
+    /* float s = smoothstep(ubo.cameraPos.y - 1.0f, ubo.cameraPos.y + 3.0, position.y); */
+    /* outAmbient = 1.0 - s * (1.0 - ambientStrength); */
 
     vec4 centerInCameraSpace = ubo.view * vec4(position, 1.0);
 

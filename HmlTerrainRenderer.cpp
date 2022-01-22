@@ -23,10 +23,41 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
         .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
         .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 4,
+        .lineWidth = 1.0f,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
 }
+
+
+// std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipelineDebug(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
+//         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
+//     HmlGraphicsPipelineConfig config{
+//         .bindingDescriptions   = {},
+//         .attributeDescriptions = {},
+//         .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
+//         .hmlShaders = HmlShaders()
+//             .addVertex("shaders/out/terrain.vert.spv")
+//             .addTessellationControl("shaders/out/terrain.tesc.spv")
+//             .addTessellationEvaluation("shaders/out/terrain_debug.tese.spv")
+//             .addGeometry("shaders/out/terrain_debug.geom.spv")
+//             .addFragment("shaders/out/terrain_debug.frag.spv"),
+//         .renderPass = renderPass,
+//         .swapchainExtent = extent,
+//         // .polygoneMode = VK_POLYGON_MODE_LINE,
+//         .polygoneMode = VK_POLYGON_MODE_FILL, // NOTE does not matter, we output a line strip
+//         // .cullMode = VK_CULL_MODE_BACK_BIT,
+//         .cullMode = VK_CULL_MODE_NONE,
+//         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+//         .descriptorSetLayouts = descriptorSetLayouts,
+//         .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+//         .pushConstantsSizeBytes = sizeof(PushConstant),
+//         .tessellationPatchPoints = 4,
+//         .lineWidth = 2.0f,
+//     };
+//
+//     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
+// }
 
 
 std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
@@ -97,6 +128,9 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
     hmlRenderer->hmlPipeline = createPipeline(hmlDevice,
         hmlSwapchain->extent, hmlSwapchain->renderPass, hmlRenderer->descriptorSetLayouts);
     if (!hmlRenderer->hmlPipeline) return { nullptr };
+    // hmlRenderer->hmlPipelineDebug = createPipelineDebug(hmlDevice,
+    //     hmlSwapchain->extent, hmlSwapchain->renderPass, hmlRenderer->descriptorSetLayouts);
+    // if (!hmlRenderer->hmlPipelineDebug) return { nullptr };
 
 
     hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames);
@@ -365,39 +399,76 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
     };
     hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
+    {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
-    std::array<VkDescriptorSet, 2> descriptorSets = {
-        descriptorSet_0, descriptorSet_heightmap_1
-    };
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+        std::array<VkDescriptorSet, 2> descriptorSets = {
+            descriptorSet_0, descriptorSet_heightmap_1
+        };
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-    for (const auto& subTerrain : subTerrains) {
-        for (const auto& patch : subTerrain.patches) {
-            if (patch.isParent()) continue;
-            PushConstant pushConstant{
-                .center = patch.center,
-                .size = patch.size,
-                .texCoordStart = patch.texCoordStart,
-                .texCoordStep = patch.texCoordStep,
-                .tessLevelLeft  = static_cast<float>(1 << (patch.tessPowerLeft  ? patch.tessPowerLeft  : patch.tessPower)),
-                .tessLevelDown  = static_cast<float>(1 << (patch.tessPowerDown  ? patch.tessPowerDown  : patch.tessPower)),
-                .tessLevelRight = static_cast<float>(1 << (patch.tessPowerRight ? patch.tessPowerRight : patch.tessPower)),
-                .tessLevelUp    = static_cast<float>(1 << (patch.tessPowerUp    ? patch.tessPowerUp    : patch.tessPower)),
-                .offsetY = bounds.yOffset,
-                .maxHeight = bounds.height,
-            };
-            vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
-                hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
+        for (const auto& subTerrain : subTerrains) {
+            for (const auto& patch : subTerrain.patches) {
+                if (patch.isParent()) continue;
+                PushConstant pushConstant{
+                    .center = patch.center,
+                        .size = patch.size,
+                        .texCoordStart = patch.texCoordStart,
+                        .texCoordStep = patch.texCoordStep,
+                        .tessLevelLeft  = static_cast<float>(1 << (patch.tessPowerLeft  ? patch.tessPowerLeft  : patch.tessPower)),
+                        .tessLevelDown  = static_cast<float>(1 << (patch.tessPowerDown  ? patch.tessPowerDown  : patch.tessPower)),
+                        .tessLevelRight = static_cast<float>(1 << (patch.tessPowerRight ? patch.tessPowerRight : patch.tessPower)),
+                        .tessLevelUp    = static_cast<float>(1 << (patch.tessPowerUp    ? patch.tessPowerUp    : patch.tessPower)),
+                        .offsetY = bounds.yOffset,
+                        .maxHeight = bounds.height,
+                };
+                vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
+                        hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
 
-            const uint32_t instanceCount = 1;
-            const uint32_t firstInstance = 0;
-            const uint32_t vertexCount = 4; // a simple square
-            const uint32_t firstVertex = 0;
-            vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+                const uint32_t instanceCount = 1;
+                const uint32_t firstInstance = 0;
+                const uint32_t vertexCount = 4; // a simple square
+                const uint32_t firstVertex = 0;
+                vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+            }
         }
     }
+    // {
+    //     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipelineDebug->pipeline);
+    //
+    //     std::array<VkDescriptorSet, 2> descriptorSets = {
+    //         descriptorSet_0, descriptorSet_heightmap_1
+    //     };
+    //     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    //             hmlPipelineDebug->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+    //
+    //     for (const auto& subTerrain : subTerrains) {
+    //         for (const auto& patch : subTerrain.patches) {
+    //             if (patch.isParent()) continue;
+    //             PushConstant pushConstant{
+    //                 .center = patch.center,
+    //                     .size = patch.size,
+    //                     .texCoordStart = patch.texCoordStart,
+    //                     .texCoordStep = patch.texCoordStep,
+    //                     .tessLevelLeft  = static_cast<float>(1 << (patch.tessPowerLeft  ? patch.tessPowerLeft  : patch.tessPower)),
+    //                     .tessLevelDown  = static_cast<float>(1 << (patch.tessPowerDown  ? patch.tessPowerDown  : patch.tessPower)),
+    //                     .tessLevelRight = static_cast<float>(1 << (patch.tessPowerRight ? patch.tessPowerRight : patch.tessPower)),
+    //                     .tessLevelUp    = static_cast<float>(1 << (patch.tessPowerUp    ? patch.tessPowerUp    : patch.tessPower)),
+    //                     .offsetY = bounds.yOffset,
+    //                     .maxHeight = bounds.height,
+    //             };
+    //             vkCmdPushConstants(commandBuffer, hmlPipelineDebug->layout,
+    //                     hmlPipelineDebug->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
+    //
+    //             const uint32_t instanceCount = 1;
+    //             const uint32_t firstInstance = 0;
+    //             const uint32_t vertexCount = 4; // a simple square
+    //             const uint32_t firstVertex = 0;
+    //             vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+    //         }
+    //     }
+    // }
 
     hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
@@ -410,6 +481,7 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
 void HmlTerrainRenderer::replaceSwapchain(std::shared_ptr<HmlSwapchain> newHmlSwapChain) noexcept {
     hmlSwapchain = newHmlSwapChain;
     hmlPipeline = createPipeline(hmlDevice, hmlSwapchain->extent, hmlSwapchain->renderPass, descriptorSetLayouts);
+    // hmlPipelineDebug = createPipelineDebug(hmlDevice, hmlSwapchain->extent, hmlSwapchain->renderPass, descriptorSetLayouts);
     // NOTE The command pool is reset for all renderers prior to calling this function.
     // NOTE commandBuffers must be rerecorded -- is done during baking
 }

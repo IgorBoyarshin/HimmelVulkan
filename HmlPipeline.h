@@ -11,20 +11,15 @@
 
 
 struct HmlShaders {
-    const char* vertex;
-    const char* fragment;
-    const char* tessellationControl;
-    const char* tessellationEvaluation;
-    // const char* geometry;
+    const char* vertex                 = nullptr;
+    const char* fragment               = nullptr;
+    const char* tessellationControl    = nullptr;
+    const char* tessellationEvaluation = nullptr;
+    const char* geometry               = nullptr;
     // const char* compute;
 
     inline HmlShaders& addVertex(const char* fileNameSpv) noexcept {
         vertex = fileNameSpv;
-        return *this;
-    }
-
-    inline HmlShaders& addFragment(const char* fileNameSpv) noexcept {
-        fragment = fileNameSpv;
         return *this;
     }
 
@@ -35,6 +30,16 @@ struct HmlShaders {
 
     inline HmlShaders& addTessellationEvaluation(const char* fileNameSpv) noexcept {
         tessellationEvaluation = fileNameSpv;
+        return *this;
+    }
+
+    inline HmlShaders& addGeometry(const char* fileNameSpv) noexcept {
+        geometry = fileNameSpv;
+        return *this;
+    }
+
+    inline HmlShaders& addFragment(const char* fileNameSpv) noexcept {
+        fragment = fileNameSpv;
         return *this;
     }
 };
@@ -65,6 +70,7 @@ struct HmlGraphicsPipelineConfig {
 
     // TODO Later will probably be an optional
     uint32_t tessellationPatchPoints;
+    float lineWidth;
 };
 
 

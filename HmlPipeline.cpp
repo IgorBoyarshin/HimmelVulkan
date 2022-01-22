@@ -12,12 +12,6 @@ std::optional<std::pair<std::vector<VkShaderModule>, std::vector<VkPipelineShade
             shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_VERTEX_BIT, shaderModule));
         } else return std::nullopt;
     }
-    if (hmlShaders.fragment) {
-        if (auto shaderModule = createShaderModule(readFile(hmlShaders.fragment)); shaderModule) {
-            shaderModules.push_back(shaderModule);
-            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_FRAGMENT_BIT, shaderModule));
-        } else return std::nullopt;
-    }
     if (hmlShaders.tessellationControl) {
         if (auto shaderModule = createShaderModule(readFile(hmlShaders.tessellationControl)); shaderModule) {
             shaderModules.push_back(shaderModule);
@@ -28,6 +22,18 @@ std::optional<std::pair<std::vector<VkShaderModule>, std::vector<VkPipelineShade
         if (auto shaderModule = createShaderModule(readFile(hmlShaders.tessellationEvaluation)); shaderModule) {
             shaderModules.push_back(shaderModule);
             shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, shaderModule));
+        } else return std::nullopt;
+    }
+    if (hmlShaders.geometry) {
+        if (auto shaderModule = createShaderModule(readFile(hmlShaders.geometry)); shaderModule) {
+            shaderModules.push_back(shaderModule);
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_GEOMETRY_BIT, shaderModule));
+        } else return std::nullopt;
+    }
+    if (hmlShaders.fragment) {
+        if (auto shaderModule = createShaderModule(readFile(hmlShaders.fragment)); shaderModule) {
+            shaderModules.push_back(shaderModule);
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_FRAGMENT_BIT, shaderModule));
         } else return std::nullopt;
     }
 
@@ -101,8 +107,8 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
     // VK_TRUE => basically disables any output to the framebuffer
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = hmlPipelineConfig.polygoneMode;
-    // Thicker than 1.0 requires wideLines GPU feature
-    rasterizer.lineWidth = 1.0f;
+    // NOTE Thicker than 1.0 requires wideLines GPU feature
+    rasterizer.lineWidth = hmlPipelineConfig.lineWidth;
     rasterizer.cullMode = hmlPipelineConfig.cullMode;
     rasterizer.frontFace = hmlPipelineConfig.frontFace;
     rasterizer.depthBiasEnable = VK_FALSE;

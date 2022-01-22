@@ -1,5 +1,4 @@
 #version 450
-#extension GL_ARB_separate_shader_objects : enable
 
 #define TEXTURES_COUNT 2
 layout(set = 1, binding = 0) uniform sampler2D texSamplers[TEXTURES_COUNT];

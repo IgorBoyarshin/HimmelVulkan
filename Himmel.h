@@ -80,7 +80,7 @@ struct Himmel {
     void run() noexcept;
     void updateForDt(float dt, float sinceStart) noexcept;
     void updateForImage(uint32_t imageIndex) noexcept;
-    void drawFrame() noexcept;
+    bool drawFrame() noexcept;
     void recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex) noexcept;
     void recordDrawEnd(VkCommandBuffer commandBuffer) noexcept;
     void recreateSwapchain() noexcept;

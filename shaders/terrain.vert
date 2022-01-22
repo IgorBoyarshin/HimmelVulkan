@@ -1,5 +1,4 @@
 #version 450
-#extension GL_ARB_separate_shader_objects : enable
 
 // XXX Sync across all shaders
 layout(set = 0, binding = 0) uniform UniformBufferObject {

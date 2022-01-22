@@ -20,6 +20,7 @@ std::unique_ptr<HmlPipeline> HmlSnowParticleRenderer::createSnowPipeline(std::sh
         .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT,
         .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 0,
+        .lineWidth = 1.0f,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -236,7 +237,7 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(uint32_t frameIndex, uint32_t imag
     PushConstant pushConstant{
         .halfSize = glm::vec3(half, half, half),
         .time = sinceStart,
-        .velocity = 0.4f * glm::vec3(0.5f, -2.0f, -0.1f), // TODO make interesting
+        .velocity = 0.7f * glm::vec3(0.6f, -2.0f, -0.2f), // TODO make interesting
         .snowMode = SNOW_MODE_CAMERA,
     };
     vkCmdPushConstants(commandBuffer, hmlPipeline->layout,

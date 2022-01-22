@@ -96,6 +96,7 @@ struct HmlTerrainRenderer {
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
     std::unique_ptr<HmlPipeline> hmlPipeline;
+    // std::unique_ptr<HmlPipeline> hmlPipelineDebug;
 
     VkDescriptorPool descriptorPool;
     VkDescriptorSet              descriptorSet_heightmap_1;
@@ -111,6 +112,8 @@ struct HmlTerrainRenderer {
 
     static std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
             VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
+    // static std::unique_ptr<HmlPipeline> createPipelineDebug(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
+    //         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
     static std::unique_ptr<HmlTerrainRenderer> create(
             const char* heightmapFilename,
             uint32_t granularity,

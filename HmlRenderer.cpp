@@ -105,6 +105,11 @@ void HmlRenderer::specifyEntitiesToRender(const std::vector<std::shared_ptr<Enti
         entitiesToRenderForModel[id].push_back(entity);
     }
 
+    if (nextFreeTextureIndex == 0) {
+        std::cerr << "::> No Entity with a texture has been specified.\n";
+        exit(-1);
+    }
+
     updateDescriptorSetTextures();
 }
 

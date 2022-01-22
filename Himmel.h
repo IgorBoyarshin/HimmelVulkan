@@ -28,6 +28,20 @@ struct Himmel {
         glm::vec3 cameraPos;
     };
 
+    struct PointLight {
+        glm::vec3 color;
+        float intensity;
+        glm::vec3 position;
+        float reserved;
+    };
+    std::vector<PointLight> pointLights;
+
+    static const uint32_t MAX_POINT_LIGHTS = 32;
+    struct LightUbo {
+        PointLight pointLights[MAX_POINT_LIGHTS];
+        uint32_t count;
+    };
+
     struct Weather {
         glm::vec3 fogColor;
         float fogDensity;
@@ -63,6 +77,9 @@ struct Himmel {
     std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
     std::vector<std::unique_ptr<HmlUniformBuffer>> viewProjUniformBuffers;
+
+    // NOTE if they are static, we can share a single UBO
+    std::vector<std::unique_ptr<HmlUniformBuffer>> lightUniformBuffers;
 
 
     VkDescriptorPool generalDescriptorPool;

@@ -4,14 +4,28 @@
 layout(quads, equal_spacing, cw) in;
 
 // XXX Sync across all shaders
-layout(set = 0, binding = 0) uniform UniformBufferObject {
+layout(set = 0, binding = 0) uniform GeneralUbo {
     mat4 view;
     mat4 proj;
     vec4 globalLightDir_ambientStrength;
     vec4 fogColor_density;
     vec3 cameraPos;
-} ubo;
+} uboGeneral;
 const float fogGradient = 2.0;
+
+struct PointLight {
+    vec3 color;
+    float intensity;
+    vec3 position;
+    float reserved;
+};
+
+// XXX Sync across all shaders
+const uint MAX_POINT_LIGHTS = 32;
+layout(set = 0, binding = 1) uniform LightsUbo {
+    PointLight pointLights[MAX_POINT_LIGHTS];
+    uint count;
+} uboLights;
 
 // XXX Sync with other shaders
 // Per patch
@@ -31,8 +45,9 @@ layout(location = 0) in vec2  inTexCoord[];
 layout(location = 1) in float inSegments[];
 
 layout(location = 0) out vec2  outTexCoord;
-layout(location = 1) out float outFragIllumIntensity;
-layout(location = 2) out float outVisibility;
+/* layout(location = 1) out float outFragIllumIntensity; */
+layout(location = 1) out float outVisibility;
+layout(location = 2) out vec3 outFragColor;
 /* layout(location = 2) out vec3  outNormal; */
 
 void main() {
@@ -57,16 +72,30 @@ void main() {
     float hU = texture(heightmap, t + d.yx).r;
     vec3 normal = normalize(vec3(hL - hR, 16.0 * unit, hD - hU));
 
-    vec4 cameraPosition = ubo.view * v0;
-    gl_Position = ubo.proj * cameraPosition;
+    vec4 cameraPosition = uboGeneral.view * v0;
+    gl_Position = uboGeneral.proj * cameraPosition;
 
-    float ambientStrength = ubo.globalLightDir_ambientStrength.w;
-    vec3 lightDir         = ubo.globalLightDir_ambientStrength.xyz;
-    float diffuseStrength = max(dot(normal, -lightDir), 0.0);
-    outFragIllumIntensity = ambientStrength + diffuseStrength;
+    float ambientStrength = uboGeneral.globalLightDir_ambientStrength.w;
+    vec3 globalLightDir = uboGeneral.globalLightDir_ambientStrength.xyz;
+    vec3 total = ambientStrength * vec3(1.0, 1.0, 1.0); // sun ??
+    const float DIRECT_INTENSITY = 0.5;
+    float globalDiffuseStrength = max(dot(normal, -globalLightDir), 0.0);
+    total += DIRECT_INTENSITY * globalDiffuseStrength * vec3(1.0, 1.0, 1.0); // sun ??
+    for (uint i = 0; i < uboLights.count; i++) {
+        float intensity = uboLights.pointLights[i].intensity;
+        vec3 position   = uboLights.pointLights[i].position;
+        vec3 color      = uboLights.pointLights[i].color;
+        vec3 lightDir = v0.xyz - position;
+        float dist2 = pow(length(lightDir), 2);
+        float diffuseStrength = max(dot(normal, -normalize(lightDir)), 0.0);
+        intensity /= dist2;
+        intensity *= diffuseStrength;
+        total += intensity * color;
+    }
+    outFragColor = total;
 
     outTexCoord = t;
-    float fogDensity = ubo.fogColor_density.w;
+    float fogDensity = uboGeneral.fogColor_density.w;
     if (fogDensity > 0) {
         float dist = length(cameraPosition.xyz);
         outVisibility = clamp(exp(-pow((dist * fogDensity), fogGradient)), 0.0, 1.0);

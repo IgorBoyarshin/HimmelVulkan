@@ -32,17 +32,33 @@ bool Himmel::init() noexcept {
         ubo->map();
         viewProjUniformBuffers.push_back(std::move(ubo));
     }
+    for (size_t i = 0; i < hmlSwapchain->imageCount(); i++) {
+        const auto size = sizeof(LightUbo);
+        auto ubo = hmlResourceManager->createUniformBuffer(size);
+        ubo->map();
+        lightUniformBuffers.push_back(std::move(ubo));
+    }
 
 
     generalDescriptorPool = hmlDescriptors->buildDescriptorPool()
-        .withUniformBuffers(hmlSwapchain->imageCount())
-        .maxSets(hmlSwapchain->imageCount())
+        .withUniformBuffers(hmlSwapchain->imageCount() + hmlSwapchain->imageCount()) // GeneralUbo + LightUbo
+        .maxSets(hmlSwapchain->imageCount()) // they are in the same set
         .build(hmlDevice);
     if (!generalDescriptorPool) return false;
 
     generalDescriptorSetLayout = hmlDescriptors->buildDescriptorSetLayout()
-        .withUniformBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT
-                | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT | VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+        .withUniformBufferAt(0,
+            VK_SHADER_STAGE_VERTEX_BIT |
+            VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT |
+            VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT |
+            VK_SHADER_STAGE_GEOMETRY_BIT |
+            VK_SHADER_STAGE_FRAGMENT_BIT
+        )
+        .withUniformBufferAt(1,
+            VK_SHADER_STAGE_VERTEX_BIT |
+            VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT |
+            VK_SHADER_STAGE_FRAGMENT_BIT
+        )
         .build(hmlDevice);
     if (!generalDescriptorSetLayout) return false;
 
@@ -51,17 +67,29 @@ bool Himmel::init() noexcept {
     if (generalDescriptorSet_0_perImage.empty()) return false;
     for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imageCount(); imageIndex++) {
         const auto set = generalDescriptorSet_0_perImage[imageIndex];
-        const auto buffer = viewProjUniformBuffers[imageIndex]->uniformBuffer;
-        const auto size = sizeof(GeneralUbo);
-        HmlDescriptorSetUpdater(set).uniformBufferAt(0, buffer, size).update(hmlDevice);
+        // TODO
+        // TODO
+        // TODO Why does not work in bulk and have to do by one??
+        // TODO
+        // TODO
+        {
+            const auto buffer = viewProjUniformBuffers[imageIndex]->uniformBuffer;
+            const auto size = sizeof(GeneralUbo);
+            HmlDescriptorSetUpdater(set).uniformBufferAt(0, buffer, size).update(hmlDevice);
+        }
+        {
+            const auto buffer = lightUniformBuffers[imageIndex]->uniformBuffer;
+            const auto size = sizeof(LightUbo);
+            HmlDescriptorSetUpdater(set).uniformBufferAt(1, buffer, size).update(hmlDevice);
+        }
     }
 
 
     weather = Weather{
         // .fogColor = glm::vec3(0.0, 0.0, 0.0),
         .fogColor = glm::vec3(0.8, 0.8, 0.8),
-        .fogDensity = -1.0,
-        // .fogDensity = 0.011,
+        // .fogDensity = -1.0,
+        .fogDensity = 0.011,
     };
 
 
@@ -101,6 +129,30 @@ bool Himmel::init() noexcept {
     if (!hmlTerrainRenderer) return false;
 
 
+    // Add lights
+    {
+        const float unit = 40.0f;
+        pointLights.push_back(PointLight{
+            .color = glm::vec3(1.0, 0.0, 0.0),
+            .intensity = 5000.0f,
+            .position = glm::vec3(0.0, unit, 0.0),
+            .reserved = 0.0f,
+        });
+        pointLights.push_back(PointLight{
+            .color = glm::vec3(0.0, 1.0, 0.0),
+            .intensity = 3000.0f,
+            .position = glm::vec3(3*unit, unit, 0.0),
+            .reserved = 0.0f,
+        });
+        pointLights.push_back(PointLight{
+            .color = glm::vec3(0.0, 0.0, 1.0),
+            .intensity = 3800.0f,
+            .position = glm::vec3(-2*unit, unit, -3*unit),
+            .reserved = 0.0f,
+        });
+    }
+
+
     camera = HmlCamera{{ 25.0f, 30.0f, 35.0f }};
     camera.rotateDir(-15.0f, -40.0f);
     cursor = hmlWindow->getCursor();
@@ -108,35 +160,35 @@ bool Himmel::init() noexcept {
 
 
     {
-        {
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, -0.5f, 0.0f},
-                .texCoord = {1.0f, 0.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, -0.5f, 0.0f},
-                .texCoord = {0.0f, 0.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, 0.5f, 0.0f},
-                .texCoord = {0.0f, 1.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, 0.5f, 0.0f},
-                .texCoord = {1.0f, 1.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-
-            std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
-            models.push_back(model);
-        }
+        // {
+        //     std::vector<HmlSimpleModel::Vertex> vertices;
+        //     vertices.push_back(HmlSimpleModel::Vertex{
+        //         .pos = {-0.5f, -0.5f, 0.0f},
+        //         .texCoord = {1.0f, 0.0f},
+        //         .normal = {0.0f, 0.0f, 1.0f},
+        //     });
+        //     vertices.push_back(HmlSimpleModel::Vertex{
+        //         .pos = {0.5f, -0.5f, 0.0f},
+        //         .texCoord = {0.0f, 0.0f},
+        //         .normal = {0.0f, 0.0f, 1.0f},
+        //     });
+        //     vertices.push_back(HmlSimpleModel::Vertex{
+        //         .pos = {0.5f, 0.5f, 0.0f},
+        //         .texCoord = {0.0f, 1.0f},
+        //         .normal = {0.0f, 0.0f, 1.0f},
+        //     });
+        //     vertices.push_back(HmlSimpleModel::Vertex{
+        //         .pos = {-0.5f, 0.5f, 0.0f},
+        //         .texCoord = {1.0f, 1.0f},
+        //         .normal = {0.0f, 0.0f, 1.0f},
+        //     });
+        //
+        //     std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
+        //
+        //     const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        //     const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+        //     models.push_back(model);
+        // }
 
         {
             std::vector<HmlSimpleModel::Vertex> vertices;
@@ -174,7 +226,8 @@ bool Himmel::init() noexcept {
             if (!HmlSimpleModel::load("models/viking_room.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "models/viking_room.png", VK_FILTER_LINEAR);
+            // const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "models/viking_room.png", VK_FILTER_LINEAR);
+            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
             models.push_back(model);
         }
 
@@ -188,15 +241,32 @@ bool Himmel::init() noexcept {
             models.push_back(model);
         }
 
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[3], glm::vec3{ 0.8f, 0.2f, 0.5f }));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[0], glm::vec3{ 1.0f, 0.0f, 0.0f }));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[2]));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[1]));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[3], glm::vec3{ 0.1f, 0.8f, 0.5f }));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[0], glm::vec3{ 0.0f, 1.0f, 0.0f }));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[1]));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[2]));
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(models[3], glm::vec3{ 0.8f, 0.2f, 0.5f }));
+        const auto& phonyModel = models[0];
+        const auto& vikingModel = models[1];
+        const auto& planeModel = models[2];
+
+
+        // Add Entities
+
+        // PHONY with a texture
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, -50.0f, 0.0f});
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.1f, 0.8f, 0.5f }));
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 25.0f, 30.0f});
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.8f, 0.2f, 0.5f }));
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 60.0f});
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.2f, 0.2f, 0.9f }));
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 25.0f, 90.0f});
+
+        for (const auto& pointLight : pointLights) {
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
+            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), pointLight.position);
+            entities.back()->color = pointLight.color;
+        }
+
 
         hmlRenderer->specifyEntitiesToRender(entities);
     }
@@ -235,17 +305,23 @@ void Himmel::run() noexcept {
 
 
 void Himmel::updateForDt(float dt, float sinceStart) noexcept {
-    int index = 0;
-    for (auto& entity : entities) {
-        const float dir = (index % 2) ? 1.0f : -1.0f;
-        auto matrix = glm::mat4(1.0f);
-        // matrix = glm::rotate(matrix, dir * sinceStart * glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        // matrix = glm::translate(matrix, glm::vec3{0.0f, 15.0f, dir * index * 8.0f + 5.0f * glm::sin(sinceStart)});
-        matrix = glm::translate(matrix, glm::vec3{0.0f, 15.0f, dir * index * 8.0f});
-        entity->modelMatrix = matrix;
-
-        index++;
+    size_t index = entities.size() - pointLights.size();
+    const float unit = 40.0f;
+    for (size_t i = 0; i < pointLights.size(); i++) {
+        glm::mat4 model(1.0);
+        if (i == 0) {
+            model = glm::translate(model, glm::vec3(0.0, unit, 2*unit));
+        } else if (i == 1) {
+            model = glm::translate(model, glm::vec3(3*unit, unit, 0.0));
+        } else if (i == 2) {
+            model = glm::translate(model, glm::vec3(-2*unit, unit, -3*unit));
+        }
+        model = glm::rotate(model, (i+1) * 0.7f * sinceStart + i * 1.0f, glm::vec3(0.0, 1.0, 0.0));
+        model = glm::translate(model, glm::vec3(50.0f, 0.0f, 0.0f));
+        pointLights[i].position = model[3];
+        entities[index + i]->modelMatrix = model;
     }
+
 
     {
         const auto newCursor = hmlWindow->getCursor();
@@ -301,7 +377,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 
 void Himmel::updateForImage(uint32_t imageIndex) noexcept {
-    GeneralUbo ubo{
+    GeneralUbo generalUbo{
         .view = camera.view(),
         .proj = proj,
         .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
@@ -310,7 +386,14 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         .fogDensity = weather.fogDensity,
         .cameraPos = camera.getPos(),
     };
-    viewProjUniformBuffers[imageIndex]->update(&ubo);
+    viewProjUniformBuffers[imageIndex]->update(&generalUbo);
+
+    LightUbo lightUbo;
+    lightUbo.count = pointLights.size();
+    for (size_t i = 0; i < pointLights.size(); i++) {
+        lightUbo.pointLights[i] = pointLights[i];
+    }
+    lightUniformBuffers[imageIndex]->update(&lightUbo);
 
     hmlSnowRenderer->updateForImage(imageIndex);
 }

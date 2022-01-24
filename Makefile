@@ -67,12 +67,8 @@ HmlWindow.o: HmlWindow.cpp HmlWindow.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 
-all: $(mainFileName)
-
-# all: cleanExe $(mainFileName)
-
-
-run: all compileShaders
+run: $(mainFileName)
+	$(MAKE) -C shaders compileShaders
 	LD_LIBRARY_PATH=$(VULKAN_SDK_PATH_LIB) VK_LAYER_PATH=$(VULKAN_SDK_PATH_LAYER) ./main
 
 
@@ -87,35 +83,22 @@ $(mainFileName): $(filesObj)
 
 # Utils
 clean:
-	rm -f a.out *.o *.gch .*.gch $(mainFileName) shaders/out/*.spv
+	rm -f a.out *.o *.gch .*.gch $(mainFileName)
+	$(MAKE) -C shaders clean
 
 cleanExe:
 	rm -f $(mainFileName)
 
-# SPVS=$(wildcard shaders/out/*.spv)
 
-# shaders: $(SPVS)
-
-# %.spv: %
-# 	glslc $^ -o $@
-
-# shaders/out/simple.vert.spv: shaders/simple.vert
-# 	glslc $^ -o $@
-
-
-compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag shaders/terrain.vert shaders/terrain.frag shaders/terrain.tesc shaders/terrain.tese shaders/terrain_debug.geom shaders/terrain_debug.frag shaders/terrain_debug.tese
-	glslc shaders/simple.vert -o shaders/out/simple.vert.spv
-	glslc shaders/simple.frag -o shaders/out/simple.frag.spv
-	glslc shaders/snow.vert -o shaders/out/snow.vert.spv
-	glslc shaders/snow.frag -o shaders/out/snow.frag.spv
-	glslc shaders/terrain.vert -o shaders/out/terrain.vert.spv
-	glslc shaders/terrain.frag -o shaders/out/terrain.frag.spv
-	glslc shaders/terrain.tesc -o shaders/out/terrain.tesc.spv
-	glslc shaders/terrain.tese -o shaders/out/terrain.tese.spv
-	glslc shaders/terrain_debug.geom -o shaders/out/terrain_debug.geom.spv
-	glslc shaders/terrain_debug.frag -o shaders/out/terrain_debug.frag.spv
-	glslc shaders/terrain_debug.tese -o shaders/out/terrain_debug.tese.spv
-
-
-# %.spv: %
-# glslc $^ -o $@
+# compileShaders: shaders/simple.vert shaders/simple.frag shaders/snow.vert shaders/snow.frag shaders/terrain.vert shaders/terrain.frag shaders/terrain.tesc shaders/terrain.tese shaders/terrain_debug.geom shaders/terrain_debug.frag shaders/terrain_debug.tese
+# 	glslc shaders/simple.vert -o shaders/out/simple.vert.spv
+# 	glslc shaders/simple.frag -o shaders/out/simple.frag.spv
+# 	glslc shaders/snow.vert -o shaders/out/snow.vert.spv
+# 	glslc shaders/snow.frag -o shaders/out/snow.frag.spv
+# 	glslc shaders/terrain.vert -o shaders/out/terrain.vert.spv
+# 	glslc shaders/terrain.frag -o shaders/out/terrain.frag.spv
+# 	glslc shaders/terrain.tesc -o shaders/out/terrain.tesc.spv
+# 	glslc shaders/terrain.tese -o shaders/out/terrain.tese.spv
+# 	glslc shaders/terrain_debug.geom -o shaders/out/terrain_debug.geom.spv
+# 	glslc shaders/terrain_debug.frag -o shaders/out/terrain_debug.frag.spv
+# 	glslc shaders/terrain_debug.tese -o shaders/out/terrain_debug.tese.spv

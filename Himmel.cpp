@@ -88,8 +88,8 @@ bool Himmel::init() noexcept {
     weather = Weather{
         // .fogColor = glm::vec3(0.0, 0.0, 0.0),
         .fogColor = glm::vec3(0.8, 0.8, 0.8),
-        // .fogDensity = -1.0,
-        .fogDensity = 0.011,
+        .fogDensity = -1.0,
+        // .fogDensity = 0.011,
     };
 
 
@@ -130,6 +130,24 @@ bool Himmel::init() noexcept {
 
 
     // Add lights
+    for (size_t i = 0; i < 20; i++) {
+        const auto pos = glm::vec3(
+            hml::getRandomUniformFloat(-SIZE_MAP, SIZE_MAP),
+            hml::getRandomUniformFloat(HEIGHT_MAP/2.0f, HEIGHT_MAP),
+            hml::getRandomUniformFloat(-SIZE_MAP, SIZE_MAP)
+        );
+        const auto color = glm::vec3(
+            hml::getRandomUniformFloat(0.0f, 1.0f),
+            hml::getRandomUniformFloat(0.0f, 1.0f),
+            hml::getRandomUniformFloat(0.0f, 1.0f)
+        );
+        pointLights.push_back(PointLight{
+            .color = color,
+            .intensity = 3000.0f,
+            .position = pos,
+            .reserved = 0.0f,
+        });
+    }
     {
         const float unit = 40.0f;
         pointLights.push_back(PointLight{
@@ -252,7 +270,7 @@ bool Himmel::init() noexcept {
         entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
         entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, -50.0f, 0.0f});
 
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.1f, 0.8f, 0.5f }));
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
         entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 25.0f, 30.0f});
 
         entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.8f, 0.2f, 0.5f }));
@@ -305,9 +323,10 @@ void Himmel::run() noexcept {
 
 
 void Himmel::updateForDt(float dt, float sinceStart) noexcept {
-    size_t index = entities.size() - pointLights.size();
+#define LAST_COUNT 3
+    size_t index = entities.size() - LAST_COUNT;
     const float unit = 40.0f;
-    for (size_t i = 0; i < pointLights.size(); i++) {
+    for (size_t i = 0; i < LAST_COUNT; i++) {
         glm::mat4 model(1.0);
         if (i == 0) {
             model = glm::translate(model, glm::vec3(0.0, unit, 2*unit));
@@ -318,7 +337,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
         model = glm::rotate(model, (i+1) * 0.7f * sinceStart + i * 1.0f, glm::vec3(0.0, 1.0, 0.0));
         model = glm::translate(model, glm::vec3(50.0f, 0.0f, 0.0f));
-        pointLights[i].position = model[3];
+        pointLights[pointLights.size() - LAST_COUNT + i].position = model[3];
         entities[index + i]->modelMatrix = model;
     }
 
@@ -381,7 +400,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         .view = camera.view(),
         .proj = proj,
         .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
-        .ambientStrength = 0.1f,
+        .ambientStrength = 0.0f,
         .fogColor = weather.fogColor,
         .fogDensity = weather.fogDensity,
         .cameraPos = camera.getPos(),

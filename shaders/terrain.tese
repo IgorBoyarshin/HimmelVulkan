@@ -78,17 +78,17 @@ void main() {
     float ambientStrength = uboGeneral.globalLightDir_ambientStrength.w;
     vec3 globalLightDir = uboGeneral.globalLightDir_ambientStrength.xyz;
     vec3 total = ambientStrength * vec3(1.0, 1.0, 1.0); // sun ??
-    const float DIRECT_INTENSITY = 0.5;
+    const float DIRECT_INTENSITY = 0.0;
     float globalDiffuseStrength = max(dot(normal, -globalLightDir), 0.0);
     total += DIRECT_INTENSITY * globalDiffuseStrength * vec3(1.0, 1.0, 1.0); // sun ??
     for (uint i = 0; i < uboLights.count; i++) {
         float intensity = uboLights.pointLights[i].intensity;
         vec3 position   = uboLights.pointLights[i].position;
         vec3 color      = uboLights.pointLights[i].color;
-        vec3 lightDir = v0.xyz - position;
-        float dist2 = pow(length(lightDir), 2);
-        float diffuseStrength = max(dot(normal, -normalize(lightDir)), 0.0);
-        intensity /= dist2;
+        vec3 lightDir = position - v0.xyz;
+        float attenuation = 1.0 / dot(lightDir, lightDir);
+        float diffuseStrength = max(dot(normal, normalize(lightDir)), 0.0);
+        intensity *= attenuation;
         intensity *= diffuseStrength;
         total += intensity * color;
     }

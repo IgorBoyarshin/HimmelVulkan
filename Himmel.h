@@ -15,6 +15,7 @@
 #include "HmlTerrainRenderer.h"
 #include "HmlModel.h"
 #include "HmlCamera.h"
+#include "util.h"
 
 
 struct Himmel {

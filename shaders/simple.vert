@@ -55,10 +55,10 @@ void main() {
         float intensity = uboLights.pointLights[i].intensity;
         vec3 position   = uboLights.pointLights[i].position;
         vec3 color      = uboLights.pointLights[i].color;
-        vec3 lightDir = inPosition - position;
-        float dist2 = pow(length(lightDir), 2);
-        float diffuseStrength = max(dot(normal, -normalize(lightDir)), 0.0);
-        intensity /= dist2;
+        vec3 lightDir = position - inPosition;
+        float attenuation = 1.0 / dot(lightDir, lightDir);
+        float diffuseStrength = max(dot(normal, normalize(lightDir)), 0.0);
+        intensity *= attenuation;
         intensity *= diffuseStrength;
         total += intensity * color;
     }

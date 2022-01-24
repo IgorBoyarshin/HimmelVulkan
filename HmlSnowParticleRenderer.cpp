@@ -154,17 +154,17 @@ void HmlSnowParticleRenderer::createSnow(uint32_t count, const SnowBounds& bound
 
         const auto& bounds = std::get<SnowBoxBounds>(snowBounds);
         for (size_t i = 0; i < snowInstances.size(); i++) {
-            snowInstances[i].position[0] = getRandomUniformFloat(bounds.xMin, bounds.xMax);
-            snowInstances[i].position[1] = getRandomUniformFloat(bounds.yMin, bounds.yMax);
-            snowInstances[i].position[2] = getRandomUniformFloat(bounds.zMin, bounds.zMax);
-            snowInstances[i].angleRadians = getRandomUniformFloat(0.0f, 6.28f);
+            snowInstances[i].position[0] = hml::getRandomUniformFloat(bounds.xMin, bounds.xMax);
+            snowInstances[i].position[1] = hml::getRandomUniformFloat(bounds.yMin, bounds.yMax);
+            snowInstances[i].position[2] = hml::getRandomUniformFloat(bounds.zMin, bounds.zMax);
+            snowInstances[i].angleRadians = hml::getRandomUniformFloat(0.0f, 6.28f);
         }
     } else { // SnowCameraBounds
         for (size_t i = 0; i < snowInstances.size(); i++) {
-            snowInstances[i].position[0] = getRandomUniformFloat(-1.0f, 1.0f);
-            snowInstances[i].position[1] = getRandomUniformFloat(-1.0f, 1.0f);
-            snowInstances[i].position[2] = getRandomUniformFloat(-1.0f, 1.0f);
-            snowInstances[i].angleRadians = getRandomUniformFloat(0.0f, 6.28f);
+            snowInstances[i].position[0] = hml::getRandomUniformFloat(-1.0f, 1.0f);
+            snowInstances[i].position[1] = hml::getRandomUniformFloat(-1.0f, 1.0f);
+            snowInstances[i].position[2] = hml::getRandomUniformFloat(-1.0f, 1.0f);
+            snowInstances[i].angleRadians = hml::getRandomUniformFloat(0.0f, 6.28f);
         }
     }
 }

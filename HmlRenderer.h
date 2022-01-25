@@ -9,12 +9,12 @@
 
 #include "HmlWindow.h"
 #include "HmlPipeline.h"
-#include "HmlSwapchain.h"
 #include "HmlCommands.h"
 #include "HmlModel.h"
 #include "HmlDevice.h"
 #include "HmlResourceManager.h"
 #include "HmlDescriptors.h"
+#include "HmlRenderPass.h"
 
 
 // NOTE
@@ -22,7 +22,7 @@
 // swapchain recreation by recreating the whole Renderer object.
 // NOTE
 struct HmlRenderer {
-    struct SimplePushConstant {
+    struct PushConstant {
         alignas(16) glm::mat4 model;
         glm::vec4 color;
         int32_t textureIndex;
@@ -50,7 +50,7 @@ struct HmlRenderer {
     std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
-    std::shared_ptr<HmlSwapchain> hmlSwapchain;
+    std::shared_ptr<HmlRenderPass> hmlRenderPass;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
 
@@ -74,13 +74,13 @@ struct HmlRenderer {
     std::vector<VkCommandBuffer> commandBuffers;
 
 
-    static std::unique_ptr<HmlPipeline> createSimplePipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
+    static std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
-    static std::unique_ptr<HmlRenderer> createSimpleRenderer(
+    static std::unique_ptr<HmlRenderer> create(
             std::shared_ptr<HmlWindow> hmlWindow,
             std::shared_ptr<HmlDevice> hmlDevice,
             std::shared_ptr<HmlCommands> hmlCommands,
-            std::shared_ptr<HmlSwapchain> hmlSwapchain,
+            std::shared_ptr<HmlRenderPass> hmlRenderPass,
             std::shared_ptr<HmlResourceManager> hmlResourceManager,
             std::shared_ptr<HmlDescriptors> hmlDescriptors,
             VkDescriptorSetLayout generalDescriptorSetLayout,
@@ -93,7 +93,7 @@ struct HmlRenderer {
     // TODO in order for each type of Renderer to properly replace its pipeline,
     // store a member in Renderer which specifies its type, and recreate the pipeline
     // based on its value.
-    void replaceSwapchain(std::shared_ptr<HmlSwapchain> newHmlSwapChain) noexcept;
+    void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept;
 };
 
 #endif

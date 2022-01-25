@@ -16,6 +16,7 @@
 #include "HmlModel.h"
 #include "HmlCamera.h"
 #include "util.h"
+#include "HmlRenderPass.h"
 
 
 struct Himmel {
@@ -51,13 +52,16 @@ struct Himmel {
 
     std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
+    std::shared_ptr<HmlDepthResource> hmlDepthResource;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
     std::shared_ptr<HmlCommands> hmlCommands;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
+    std::shared_ptr<HmlRenderPass> hmlRenderPassGeneral;
     std::shared_ptr<HmlRenderer> hmlRenderer;
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
     std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
+
 
     HmlCamera camera;
     glm::mat4 proj;

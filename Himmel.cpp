@@ -87,14 +87,48 @@ bool Himmel::init() noexcept {
 
     weather = Weather{
         // .fogColor = glm::vec3(0.0, 0.0, 0.0),
-        .fogColor = glm::vec3(0.8, 0.8, 0.8),
-        .fogDensity = -1.0,
+        .fogColor = glm::vec3(0.8f, 0.8f, 0.8f),
+        .fogDensity = -1.0f,
         // .fogDensity = 0.011,
     };
 
 
-    hmlRenderer = HmlRenderer::createSimpleRenderer(hmlWindow, hmlDevice, hmlCommands,
-        hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
+    // General RenderPass
+    hmlDepthResource = hmlResourceManager->newDepthResource(hmlSwapchain->extent);
+    if (!hmlDepthResource) return false;
+    {
+        // std::array<VkClearValue, 2> clearValues{};
+        // clearValues[0].color = {{weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0}};
+        // clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
+        const HmlRenderPass::ColorAttachment colorAttachment{
+            .imageFormat = hmlSwapchain->imageFormat,
+            .imageViews = hmlSwapchain->imageViews,
+            .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
+        };
+        const VkClearDepthStencilValue depthClearValue{ 1.0f, 0 }; // 1.0 is farthest
+        const HmlRenderPass::DepthStencilAttachment depthAttachment{
+            .imageFormat = hmlDepthResource->format,
+            .imageView = hmlDepthResource->imageView,
+            .clearColor = depthClearValue,
+        };
+        HmlRenderPass::Config config{
+            .colorAttachments = { colorAttachment },
+            .depthStencilAttachment = { depthAttachment },
+            .extent = hmlSwapchain->extent,
+            .saveDepth = false,
+            .hasPrevious = false,
+            .hasNext = false,
+        };
+        hmlRenderPassGeneral = HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
+        if (!hmlRenderPassGeneral) {
+            std::cerr << "::> Failed to create HmlRenderPass.\n";
+            return false;
+        }
+    }
+
+
+    hmlRenderer = HmlRenderer::create(hmlWindow, hmlDevice, hmlCommands,
+        hmlRenderPassGeneral, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlRenderer) return false;
 
 
@@ -102,17 +136,9 @@ bool Himmel::init() noexcept {
     const auto SIZE_SNOW = 70.0f;
     const auto snowCount = 400000;
     const auto HEIGHT_MAP = 70.0f;
-    // const auto snowBounds = HmlSnowParticleRenderer::SnowBounds {
-    //     .xMin = -SIZE,
-    //     .xMax = +SIZE,
-    //     .yMin = 0.0f,
-    //     .yMax = +2.0f * HEIGHT,
-    //     .zMin = -SIZE,
-    //     .zMax = +SIZE
-    // };
     const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ SIZE_SNOW };
     hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlWindow,
-        hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
+        hmlDevice, hmlCommands, hmlRenderPassGeneral, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlSnowRenderer) return false;
 
 
@@ -125,7 +151,7 @@ bool Himmel::init() noexcept {
     const uint32_t granularity = 4;
     hmlTerrainRenderer = HmlTerrainRenderer::create("models/heightmap.png", granularity, "models/grass-small.png",
         terrainBounds, generalDescriptorSet_0_perImage, hmlWindow,
-        hmlDevice, hmlCommands, hmlSwapchain, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
+        hmlDevice, hmlCommands, hmlRenderPassGeneral, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlTerrainRenderer) return false;
 
 
@@ -471,15 +497,17 @@ bool Himmel::drawFrame() noexcept {
 
     // NOTE Only this part depends on a Renderer (commandBuffers)
     {
-        recordDrawBegin(commandBuffers[imageIndex], imageIndex);
+        hmlRenderPassGeneral->begin(commandBuffers[imageIndex], imageIndex);
+        {
+            // NOTE These are parallelizable
+            std::vector<VkCommandBuffer> secondaryCommandBuffers;
+            secondaryCommandBuffers.push_back(hmlTerrainRenderer->draw(imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
+            secondaryCommandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
+            secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
+            vkCmdExecuteCommands(commandBuffers[imageIndex], secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
+        }
+        hmlRenderPassGeneral->end(commandBuffers[imageIndex]);
 
-        std::vector<VkCommandBuffer> secondaryCommandBuffers;
-        secondaryCommandBuffers.push_back(hmlTerrainRenderer->draw(imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
-        secondaryCommandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
-        secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
-        vkCmdExecuteCommands(commandBuffers[imageIndex], secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
-
-        recordDrawEnd(commandBuffers[imageIndex]);
 
         VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
@@ -532,36 +560,6 @@ bool Himmel::drawFrame() noexcept {
 }
 
 
-void Himmel::recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex) noexcept {
-    hmlCommands->beginRecordingPrimaryOnetime(commandBuffer);
-
-    VkRenderPassBeginInfo renderPassInfo = {};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = hmlSwapchain->renderPass;
-    renderPassInfo.framebuffer = hmlSwapchain->framebuffers[imageIndex];
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = hmlSwapchain->extent;
-
-    // Used for VK_ATTACHMENT_LOAD_OP_CLEAR
-    std::array<VkClearValue, 2> clearValues{};
-    // The order (indexing) must be the same as in attachments!
-    // NOTE will be removed in favor of skyboxes
-    clearValues[0].color = {{weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0}};
-    clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
-
-    // vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-}
-
-
-void Himmel::recordDrawEnd(VkCommandBuffer commandBuffer) noexcept {
-    vkCmdEndRenderPass(commandBuffer);
-    hmlCommands->endRecording(commandBuffer);
-}
-
-
 void Himmel::recreateSwapchain() noexcept {
     std::cout << ":> Recreating the Swapchain.\n";
 
@@ -579,10 +577,42 @@ void Himmel::recreateSwapchain() noexcept {
     // Because they have to be rerecorder, and for that they need to be reset first
     hmlCommands->resetCommandPool(hmlCommands->commandPoolGeneral);
 
+
+    // General RenderPass
+    hmlDepthResource = hmlResourceManager->newDepthResource(hmlSwapchain->extent);
+    if (!hmlDepthResource) return;
+    {
+        const HmlRenderPass::ColorAttachment colorAttachment{
+            .imageFormat = hmlSwapchain->imageFormat,
+            .imageViews = hmlSwapchain->imageViews,
+            .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
+        };
+        const VkClearDepthStencilValue depthClearValue{ 1.0f, 0 }; // 1.0 is farthest
+        const HmlRenderPass::DepthStencilAttachment depthAttachment{
+            .imageFormat = hmlDepthResource->format,
+            .imageView = hmlDepthResource->imageView,
+            .clearColor = depthClearValue,
+        };
+        HmlRenderPass::Config config{
+            .colorAttachments = { colorAttachment },
+            .depthStencilAttachment = { depthAttachment },
+            .extent = hmlSwapchain->extent,
+            .saveDepth = false,
+            .hasPrevious = false,
+            .hasNext = false,
+        };
+        hmlRenderPassGeneral = HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
+        if (!hmlRenderPassGeneral) {
+            std::cerr << "::> Failed to recreate HmlRenderPass.\n";
+            return;
+        }
+    }
+
+
     // TODO foreach Renderer
-    hmlRenderer->replaceSwapchain(hmlSwapchain);
-    hmlSnowRenderer->replaceSwapchain(hmlSwapchain);
-    hmlTerrainRenderer->replaceSwapchain(hmlSwapchain);
+    hmlRenderer->replaceRenderPass(hmlRenderPassGeneral);
+    hmlSnowRenderer->replaceRenderPass(hmlRenderPassGeneral);
+    hmlTerrainRenderer->replaceRenderPass(hmlRenderPassGeneral);
     // TODO maybe store this as as flag inside the Renderer so that it knows automatically
     // hmlTerrainRenderer->bake(generalDescriptorSet_0_perImage);
 
@@ -623,6 +653,9 @@ bool Himmel::createSyncObjects() noexcept {
 
 
 Himmel::~Himmel() noexcept {
+    std::cout << ":> Destroying Himmel...\n";
+    // vkDeviceWaitIdle(hmlDevice->device);
+
     for (size_t i = 0; i < maxFramesInFlight; i++) {
         vkDestroySemaphore(hmlDevice->device, renderFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(hmlDevice->device, imageAvailableSemaphores[i], nullptr);

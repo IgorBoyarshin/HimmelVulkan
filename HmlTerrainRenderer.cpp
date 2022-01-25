@@ -13,7 +13,7 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
             .addTessellationControl("shaders/out/terrain.tesc.spv")
             .addTessellationEvaluation("shaders/out/terrain.tese.spv"),
         .renderPass = renderPass,
-        .swapchainExtent = extent,
+        .extent = extent,
         // .polygoneMode = VK_POLYGON_MODE_LINE,
         .polygoneMode = VK_POLYGON_MODE_FILL,
         // .cullMode = VK_CULL_MODE_BACK_BIT,
@@ -43,7 +43,7 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
 //             .addGeometry("shaders/out/terrain_debug.geom.spv")
 //             .addFragment("shaders/out/terrain_debug.frag.spv"),
 //         .renderPass = renderPass,
-//         .swapchainExtent = extent,
+//         .extent = extent,
 //         // .polygoneMode = VK_POLYGON_MODE_LINE,
 //         .polygoneMode = VK_POLYGON_MODE_FILL, // NOTE does not matter, we output a line strip
 //         // .cullMode = VK_CULL_MODE_BACK_BIT,
@@ -69,7 +69,7 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,
-        std::shared_ptr<HmlSwapchain> hmlSwapchain,
+        std::shared_ptr<HmlRenderPass> hmlRenderPass,
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         VkDescriptorSetLayout viewProjDescriptorSetLayout,
@@ -78,7 +78,7 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
     hmlRenderer->hmlWindow = hmlWindow;
     hmlRenderer->hmlDevice = hmlDevice;
     hmlRenderer->hmlCommands = hmlCommands;
-    hmlRenderer->hmlSwapchain = hmlSwapchain;
+    hmlRenderer->hmlRenderPass = hmlRenderPass;
     hmlRenderer->hmlResourceManager = hmlResourceManager;
     hmlRenderer->hmlDescriptors = hmlDescriptors;
 
@@ -126,14 +126,14 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
 
 
     hmlRenderer->hmlPipeline = createPipeline(hmlDevice,
-        hmlSwapchain->extent, hmlSwapchain->renderPass, hmlRenderer->descriptorSetLayouts);
+        hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
     if (!hmlRenderer->hmlPipeline) return { nullptr };
     // hmlRenderer->hmlPipelineDebug = createPipelineDebug(hmlDevice,
-    //     hmlSwapchain->extent, hmlSwapchain->renderPass, hmlRenderer->descriptorSetLayouts);
+    //     hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
     // if (!hmlRenderer->hmlPipelineDebug) return { nullptr };
 
 
-    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames);
+    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(hmlRenderPass->imageCount(), hmlCommands->commandPoolOnetimeFrames);
 
     // std::vector<VkSampler> samplers;
     // std::vector<VkImageView> imageViews;
@@ -390,9 +390,9 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
-        .renderPass = hmlSwapchain->renderPass,
+        .renderPass = hmlRenderPass->renderPass,
         .subpass = 0, // we only have a single one
-        .framebuffer = hmlSwapchain->framebuffers[imageIndex],
+        .framebuffer = hmlRenderPass->framebuffers[imageIndex],
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
@@ -478,10 +478,10 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
 // TODO in order for each type of Renderer to properly replace its pipeline,
 // store a member in Renderer which specifies its type, and recreate the pipeline
 // based on its value.
-void HmlTerrainRenderer::replaceSwapchain(std::shared_ptr<HmlSwapchain> newHmlSwapChain) noexcept {
-    hmlSwapchain = newHmlSwapChain;
-    hmlPipeline = createPipeline(hmlDevice, hmlSwapchain->extent, hmlSwapchain->renderPass, descriptorSetLayouts);
-    // hmlPipelineDebug = createPipelineDebug(hmlDevice, hmlSwapchain->extent, hmlSwapchain->renderPass, descriptorSetLayouts);
+void HmlTerrainRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
+    hmlRenderPass = newHmlRenderPass;
+    hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
+    // hmlPipelineDebug = createPipelineDebug(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
     // NOTE The command pool is reset for all renderers prior to calling this function.
     // NOTE commandBuffers must be rerecorded -- is done during baking
 }

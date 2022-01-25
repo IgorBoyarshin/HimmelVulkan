@@ -9,6 +9,16 @@
 #include "HmlCommands.h"
 
 
+struct HmlDepthResource {
+    std::shared_ptr<HmlDevice> hmlDevice;
+
+    VkImage image;
+    VkDeviceMemory imageMemory;
+    VkImageView imageView;
+    VkFormat format;
+
+    ~HmlDepthResource() noexcept;
+};
 
 
 struct HmlTextureResource {
@@ -100,6 +110,7 @@ struct HmlResourceManager {
     // TODO add options for VERTEX_INPUT etc.
     std::unique_ptr<HmlStorageBuffer> createStorageBuffer(VkDeviceSize sizeBytes) noexcept;
     std::unique_ptr<HmlTextureResource> newTextureResource(const char* fileName, VkFilter filter) noexcept;
+    std::unique_ptr<HmlDepthResource> newDepthResource(VkExtent2D extent) noexcept;
     // Model with color
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) noexcept;
     // Model with texture
@@ -129,8 +140,8 @@ struct HmlResourceManager {
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
             VkImageTiling tiling, VkFormatFeatureFlags features) const noexcept;
     VkFormat findDepthFormat() const noexcept;
-    bool createDepthResources(VkImage& depthImage, VkDeviceMemory& depthImageMemory,
-            VkImageView& depthImageView, VkExtent2D extent) noexcept;
+    // bool createDepthResources(VkImage& depthImage, VkDeviceMemory& depthImageMemory,
+    //         VkImageView& depthImageView, VkExtent2D extent) noexcept;
     // ========================================================================
     // TODO add device, physicalDevice, memProperties
     // VkBufferUsageFlagBits:

@@ -10,7 +10,7 @@
 
 #include "HmlWindow.h"
 #include "HmlPipeline.h"
-#include "HmlSwapchain.h"
+#include "HmlRenderPass.h"
 #include "HmlCommands.h"
 #include "HmlModel.h"
 #include "HmlDevice.h"
@@ -92,7 +92,7 @@ struct HmlTerrainRenderer {
     std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
-    std::shared_ptr<HmlSwapchain> hmlSwapchain;
+    std::shared_ptr<HmlRenderPass> hmlRenderPass;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
     std::unique_ptr<HmlPipeline> hmlPipeline;
@@ -123,7 +123,7 @@ struct HmlTerrainRenderer {
             std::shared_ptr<HmlWindow> hmlWindow,
             std::shared_ptr<HmlDevice> hmlDevice,
             std::shared_ptr<HmlCommands> hmlCommands,
-            std::shared_ptr<HmlSwapchain> hmlSwapchain,
+            std::shared_ptr<HmlRenderPass> hmlRenderPass,
             std::shared_ptr<HmlResourceManager> hmlResourceManager,
             std::shared_ptr<HmlDescriptors> hmlDescriptors,
             VkDescriptorSetLayout viewProjDescriptorSetLayout,
@@ -137,7 +137,7 @@ struct HmlTerrainRenderer {
     // TODO in order for each type of Renderer to properly replace its pipeline,
     // store a member in Renderer which specifies its type, and recreate the pipeline
     // based on its value.
-    void replaceSwapchain(std::shared_ptr<HmlSwapchain> newHmlSwapChain) noexcept;
+    void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept;
 };
 
 #endif

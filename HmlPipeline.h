@@ -51,7 +51,7 @@ struct HmlGraphicsPipelineConfig {
     VkPrimitiveTopology topology;
     HmlShaders hmlShaders;
     VkRenderPass renderPass;
-    VkExtent2D swapchainExtent;
+    VkExtent2D extent;
     // VK_POLYGON_MODE_FILL: fill the area of the polygon with fragments
     // VK_POLYGON_MODE_LINE: polygon edges are drawn as lines. REQUIRES GPU FEATURE
     // VK_POLYGON_MODE_POINT: polygon vertices are drawn as points. REQUIRES GPU FEATURE

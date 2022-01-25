@@ -82,14 +82,14 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = (float) hmlPipelineConfig.swapchainExtent.width; // may differ from WIDTH
-    viewport.height = (float) hmlPipelineConfig.swapchainExtent.height; // may differ from HEIGHT
+    viewport.width = (float) hmlPipelineConfig.extent.width; // may differ from WIDTH
+    viewport.height = (float) hmlPipelineConfig.extent.height; // may differ from HEIGHT
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     VkRect2D scissor = {};
     scissor.offset = {0, 0};
-    scissor.extent = hmlPipelineConfig.swapchainExtent;
+    scissor.extent = hmlPipelineConfig.extent;
 
     VkPipelineViewportStateCreateInfo viewportState = {};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;

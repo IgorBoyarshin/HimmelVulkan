@@ -14,6 +14,16 @@
 // TODO
 
 
+HmlDepthResource::~HmlDepthResource() noexcept {
+    std::cout << ":> Destroying HmlDepthResource.\n";
+
+    vkDestroyImageView(hmlDevice->device, imageView, nullptr);
+    vkDestroyImage(hmlDevice->device, image, nullptr);
+    vkFreeMemory(hmlDevice->device, imageMemory, nullptr);
+}
+// ============================================================================
+// ============================================================================
+// ============================================================================
 HmlTextureResource::~HmlTextureResource() noexcept {
     std::cout << ":> Destroying HmlTextureResource.\n";
 
@@ -132,12 +142,32 @@ std::unique_ptr<HmlTextureResource> HmlResourceManager::newTextureResource(const
     auto textureResource = std::make_unique<HmlTextureResource>();
     textureResource->hmlDevice = hmlDevice;
     const auto dimOpt = createTextureImage(textureResource->image, textureResource->imageMemory, fileName);
-    if (!dimOpt) return { nullptr };
+    if (!dimOpt) {
+        std::cerr << "::> Failed to create new HmlTextureResource.\n";
+        return { nullptr };
+    }
     textureResource->width = dimOpt->first;
     textureResource->height = dimOpt->second;
     textureResource->imageView = createTextureImageView(textureResource->image);
     textureResource->sampler = createTextureSampler(filter, filter);
     return textureResource;
+}
+
+
+std::unique_ptr<HmlDepthResource> HmlResourceManager::newDepthResource(VkExtent2D extent) noexcept {
+    auto depthResource = std::make_unique<HmlDepthResource>();
+    depthResource->hmlDevice = hmlDevice;
+    depthResource->format = findDepthFormat();
+    createImage(extent.width, extent.height, depthResource->format,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthResource->image, depthResource->imageMemory);
+    depthResource->imageView = createImageView(depthResource->image, depthResource->format, VK_IMAGE_ASPECT_DEPTH_BIT);
+    if (!transitionImageLayout(depthResource->image, depthResource->format, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)) {
+        std::cerr << "::> Failed to create new HmlDepthResource.\n";
+        return { nullptr };
+    }
+    return depthResource;
 }
 
 
@@ -480,19 +510,6 @@ VkFormat HmlResourceManager::findDepthFormat() const noexcept {
         VK_IMAGE_TILING_OPTIMAL,
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
     );
-}
-
-
-bool HmlResourceManager::createDepthResources(VkImage& depthImage, VkDeviceMemory& depthImageMemory,
-        VkImageView& depthImageView, VkExtent2D extent) noexcept {
-    VkFormat depthFormat = findDepthFormat();
-    createImage(extent.width, extent.height, depthFormat,
-            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
-    depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-    if (!transitionImageLayout(depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)) return false;
-    return true;
 }
 // ========================================================================
 // ========================================================================

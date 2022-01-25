@@ -1,7 +1,7 @@
 #include "HmlRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlRenderer::createSimplePipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
+std::unique_ptr<HmlPipeline> HmlRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
     HmlGraphicsPipelineConfig config{
         .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
@@ -11,14 +11,14 @@ std::unique_ptr<HmlPipeline> HmlRenderer::createSimplePipeline(std::shared_ptr<H
             .addVertex("shaders/out/simple.vert.spv")
             .addFragment("shaders/out/simple.frag.spv"),
         .renderPass = renderPass,
-        .swapchainExtent = extent,
+        .extent = extent,
         .polygoneMode = VK_POLYGON_MODE_FILL,
         // .cullMode = VK_CULL_MODE_BACK_BIT,
         .cullMode = VK_CULL_MODE_NONE,
         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
         .descriptorSetLayouts = descriptorSetLayouts,
         .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pushConstantsSizeBytes = sizeof(SimplePushConstant),
+        .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 0,
         .lineWidth = 1.0f,
     };
@@ -27,11 +27,11 @@ std::unique_ptr<HmlPipeline> HmlRenderer::createSimplePipeline(std::shared_ptr<H
 }
 
 
-std::unique_ptr<HmlRenderer> HmlRenderer::createSimpleRenderer(
+std::unique_ptr<HmlRenderer> HmlRenderer::create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,
-        std::shared_ptr<HmlSwapchain> hmlSwapchain,
+        std::shared_ptr<HmlRenderPass> hmlRenderPass,
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         VkDescriptorSetLayout generalDescriptorSetLayout,
@@ -40,7 +40,7 @@ std::unique_ptr<HmlRenderer> HmlRenderer::createSimpleRenderer(
     hmlRenderer->hmlWindow = hmlWindow;
     hmlRenderer->hmlDevice = hmlDevice;
     hmlRenderer->hmlCommands = hmlCommands;
-    hmlRenderer->hmlSwapchain = hmlSwapchain;
+    hmlRenderer->hmlRenderPass = hmlRenderPass;
     hmlRenderer->hmlResourceManager = hmlResourceManager;
     hmlRenderer->hmlDescriptors = hmlDescriptors;
 
@@ -63,8 +63,8 @@ std::unique_ptr<HmlRenderer> HmlRenderer::createSimpleRenderer(
     if (!hmlRenderer->descriptorSet_textures_1) return { nullptr };
 
 
-    hmlRenderer->hmlPipeline = createSimplePipeline(hmlDevice,
-        hmlSwapchain->extent, hmlSwapchain->renderPass, hmlRenderer->descriptorSetLayouts);
+    hmlRenderer->hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent,
+        hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
     if (!hmlRenderer->hmlPipeline) return { nullptr };
 
 
@@ -150,9 +150,9 @@ VkCommandBuffer HmlRenderer::draw(uint32_t frameIndex, uint32_t imageIndex, VkDe
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
-        .renderPass = hmlSwapchain->renderPass,
+        .renderPass = hmlRenderPass->renderPass,
         .subpass = 0, // we only have a single one
-        .framebuffer = hmlSwapchain->framebuffers[imageIndex],
+        .framebuffer = hmlRenderPass->framebuffers[imageIndex],
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
@@ -182,13 +182,13 @@ VkCommandBuffer HmlRenderer::draw(uint32_t frameIndex, uint32_t imageIndex, VkDe
 
         for (const auto& entity : entities) {
             // NOTE Yes, in theory having a textureIndex per Entity is redundant
-            SimplePushConstant pushConstant{
+            PushConstant pushConstant{
                 .model = entity->modelMatrix,
                 .color = glm::vec4(entity->color, 1.0f),
                 .textureIndex = model->textureResource ? textureIndexFor[modelId] : NO_TEXTURE_MARK,
             };
             vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
-                hmlPipeline->pushConstantsStages, 0, sizeof(SimplePushConstant), &pushConstant);
+                hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
 
             // NOTE could use firstInstance to supply a single integer to gl_BaseInstance
             const uint32_t instanceCount = 1;
@@ -211,9 +211,9 @@ VkCommandBuffer HmlRenderer::draw(uint32_t frameIndex, uint32_t imageIndex, VkDe
 // TODO in order for each type of Renderer to properly replace its pipeline,
 // store a member in Renderer which specifies its type, and recreate the pipeline
 // based on its value.
-void HmlRenderer::replaceSwapchain(std::shared_ptr<HmlSwapchain> newHmlSwapChain) noexcept {
-    hmlSwapchain = newHmlSwapChain;
-    hmlPipeline = createSimplePipeline(hmlDevice, hmlSwapchain->extent, hmlSwapchain->renderPass, descriptorSetLayouts);
+void HmlRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
+    hmlRenderPass = newHmlRenderPass;
+    hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
     // NOTE The command pool is reset for all renderers prior to calling this function.
     // NOTE commandBuffers must be rerecorded -- is done during baking
 }

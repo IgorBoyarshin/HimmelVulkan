@@ -96,35 +96,8 @@ bool Himmel::init() noexcept {
     // General RenderPass
     hmlDepthResource = hmlResourceManager->newDepthResource(hmlSwapchain->extent);
     if (!hmlDepthResource) return false;
-    {
-        // std::array<VkClearValue, 2> clearValues{};
-        // clearValues[0].color = {{weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0}};
-        // clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
-        const HmlRenderPass::ColorAttachment colorAttachment{
-            .imageFormat = hmlSwapchain->imageFormat,
-            .imageViews = hmlSwapchain->imageViews,
-            .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
-        };
-        const VkClearDepthStencilValue depthClearValue{ 1.0f, 0 }; // 1.0 is farthest
-        const HmlRenderPass::DepthStencilAttachment depthAttachment{
-            .imageFormat = hmlDepthResource->format,
-            .imageView = hmlDepthResource->imageView,
-            .clearColor = depthClearValue,
-        };
-        HmlRenderPass::Config config{
-            .colorAttachments = { colorAttachment },
-            .depthStencilAttachment = { depthAttachment },
-            .extent = hmlSwapchain->extent,
-            .saveDepth = false,
-            .hasPrevious = false,
-            .hasNext = false,
-        };
-        hmlRenderPassGeneral = HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
-        if (!hmlRenderPassGeneral) {
-            std::cerr << "::> Failed to create HmlRenderPass.\n";
-            return false;
-        }
-    }
+    hmlRenderPassGeneral = createGeneralRenderPass(hmlSwapchain, hmlDepthResource, weather);
+    if (!hmlRenderPassGeneral) return false;
 
 
     hmlRenderer = HmlRenderer::create(hmlWindow, hmlDevice, hmlCommands,
@@ -318,6 +291,40 @@ bool Himmel::init() noexcept {
     if (!createSyncObjects()) return false;
 
     return true;
+}
+
+
+std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
+        std::shared_ptr<HmlSwapchain> hmlSwapchain,
+        std::shared_ptr<HmlDepthResource> hmlDepthResource,
+        const Weather& weather) const noexcept {
+    // std::array<VkClearValue, 2> clearValues{};
+    // clearValues[0].color = {{weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0}};
+    // clearValues[1].depthStencil = {1.0f, 0}; // 1.0 is farthest
+    const HmlRenderPass::ColorAttachment colorAttachment{
+        .imageFormat = hmlSwapchain->imageFormat,
+        .imageViews = hmlSwapchain->imageViews,
+        .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
+    };
+    const HmlRenderPass::DepthStencilAttachment depthAttachment{
+        .imageFormat = hmlDepthResource->format,
+        .imageView = hmlDepthResource->imageView,
+        .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
+    };
+    HmlRenderPass::Config config{
+        .colorAttachments = { colorAttachment },
+        .depthStencilAttachment = { depthAttachment },
+        .extent = hmlSwapchain->extent,
+        .saveDepth = false,
+        .hasPrevious = false,
+        .hasNext = false,
+    };
+    auto hmlRenderPass= HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
+    if (!hmlRenderPass) {
+        std::cerr << "::> Failed to create General HmlRenderPass.\n";
+        return { nullptr };
+    }
+    return hmlRenderPass;
 }
 
 
@@ -581,32 +588,8 @@ void Himmel::recreateSwapchain() noexcept {
     // General RenderPass
     hmlDepthResource = hmlResourceManager->newDepthResource(hmlSwapchain->extent);
     if (!hmlDepthResource) return;
-    {
-        const HmlRenderPass::ColorAttachment colorAttachment{
-            .imageFormat = hmlSwapchain->imageFormat,
-            .imageViews = hmlSwapchain->imageViews,
-            .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
-        };
-        const VkClearDepthStencilValue depthClearValue{ 1.0f, 0 }; // 1.0 is farthest
-        const HmlRenderPass::DepthStencilAttachment depthAttachment{
-            .imageFormat = hmlDepthResource->format,
-            .imageView = hmlDepthResource->imageView,
-            .clearColor = depthClearValue,
-        };
-        HmlRenderPass::Config config{
-            .colorAttachments = { colorAttachment },
-            .depthStencilAttachment = { depthAttachment },
-            .extent = hmlSwapchain->extent,
-            .saveDepth = false,
-            .hasPrevious = false,
-            .hasNext = false,
-        };
-        hmlRenderPassGeneral = HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
-        if (!hmlRenderPassGeneral) {
-            std::cerr << "::> Failed to recreate HmlRenderPass.\n";
-            return;
-        }
-    }
+    hmlRenderPassGeneral = createGeneralRenderPass(hmlSwapchain, hmlDepthResource, weather);
+    if (!hmlRenderPassGeneral) return;
 
 
     // TODO foreach Renderer

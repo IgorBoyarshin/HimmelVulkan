@@ -125,7 +125,7 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
 
     VkRenderPass renderPass;
     if (vkCreateRenderPass(hmlDevice->device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        std::cerr << "::> Failed to create render pass.\n";
+        std::cerr << "::> Failed to create HmlRenderPass.\n";
         return { nullptr };
     }
 
@@ -155,7 +155,10 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
             imageViews.push_back(config.depthStencilAttachment->imageView);
         }
         const auto framebuffer = hmlRenderPass->createFramebuffer(imageViews);
-        if (!framebuffer) return { nullptr };
+        if (!framebuffer) {
+            std::cerr << "::> Failed to create HmlRenderPass.\n";
+            return { nullptr };
+        }
         hmlRenderPass->framebuffers.push_back(framebuffer);
     }
 

@@ -105,6 +105,10 @@ struct Himmel {
     bool drawFrame() noexcept;
     void recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex) noexcept;
     void recordDrawEnd(VkCommandBuffer commandBuffer) noexcept;
+    std::unique_ptr<HmlRenderPass> createGeneralRenderPass(
+            std::shared_ptr<HmlSwapchain> hmlSwapchain,
+            std::shared_ptr<HmlDepthResource> hmlDepthResource,
+            const Weather& weather) const noexcept;
     void recreateSwapchain() noexcept;
     bool createSyncObjects() noexcept;
     ~Himmel() noexcept;

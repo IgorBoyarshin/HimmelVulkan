@@ -9,7 +9,7 @@ VULKAN_SDK_PATH_LAYER = /usr/share/vulkan/explicit_layer.d
 # The name of the main file and executable
 mainFileName = main
 # Files that have .h and .cpp versions
-classFiles = Himmel HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer HmlTerrainRenderer HmlRenderPass
+classFiles = Himmel HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer HmlTerrainRenderer HmlRenderPass HmlUiRenderer
 # Files that only have the .h version
 justHeaderFiles = util
 # Compilation flags
@@ -52,6 +52,9 @@ HmlPipeline.o: HmlPipeline.cpp HmlPipeline.h HmlDevice.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 HmlRenderer.o: HmlRenderer.cpp HmlRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
+
+HmlUiRenderer.o: HmlUiRenderer.cpp HmlUiRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 HmlResourceManager.o: HmlResourceManager.cpp HmlResourceManager.h HmlDevice.h HmlCommands.h

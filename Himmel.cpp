@@ -24,6 +24,7 @@ bool Himmel::init() noexcept {
 
 
     commandBuffers = hmlCommands->allocatePrimary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames);
+    commandBuffers2 = hmlCommands->allocatePrimary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames);
 
 
     for (size_t i = 0; i < hmlSwapchain->imageCount(); i++) {
@@ -90,11 +91,18 @@ bool Himmel::init() noexcept {
     if (!hmlDepthResource) return false;
     hmlRenderPassGeneral = createGeneralRenderPass(hmlSwapchain, hmlDepthResource, weather);
     if (!hmlRenderPassGeneral) return false;
+    // UI RenderPass
+    hmlRenderPassUi = createUiRenderPass(hmlSwapchain);
+    if (!hmlRenderPassUi) return false;
 
 
     hmlRenderer = HmlRenderer::create(hmlWindow, hmlDevice, hmlCommands,
         hmlRenderPassGeneral, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlRenderer) return false;
+
+    hmlUiRenderer = HmlUiRenderer::create(hmlWindow, hmlDevice, hmlCommands,
+        hmlRenderPassUi, hmlResourceManager, hmlDescriptors, maxFramesInFlight);
+    if (!hmlUiRenderer) return false;
 
 
     const auto SIZE_MAP = 250.0f;
@@ -282,6 +290,7 @@ bool Himmel::init() noexcept {
 
     if (!createSyncObjects()) return false;
 
+    successfulInit = true;
     return true;
 }
 
@@ -309,9 +318,9 @@ std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
         .extent = hmlSwapchain->extent,
         .saveDepth = false,
         .hasPrevious = false,
-        .hasNext = false,
+        .hasNext = true,
     };
-    auto hmlRenderPass= HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
+    auto hmlRenderPass = HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
     if (!hmlRenderPass) {
         std::cerr << "::> Failed to create General HmlRenderPass.\n";
         return { nullptr };
@@ -320,7 +329,30 @@ std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
 }
 
 
-void Himmel::run() noexcept {
+std::unique_ptr<HmlRenderPass> Himmel::createUiRenderPass(std::shared_ptr<HmlSwapchain> hmlSwapchain) const noexcept {
+    const HmlRenderPass::ColorAttachment colorAttachment{
+        .imageFormat = hmlSwapchain->imageFormat,
+        .imageViews = hmlSwapchain->imageViews,
+        .clearColor = std::nullopt,
+    };
+    HmlRenderPass::Config config{
+        .colorAttachments = { colorAttachment },
+        .depthStencilAttachment = std::nullopt,
+        .extent = hmlSwapchain->extent,
+        .saveDepth = false,
+        .hasPrevious = true,
+        .hasNext = false,
+    };
+    auto hmlRenderPass = HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
+    if (!hmlRenderPass) {
+        std::cerr << "::> Failed to create UI HmlRenderPass.\n";
+        return { nullptr };
+    }
+    return hmlRenderPass;
+}
+
+
+bool Himmel::run() noexcept {
     static auto startTime = std::chrono::high_resolution_clock::now();
     while (!hmlWindow->shouldClose()) {
         glfwPollEvents();
@@ -336,7 +368,7 @@ void Himmel::run() noexcept {
         // const auto mark1 = std::chrono::high_resolution_clock::now();
         // const auto updateMs = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(mark1 - newMark).count()) / 1'000.0f;
 
-        if (!drawFrame()) return;
+        if (!drawFrame()) return false;
 
         // const auto fps = 1.0 / deltaSeconds;
         // std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]"
@@ -344,6 +376,7 @@ void Himmel::run() noexcept {
         //     << '\n';
     }
     vkDeviceWaitIdle(hmlDevice->device);
+    return true;
 }
 
 
@@ -496,31 +529,75 @@ bool Himmel::drawFrame() noexcept {
 
     // NOTE Only this part depends on a Renderer (commandBuffers)
     {
-        hmlRenderPassGeneral->begin(commandBuffers[imageIndex], imageIndex);
+        const auto commandBuffer = commandBuffers[imageIndex];
+        hmlRenderPassGeneral->begin(commandBuffer, imageIndex);
         {
             // NOTE These are parallelizable
             std::vector<VkCommandBuffer> secondaryCommandBuffers;
             secondaryCommandBuffers.push_back(hmlTerrainRenderer->draw(imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
             secondaryCommandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
             secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
-            vkCmdExecuteCommands(commandBuffers[imageIndex], secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
+            vkCmdExecuteCommands(commandBuffer, secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
         }
-        hmlRenderPassGeneral->end(commandBuffers[imageIndex]);
-
+        hmlRenderPassGeneral->end(commandBuffer);
 
         VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        // VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
+        VkSemaphore signalSemaphores[] = { generalFinishedSemaphores[currentFrame] };
+
+        VkSubmitInfo submitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = waitSemaphores,
+            .pWaitDstStageMask = waitStages,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &commandBuffer,
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = signalSemaphores,
+        };
+
+        // vkResetFences(hmlDevice->device, 1, &inFlightFences[currentFrame]);
+        // The specified fence will get signaled when the command buffer finishes executing.
+        // if (vkQueueSubmit(hmlDevice->graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
+        if (vkQueueSubmit(hmlDevice->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+            std::cerr << "::> Failed to submit draw command buffer.\n";
+            return false;
+        }
+    }
+    // NOTE
+    // NOTE It is also possible to combine the two commandBuffers into a single submission.
+    // NOTE However, it might be prudent to do so only when we parallelize draws,
+    // NOTE because otherwise right now we take advantage from the fact that
+    // NOTE the first submission is already being processed while we record the second commandBuffer
+    // NOTE
+    {
+        const auto commandBuffer = commandBuffers2[imageIndex];
+        hmlRenderPassUi->begin(commandBuffer, imageIndex);
+        {
+            // NOTE These are parallelizable
+            std::vector<VkCommandBuffer> secondaryCommandBuffers;
+            secondaryCommandBuffers.push_back(hmlUiRenderer->draw(currentFrame, imageIndex));
+            vkCmdExecuteCommands(commandBuffer, secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
+        }
+        hmlRenderPassUi->end(commandBuffer);
+
+        VkSemaphore waitSemaphores[] = { generalFinishedSemaphores[currentFrame] };
+        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
         VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
 
-        VkSubmitInfo submitInfo = {};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = waitSemaphores;
-        submitInfo.pWaitDstStageMask = waitStages;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
+        VkSubmitInfo submitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = waitSemaphores,
+            .pWaitDstStageMask = waitStages,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &commandBuffer,
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = signalSemaphores,
+        };
 
         vkResetFences(hmlDevice->device, 1, &inFlightFences[currentFrame]);
         // The specified fence will get signaled when the command buffer finishes executing.
@@ -582,12 +659,16 @@ void Himmel::recreateSwapchain() noexcept {
     if (!hmlDepthResource) return;
     hmlRenderPassGeneral = createGeneralRenderPass(hmlSwapchain, hmlDepthResource, weather);
     if (!hmlRenderPassGeneral) return;
+    // UI RenderPass
+    hmlRenderPassUi = createUiRenderPass(hmlSwapchain);
+    if (!hmlRenderPassUi) return;
 
 
     // TODO foreach Renderer
     hmlRenderer->replaceRenderPass(hmlRenderPassGeneral);
     hmlSnowRenderer->replaceRenderPass(hmlRenderPassGeneral);
     hmlTerrainRenderer->replaceRenderPass(hmlRenderPassGeneral);
+    hmlUiRenderer->replaceRenderPass(hmlRenderPassUi);
     // TODO maybe store this as as flag inside the Renderer so that it knows automatically
     // hmlTerrainRenderer->bake(generalDescriptorSet_0_perImage);
 
@@ -600,6 +681,7 @@ void Himmel::recreateSwapchain() noexcept {
 bool Himmel::createSyncObjects() noexcept {
     imageAvailableSemaphores.resize(maxFramesInFlight);
     renderFinishedSemaphores.resize(maxFramesInFlight);
+    generalFinishedSemaphores.resize(maxFramesInFlight);
     inFlightFences.resize(maxFramesInFlight);
     imagesInFlight.resize(hmlSwapchain->imageCount(), VK_NULL_HANDLE); // initially not a single frame is using an image
 
@@ -614,9 +696,10 @@ bool Himmel::createSyncObjects() noexcept {
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (size_t i = 0; i < maxFramesInFlight; i++) {
-        if (vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-            vkCreateFence    (hmlDevice->device, &fenceInfo,     nullptr, &inFlightFences[i])           != VK_SUCCESS) {
+        if (vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i])  != VK_SUCCESS ||
+            vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i])  != VK_SUCCESS ||
+            vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &generalFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence    (hmlDevice->device, &fenceInfo,     nullptr, &inFlightFences[i])            != VK_SUCCESS) {
 
             std::cerr << "::> Failed to create sync objects.\n";
             return false;
@@ -631,8 +714,14 @@ Himmel::~Himmel() noexcept {
     std::cout << ":> Destroying Himmel...\n";
     // vkDeviceWaitIdle(hmlDevice->device);
 
+    if (!successfulInit) {
+        std::cerr << "::> Himmel init has not finished successfully, so no proper cleanup is node.\n";
+        return;
+    }
+
     for (size_t i = 0; i < maxFramesInFlight; i++) {
         vkDestroySemaphore(hmlDevice->device, renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(hmlDevice->device, generalFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(hmlDevice->device, imageAvailableSemaphores[i], nullptr);
         vkDestroyFence(hmlDevice->device, inFlightFences[i], nullptr);
     }

@@ -9,8 +9,15 @@ int main() {
     std::cout << "==================================== BEGIN ============================\n";
     {
         Himmel himmel;
-        himmel.init();
-        himmel.run();
+        if (!himmel.init()) {
+            std::cerr << "======== Failed to init Himmel ========\n";
+            return -1;
+        }
+        if (!himmel.run()) {
+            std::cerr << "======== Himmel terminated due to an error ========\n";
+            return -1;
+        }
     }
     std::cout << "====================================  END  ============================\n";
+    return 0;
 }

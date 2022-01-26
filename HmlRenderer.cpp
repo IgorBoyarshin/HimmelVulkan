@@ -168,7 +168,7 @@ VkCommandBuffer HmlRenderer::draw(uint32_t frameIndex, uint32_t imageIndex, VkDe
         hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
     for (const auto& [modelId, entities] : entitiesToRenderForModel) {
-        // NOTE We know there is at least 1 such entity (ensured by login of specifyEntitiesToRender)
+        // NOTE We know there is at least 1 such entity (ensured by logic of specifyEntitiesToRender)
         const auto& model = entities[0]->modelResource;
 
         VkBuffer vertexBuffers[] = { model->vertexBuffer };

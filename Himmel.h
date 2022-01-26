@@ -13,6 +13,7 @@
 #include "HmlRenderer.h"
 #include "HmlSnowParticleRenderer.h"
 #include "HmlTerrainRenderer.h"
+#include "HmlUiRenderer.h"
 #include "HmlModel.h"
 #include "HmlCamera.h"
 #include "util.h"
@@ -58,7 +59,9 @@ struct Himmel {
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
     std::shared_ptr<HmlRenderPass> hmlRenderPassGeneral;
+    std::shared_ptr<HmlRenderPass> hmlRenderPassUi;
     std::shared_ptr<HmlRenderer> hmlRenderer;
+    std::shared_ptr<HmlUiRenderer> hmlUiRenderer;
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
     std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
 
@@ -69,15 +72,17 @@ struct Himmel {
 
 
     std::vector<VkCommandBuffer> commandBuffers;
+    std::vector<VkCommandBuffer> commandBuffers2;
 
 
     const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
 
 
     // Sync objects
-    uint32_t maxFramesInFlight = 2; // TODO make a part of SimpleRenderer creation TODO ????
+    uint32_t maxFramesInFlight = 2;
     std::vector<VkSemaphore> imageAvailableSemaphores; // for each frame in flight
     std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
+    std::vector<VkSemaphore> generalFinishedSemaphores; // for each frame in flight
     std::vector<VkFence> inFlightFences;               // for each frame in flight
     std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
@@ -97,9 +102,10 @@ struct Himmel {
 
     std::vector<std::shared_ptr<HmlRenderer::Entity>> entities;
 
+    bool successfulInit = false;
 
     bool init() noexcept;
-    void run() noexcept;
+    bool run() noexcept;
     void updateForDt(float dt, float sinceStart) noexcept;
     void updateForImage(uint32_t imageIndex) noexcept;
     bool drawFrame() noexcept;
@@ -109,6 +115,8 @@ struct Himmel {
             std::shared_ptr<HmlSwapchain> hmlSwapchain,
             std::shared_ptr<HmlDepthResource> hmlDepthResource,
             const Weather& weather) const noexcept;
+    std::unique_ptr<HmlRenderPass> createUiRenderPass(
+            std::shared_ptr<HmlSwapchain> hmlSwapchain) const noexcept;
     void recreateSwapchain() noexcept;
     bool createSyncObjects() noexcept;
     ~Himmel() noexcept;

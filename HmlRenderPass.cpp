@@ -81,7 +81,7 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = attachment.clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
             // Because won't be used after the drawing has finished:
-            .storeOp = (config.saveDepth) ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .storeOp = (config.depthStencilAttachment->saveDepth) ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -134,7 +134,7 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
     hmlRenderPass->hmlCommands = hmlCommands;
     hmlRenderPass->renderPass = renderPass;
     hmlRenderPass->extent = config.extent;
-    
+
     if (config.depthStencilAttachment) {
         // NOTE In order to make sure the depth resource is not destroyed before we are finished
         // hmlRenderPass->_hmlDepthResource = config.depthStencilAttachment->hmlDepthResource;

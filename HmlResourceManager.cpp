@@ -4,33 +4,13 @@
 #include "libs/stb_image.h"
 
 
-// TODO
-// Maybe store resources themselves inside a Renderer, so that when a Renderer
-// is no londer needed the respective resources are freed.
-//
-// Or maybe store resources here, but upon the creation return a smart_ptr with
-// the ID, so that when a renderer dies, its ptr dies, and the resources are freed
-// automatically.
-// TODO
+HmlImageResource::~HmlImageResource() noexcept {
+    std::cout << ":> Destroying HmlImageResource.\n";
 
-
-HmlDepthResource::~HmlDepthResource() noexcept {
-    std::cout << ":> Destroying HmlDepthResource.\n";
-
-    vkDestroyImageView(hmlDevice->device, imageView, nullptr);
+    if (sampler) vkDestroySampler(hmlDevice->device, sampler, nullptr);
+    vkDestroyImageView(hmlDevice->device, view, nullptr);
     vkDestroyImage(hmlDevice->device, image, nullptr);
-    vkFreeMemory(hmlDevice->device, imageMemory, nullptr);
-}
-// ============================================================================
-// ============================================================================
-// ============================================================================
-HmlTextureResource::~HmlTextureResource() noexcept {
-    std::cout << ":> Destroying HmlTextureResource.\n";
-
-    vkDestroySampler(hmlDevice->device, sampler, nullptr);
-    vkDestroyImageView(hmlDevice->device, imageView, nullptr);
-    vkDestroyImage(hmlDevice->device, image, nullptr);
-    vkFreeMemory(hmlDevice->device, imageMemory, nullptr);
+    vkFreeMemory(hmlDevice->device, memory, nullptr);
 }
 // ============================================================================
 // ============================================================================
@@ -52,52 +32,32 @@ HmlModelResource::Id HmlModelResource::newId() noexcept {
 // ============================================================================
 // ============================================================================
 // ============================================================================
-void HmlUniformBuffer::map() noexcept {
-    if (!mappedPtr) vkMapMemory(hmlDevice->device, uniformBufferMemory, 0, sizeBytes, 0, &mappedPtr);
+void HmlBuffer::map() noexcept {
+    if (!mappedPtr) vkMapMemory(hmlDevice->device, memory, 0, sizeBytes, 0, &mappedPtr);
 }
 
 
-void HmlUniformBuffer::unmap() noexcept {
-    if (mappedPtr) vkUnmapMemory(hmlDevice->device, uniformBufferMemory);
+void HmlBuffer::unmap() noexcept {
+    if (mappedPtr) vkUnmapMemory(hmlDevice->device, memory);
     mappedPtr = nullptr;
 }
 
 
-void HmlUniformBuffer::update(void* newData) noexcept {
+void HmlBuffer::update(const void* newData) noexcept {
     if (mappedPtr) memcpy(mappedPtr, newData, sizeBytes);
 }
 
 
-HmlUniformBuffer::~HmlUniformBuffer() noexcept {
-    std::cout << ":> Destroying HmlUniformBuffer.\n";
+HmlBuffer::~HmlBuffer() noexcept {
+    switch (type) {
+        case Type::STAGING: std::cout << ":> Destroying HmlBuffer (staging).\n"; break;
+        case Type::UNIFORM: std::cout << ":> Destroying HmlBuffer (uniform).\n"; break;
+        case Type::STORAGE: std::cout << ":> Destroying HmlBuffer (storage).\n"; break;
+    }
+
     unmap();
-    vkDestroyBuffer(hmlDevice->device, uniformBuffer, nullptr);
-    vkFreeMemory(hmlDevice->device, uniformBufferMemory, nullptr);
-}
-// ============================================================================
-// ============================================================================
-// ============================================================================
-void HmlStorageBuffer::map() noexcept {
-    if (!mappedPtr) vkMapMemory(hmlDevice->device, storageBufferMemory, 0, sizeBytes, 0, &mappedPtr);
-}
-
-
-void HmlStorageBuffer::unmap() noexcept {
-    if (mappedPtr) vkUnmapMemory(hmlDevice->device, storageBufferMemory);
-    mappedPtr = nullptr;
-}
-
-
-void HmlStorageBuffer::update(void* newData) noexcept {
-    if (mappedPtr) memcpy(mappedPtr, newData, sizeBytes);
-}
-
-
-HmlStorageBuffer::~HmlStorageBuffer() noexcept {
-    std::cout << ":> Destroying HmlStorageBuffer.\n";
-    unmap();
-    vkDestroyBuffer(hmlDevice->device, storageBuffer, nullptr);
-    vkFreeMemory(hmlDevice->device, storageBufferMemory, nullptr);
+    vkDestroyBuffer(hmlDevice->device, buffer, nullptr);
+    vkFreeMemory(hmlDevice->device, memory, nullptr);
 }
 // ============================================================================
 // ============================================================================
@@ -116,58 +76,115 @@ HmlResourceManager::~HmlResourceManager() noexcept {
 }
 
 
-std::unique_ptr<HmlUniformBuffer> HmlResourceManager::createUniformBuffer(VkDeviceSize sizeBytes) noexcept {
-    auto ubo = std::make_unique<HmlUniformBuffer>();
-    ubo->hmlDevice = hmlDevice;
-    ubo->sizeBytes = sizeBytes;
-    createBuffer(sizeBytes, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        ubo->uniformBuffer, ubo->uniformBufferMemory);
-    return ubo;
+std::unique_ptr<HmlBuffer> HmlResourceManager::createStagingBuffer(VkDeviceSize sizeBytes) const noexcept {
+    auto buffer = std::make_unique<HmlBuffer>();
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::STAGING;
+    buffer->sizeBytes = sizeBytes;
+    const auto usage      = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+    return buffer;
 }
 
 
-// TODO add options for VERTEX_INPUT etc.
-std::unique_ptr<HmlStorageBuffer> HmlResourceManager::createStorageBuffer(VkDeviceSize sizeBytes) noexcept {
-    auto ssbo = std::make_unique<HmlStorageBuffer>();
-    ssbo->hmlDevice = hmlDevice;
-    ssbo->sizeBytes = sizeBytes;
-    createBuffer(sizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        ssbo->storageBuffer, ssbo->storageBufferMemory);
-    return ssbo;
+std::unique_ptr<HmlBuffer> HmlResourceManager::createUniformBuffer(VkDeviceSize sizeBytes) const noexcept {
+    auto buffer = std::make_unique<HmlBuffer>();
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::UNIFORM;
+    buffer->sizeBytes = sizeBytes;
+    const auto usage      = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+    return buffer;
 }
 
-std::unique_ptr<HmlTextureResource> HmlResourceManager::newTextureResource(const char* fileName, VkFilter filter) noexcept {
-    auto textureResource = std::make_unique<HmlTextureResource>();
-    textureResource->hmlDevice = hmlDevice;
-    const auto dimOpt = createTextureImage(textureResource->image, textureResource->imageMemory, fileName);
-    if (!dimOpt) {
-        std::cerr << "::> Failed to create new HmlTextureResource.\n";
+
+std::unique_ptr<HmlBuffer> HmlResourceManager::createStorageBuffer(VkDeviceSize sizeBytes) const noexcept {
+    auto buffer = std::make_unique<HmlBuffer>();
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::STORAGE;
+    buffer->sizeBytes = sizeBytes;
+    const auto usage      = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+    return buffer;
+}
+
+
+std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const char* fileName, VkFilter filter) noexcept {
+    // ======== Load data and store it in a staging buffer
+    int width, height, channels;
+    // NOTE Will force alpha even if it is not present
+    stbi_uc* pixels = stbi_load(fileName, &width, &height, &channels, STBI_rgb_alpha);
+    if (!pixels) {
+        std::cerr << "::> Failed to load texture image using stb library.\n";
         return { nullptr };
     }
-    textureResource->width = dimOpt->first;
-    textureResource->height = dimOpt->second;
-    textureResource->imageView = createTextureImageView(textureResource->image);
-    textureResource->sampler = createTextureSampler(filter, filter);
-    return textureResource;
+
+    auto stagingBuffer = createStagingBuffer(width * height * 4);
+    stagingBuffer->map();
+    stagingBuffer->update(pixels);
+    stagingBuffer->unmap();
+
+    stbi_image_free(pixels);
+
+    // ======== Create the image resource
+    const VkExtent2D            extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+    const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    const VkFormat              format = VK_FORMAT_R8G8B8A8_SRGB;
+    const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    auto resource = newBlankImageResource(extent, format, usage, aspect);
+
+    // ======== Copy data from the staging buffer to the image resource
+    if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, hmlCommands)) {
+        std::cerr << "::> Failed to create HmlImageResource as a texture resource.\n";
+        return { nullptr };
+    }
+    copyBufferToImage(stagingBuffer->buffer, resource->image, extent);
+    if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands)) {
+        std::cerr << "::> Failed to create HmlImageResource as a texture resource.\n";
+        return { nullptr };
+    }
+
+    // ======== Finish initializing resource members
+    resource->width = width;
+    resource->height = height;
+    resource->sampler = createTextureSampler(filter, filter); // TODO
+
+    return resource;
 }
 
 
-std::unique_ptr<HmlDepthResource> HmlResourceManager::newDepthResource(VkExtent2D extent) noexcept {
-    auto depthResource = std::make_unique<HmlDepthResource>();
-    depthResource->hmlDevice = hmlDevice;
-    depthResource->format = findDepthFormat();
-    createImage(extent.width, extent.height, depthResource->format,
-            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthResource->image, depthResource->imageMemory);
-    depthResource->imageView = createImageView(depthResource->image, depthResource->format, VK_IMAGE_ASPECT_DEPTH_BIT);
-    if (!transitionImageLayout(depthResource->image, depthResource->format, VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)) {
-        std::cerr << "::> Failed to create new HmlDepthResource.\n";
+std::unique_ptr<HmlImageResource> HmlResourceManager::newBlankImageResource(
+        VkExtent2D extent,
+        VkFormat format,
+        VkImageUsageFlags usage,
+        VkImageAspectFlagBits aspect) noexcept {
+    const VkImageTiling            tiling     = VK_IMAGE_TILING_OPTIMAL;
+    const VkMemoryPropertyFlagBits memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    auto resource = std::make_unique<HmlImageResource>();
+    resource->hmlDevice = hmlDevice;
+    resource->format = format;
+    if (!createImage(extent.width, extent.height, format, tiling, usage, memoryType, resource->image, resource->memory)) return { nullptr };
+    resource->view = createImageView(resource->image, format, aspect);
+    return resource;
+}
+
+
+std::unique_ptr<HmlImageResource> HmlResourceManager::newDepthResource(VkExtent2D extent) noexcept {
+    const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    const VkFormat              format = findDepthFormat();
+    const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+    auto resource = newBlankImageResource(extent, format, usage, aspect);
+
+    if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, hmlCommands)) {
+        std::cerr << "::> Failed to create HmlImageResource as a depth resource.\n";
         return { nullptr };
     }
-    return depthResource;
+
+    return resource;
 }
 
 
@@ -205,10 +222,10 @@ std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* verti
 // NOTE: unused
 // TODO remove
 void HmlResourceManager::createVertexBufferHost(VkBuffer& vertexBuffer,
-        VkDeviceMemory& vertexBufferMemory, const void* vertices, size_t sizeBytes) noexcept {
-    createBuffer(static_cast<VkDeviceSize>(sizeBytes), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            vertexBuffer, vertexBufferMemory);
+        VkDeviceMemory& vertexBufferMemory, const void* vertices, VkDeviceSize sizeBytes) noexcept {
+    const auto usage      = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    createBuffer(sizeBytes, usage, memoryType, vertexBuffer, vertexBufferMemory);
     // ======== Fill VertexBuffer
     // The driver may not immediately copy the data into the buffer memory,
     // for example because of caching. It is also possible that writes to
@@ -234,126 +251,39 @@ void HmlResourceManager::createVertexBufferHost(VkBuffer& vertexBuffer,
 }
 
 
-// By using a staging buffer here we improve the overall performance because
-// this is a one-time operation.
 void HmlResourceManager::createVertexBufferThroughStaging(VkBuffer& vertexBuffer,
-        VkDeviceMemory& vertexBufferMemory, const void* vertices, size_t sizeBytes) noexcept {
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(static_cast<VkDeviceSize>(sizeBytes), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            stagingBuffer, stagingBufferMemory);
+        VkDeviceMemory& vertexBufferMemory, const void* vertices, VkDeviceSize sizeBytes) noexcept {
+    auto stagingBuffer = createStagingBuffer(sizeBytes);
+    stagingBuffer->map();
+    stagingBuffer->update(vertices);
+    stagingBuffer->unmap();
 
-    void* data;
-    vkMapMemory(hmlDevice->device, stagingBufferMemory, 0, static_cast<VkDeviceSize>(sizeBytes), 0, &data);
-        memcpy(data, vertices, sizeBytes);
-    vkUnmapMemory(hmlDevice->device, stagingBufferMemory);
+    const auto usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    createBuffer(sizeBytes, usage, memoryType, vertexBuffer, vertexBufferMemory);
 
-    createBuffer(static_cast<VkDeviceSize>(sizeBytes), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-
-    copyBuffer(stagingBuffer, vertexBuffer, static_cast<VkDeviceSize>(sizeBytes));
-
-    vkDestroyBuffer(hmlDevice->device, stagingBuffer, nullptr);
-    vkFreeMemory(hmlDevice->device, stagingBufferMemory, nullptr);
+    copyBuffer(stagingBuffer->buffer, vertexBuffer, sizeBytes);
 }
 
 
 void HmlResourceManager::createIndexBufferThroughStaging(VkBuffer& indexBuffer,
         VkDeviceMemory& indexBufferMemory, const std::vector<uint32_t>& indices) noexcept {
-    size_t sizeBytes = sizeof(indices[0]) * indices.size();
+    const VkDeviceSize sizeBytes = sizeof(indices[0]) * indices.size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(static_cast<VkDeviceSize>(sizeBytes), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            stagingBuffer, stagingBufferMemory);
+    auto stagingBuffer = createStagingBuffer(sizeBytes);
+    stagingBuffer->map();
+    stagingBuffer->update(indices.data());
+    stagingBuffer->unmap();
 
-    void* data;
-    vkMapMemory(hmlDevice->device, stagingBufferMemory, 0, static_cast<VkDeviceSize>(sizeBytes), 0, &data);
-        memcpy(data, indices.data(), sizeBytes);
-    vkUnmapMemory(hmlDevice->device, stagingBufferMemory);
+    const auto usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    createBuffer(sizeBytes, usage, memoryType, indexBuffer, indexBufferMemory);
 
-    createBuffer(static_cast<VkDeviceSize>(sizeBytes), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
-    copyBuffer(stagingBuffer, indexBuffer, static_cast<VkDeviceSize>(sizeBytes));
-
-    vkDestroyBuffer(hmlDevice->device, stagingBuffer, nullptr);
-    vkFreeMemory(hmlDevice->device, stagingBufferMemory, nullptr);
+    copyBuffer(stagingBuffer->buffer, indexBuffer, sizeBytes);
 }
-
-
-// void createUniformBuffers(std::vector<VkBuffer>& uniformBuffers,
-//         std::vector<VkDeviceMemory>& uniformBuffersMemory, size_t count, size_t sizeBytes) {
-//     uniformBuffers.resize(count);
-//     uniformBuffersMemory.resize(count);
-//
-//     for (size_t i = 0; i < count; i++) {
-//         // We'll be updating it every frame, so makes sense to store it in Host memory
-//         createBuffer(sizeBytes, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-//             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-//             uniformBuffers[i], uniformBuffersMemory[i]);
-//     }
-// }
 // ========================================================================
 // ========================================================================
 // ========================================================================
-std::optional<std::pair<uint32_t, uint32_t>> HmlResourceManager::createTextureImage(
-        VkImage& textureImage, VkDeviceMemory& textureImageMemory, const char* fileName) noexcept {
-    int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(fileName, &texWidth, &texHeight, &texChannels,
-        STBI_rgb_alpha); // will force alpha even if it is not present
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-    if (!pixels) {
-        std::cerr << "::> Failed to load texture image using stb library.\n";
-        return std::nullopt;
-    }
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer, stagingBufferMemory);
-
-    void* data;
-    vkMapMemory(hmlDevice->device, stagingBufferMemory, 0, imageSize, 0, &data);
-        memcpy(data, pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(hmlDevice->device, stagingBufferMemory);
-
-    stbi_image_free(pixels);
-
-    createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        // Is a destination; we want to access it from the shader
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        textureImage, textureImageMemory);
-
-    if (!transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-        // UNDEFINED because that's what the image was created with.
-        // Can do this because we don't care about the contents before the copy.
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) return std::nullopt;
-
-    copyBufferToImage(stagingBuffer, textureImage,
-        static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-
-    if (!transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) return std::nullopt;
-
-    vkDestroyBuffer(hmlDevice->device, stagingBuffer, nullptr);
-    vkFreeMemory(hmlDevice->device, stagingBufferMemory, nullptr);
-
-    return { { texWidth, texHeight } };
-}
-
-
-VkImageView HmlResourceManager::createTextureImageView(VkImage textureImage) noexcept {
-    return createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
-}
-
-
 VkSampler HmlResourceManager::createTextureSampler(VkFilter magFilter, VkFilter minFilter) noexcept {
     // For anisotropic filtering
     VkPhysicalDeviceProperties properties{};
@@ -395,8 +325,8 @@ VkSampler HmlResourceManager::createTextureSampler(VkFilter magFilter, VkFilter 
 // ========================================================================
 // VkBufferUsageFlagBits:
 // VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-// VK_IMAGE_USAGE_TRANSFER_DST_BIT
-// VK_IMAGE_USAGE_SAMPLED_BIT
+// VK_IMAGE_USAGE_TRANSFER_DST_BIT -- we will manually copy data to it
+// VK_IMAGE_USAGE_SAMPLED_BIT -- sampled from the shader
 // VK_IMAGE_USAGE_STORAGE_BIT
 // VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
 // VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
@@ -514,7 +444,6 @@ VkFormat HmlResourceManager::findDepthFormat() const noexcept {
 // ========================================================================
 // ========================================================================
 // ========================================================================
-// TODO add device, physicalDevice, memProperties
 // VkBufferUsageFlagBits:
 // VK_BUFFER_USAGE_TRANSFER_SRC_BIT
 // VK_BUFFER_USAGE_TRANSFER_DST_BIT
@@ -526,7 +455,7 @@ VkFormat HmlResourceManager::findDepthFormat() const noexcept {
 // VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
 // VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
 bool HmlResourceManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) noexcept {
+        VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) const noexcept {
     // ======== Create a Buffer
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -568,45 +497,46 @@ bool HmlResourceManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usag
 // ========================================================================
 // Before the barrier, we wait for stages in stagesBeforeBarrier, and once
 // those stages complete, we unblock the pipeline stages in stagesAfterBarrier
-void HmlResourceManager::transitionBuffer(const std::vector<BufferTransition>& bufferTransitions,
-        VkPipelineStageFlags stagesBeforeBarrier, VkPipelineStageFlags stagesAfterBarrier) noexcept {
-    std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers;
-    for (const auto& bufferTransition : bufferTransitions) {
-        VkBufferMemoryBarrier bufferMemoryBarrier;
-        bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        bufferMemoryBarrier.pNext = nullptr;
-        bufferMemoryBarrier.offset = 0;
-        bufferMemoryBarrier.size = VK_WHOLE_SIZE;
-        bufferMemoryBarrier.buffer =              bufferTransition.buffer;
-        bufferMemoryBarrier.srcAccessMask =       bufferTransition.currentAccess;
-        bufferMemoryBarrier.dstAccessMask =       bufferTransition.newAccess;
-        bufferMemoryBarrier.srcQueueFamilyIndex = bufferTransition.currentQueueFamily;
-        bufferMemoryBarrier.dstQueueFamilyIndex = bufferTransition.newQueueFamily;
+// void HmlResourceManager::transitionBuffer(const std::vector<BufferTransition>& bufferTransitions,
+//         VkPipelineStageFlags stagesBeforeBarrier, VkPipelineStageFlags stagesAfterBarrier) noexcept {
+//     std::vector<VkBufferMemoryBarrier> bufferMemoryBarriers;
+//     for (const auto& bufferTransition : bufferTransitions) {
+//         VkBufferMemoryBarrier bufferMemoryBarrier;
+//         bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+//         bufferMemoryBarrier.pNext = nullptr;
+//         bufferMemoryBarrier.offset = 0;
+//         bufferMemoryBarrier.size = VK_WHOLE_SIZE;
+//         bufferMemoryBarrier.buffer =              bufferTransition.buffer;
+//         bufferMemoryBarrier.srcAccessMask =       bufferTransition.currentAccess;
+//         bufferMemoryBarrier.dstAccessMask =       bufferTransition.newAccess;
+//         bufferMemoryBarrier.srcQueueFamilyIndex = bufferTransition.currentQueueFamily;
+//         bufferMemoryBarrier.dstQueueFamilyIndex = bufferTransition.newQueueFamily;
+//
+//         bufferMemoryBarriers.push_back(bufferMemoryBarrier);
+//     }
+//
+//     VkCommandBuffer commandBuffer = hmlCommands->beginSingleTimeCommands();
+//     vkCmdPipelineBarrier(
+//         commandBuffer,
+//         stagesBeforeBarrier, stagesAfterBarrier,
+//         0, // or VK_DEPENDENCY_BY_REGION_BIT
+//         // (global) MemoryBarrier:
+//         0, nullptr,
+//         // BufferMemoryBarrier:
+//         static_cast<uint32_t>(bufferMemoryBarriers.size()), bufferMemoryBarriers.data(),
+//         // ImageMemoryBarrier:
+//         0, nullptr);
+//     hmlCommands->endSingleTimeCommands(commandBuffer);
+// }
 
-        bufferMemoryBarriers.push_back(bufferMemoryBarrier);
-    }
 
-    VkCommandBuffer commandBuffer = hmlCommands->beginSingleTimeCommands();
-    vkCmdPipelineBarrier(
-        commandBuffer,
-        stagesBeforeBarrier, stagesAfterBarrier,
-        0, // or VK_DEPENDENCY_BY_REGION_BIT
-        // (global) MemoryBarrier:
-        0, nullptr,
-        // BufferMemoryBarrier:
-        static_cast<uint32_t>(bufferMemoryBarriers.size()), bufferMemoryBarriers.data(),
-        // ImageMemoryBarrier:
-        0, nullptr);
-    hmlCommands->endSingleTimeCommands(commandBuffer);
-}
-
-
-bool HmlResourceManager::hasStencilComponent(VkFormat format) noexcept {
+bool HmlImageResource::hasStencilComponent() const noexcept {
     return (format == VK_FORMAT_D32_SFLOAT_S8_UINT) || (format == VK_FORMAT_D24_UNORM_S8_UINT);
 }
 
 
-bool HmlResourceManager::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) noexcept {
+bool HmlImageResource::transitionLayoutTo(VkImageLayout newLayout, std::shared_ptr<HmlCommands> hmlCommands) noexcept {
+    const auto oldLayout = layout;
     VkCommandBuffer commandBuffer = hmlCommands->beginSingleTimeCommands();
 
     // One of the most common ways to perform layout transitions is using
@@ -629,7 +559,7 @@ bool HmlResourceManager::transitionImageLayout(VkImage image, VkFormat format, V
     barrier.image = image;
     if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        if (hasStencilComponent(format)) {
+        if (hasStencilComponent()) {
             barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
         }
     } else {
@@ -687,6 +617,8 @@ bool HmlResourceManager::transitionImageLayout(VkImage image, VkFormat format, V
 
     hmlCommands->endSingleTimeCommands(commandBuffer);
 
+    layout = newLayout;
+
     return true;
 }
 // ========================================================================
@@ -718,7 +650,7 @@ void HmlResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDe
 }
 
 
-void HmlResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) noexcept {
+void HmlResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D extent) noexcept {
     VkCommandBuffer commandBuffer = hmlCommands->beginSingleTimeCommands();
 
     VkBufferImageCopy region{};
@@ -730,7 +662,7 @@ void HmlResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint3
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
     region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { width, height, 1 };
+    region.imageExtent = { extent.width, extent.height, 1 };
     vkCmdCopyBufferToImage(
         commandBuffer,
         buffer,

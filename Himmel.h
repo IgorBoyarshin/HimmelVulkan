@@ -53,7 +53,7 @@ struct Himmel {
 
     std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
-    std::shared_ptr<HmlDepthResource> hmlDepthResource;
+    std::shared_ptr<HmlImageResource> hmlDepthResource;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
     std::shared_ptr<HmlCommands> hmlCommands;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
@@ -86,10 +86,10 @@ struct Himmel {
     std::vector<VkFence> inFlightFences;               // for each frame in flight
     std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
-    std::vector<std::unique_ptr<HmlUniformBuffer>> viewProjUniformBuffers;
+    std::vector<std::unique_ptr<HmlBuffer>> viewProjUniformBuffers;
 
     // NOTE if they are static, we can share a single UBO
-    std::vector<std::unique_ptr<HmlUniformBuffer>> lightUniformBuffers;
+    std::vector<std::unique_ptr<HmlBuffer>> lightUniformBuffers;
 
 
     VkDescriptorPool generalDescriptorPool;
@@ -113,7 +113,7 @@ struct Himmel {
     void recordDrawEnd(VkCommandBuffer commandBuffer) noexcept;
     std::unique_ptr<HmlRenderPass> createGeneralRenderPass(
             std::shared_ptr<HmlSwapchain> hmlSwapchain,
-            std::shared_ptr<HmlDepthResource> hmlDepthResource,
+            std::shared_ptr<HmlImageResource> hmlDepthResource,
             const Weather& weather) const noexcept;
     std::unique_ptr<HmlRenderPass> createUiRenderPass(
             std::shared_ptr<HmlSwapchain> hmlSwapchain) const noexcept;

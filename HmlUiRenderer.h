@@ -24,6 +24,7 @@
 struct HmlUiRenderer {
     struct PushConstant {
         int32_t textureIndex;
+        float shift;
     };
 
 
@@ -41,7 +42,7 @@ struct HmlUiRenderer {
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts; // NOTE stores only 1 (for textures)
     VkDescriptorSetLayout descriptorSetLayoutTextures;
 
-    std::unique_ptr<HmlTextureResource> textureResource;
+    std::unique_ptr<HmlImageResource> textureResource;
 
 
     static constexpr uint32_t MAX_TEXTURES_COUNT = 1; // XXX must match the shader

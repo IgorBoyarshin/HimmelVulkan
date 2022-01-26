@@ -9,31 +9,24 @@
 #include "HmlCommands.h"
 
 
-struct HmlDepthResource {
+struct HmlImageResource {
     std::shared_ptr<HmlDevice> hmlDevice;
 
-    VkImage image;
-    VkDeviceMemory imageMemory;
-    VkImageView imageView;
-    VkFormat format;
-
-    ~HmlDepthResource() noexcept;
-};
-
-
-struct HmlTextureResource {
-    std::shared_ptr<HmlDevice> hmlDevice;
+    VkImage        image;
+    VkDeviceMemory memory;
+    VkImageView    view;
+    VkFormat       format;
+    VkImageLayout  layout;
+    VkSampler      sampler = VK_NULL_HANDLE; // NOTE only applicable to textures
+    // TODO find a way to reuse sampler across textures
 
     uint32_t width;
     uint32_t height;
 
-    VkImage        image;
-    VkDeviceMemory imageMemory;
-    VkImageView    imageView;
-    // TODO move sampler to Renderer and make it shared
-    VkSampler      sampler;
+    bool transitionLayoutTo(VkImageLayout newLayout, std::shared_ptr<HmlCommands> hmlCommands) noexcept;
+    bool hasStencilComponent() const noexcept;
 
-    ~HmlTextureResource() noexcept;
+    ~HmlImageResource() noexcept;
 };
 
 
@@ -51,7 +44,7 @@ struct HmlModelResource {
     VkDeviceMemory indexBufferMemory;
 
 
-    std::unique_ptr<HmlTextureResource> textureResource;
+    std::unique_ptr<HmlImageResource> textureResource;
 
     inline HmlModelResource() noexcept : id(newId()) {}
 
@@ -62,33 +55,22 @@ struct HmlModelResource {
 };
 
 
-struct HmlUniformBuffer {
+struct HmlBuffer {
+    enum class Type {
+        STAGING, UNIFORM, STORAGE
+    } type;
+
     std::shared_ptr<HmlDevice> hmlDevice;
 
-    VkDeviceSize sizeBytes;
-    VkBuffer       uniformBuffer;
-    VkDeviceMemory uniformBufferMemory;
+    VkDeviceSize   sizeBytes;
+    VkBuffer       buffer;
+    VkDeviceMemory memory;
     void* mappedPtr = nullptr;
 
     void map() noexcept;
     void unmap() noexcept;
-    void update(void* newData) noexcept;
-    ~HmlUniformBuffer() noexcept;
-};
-
-
-struct HmlStorageBuffer {
-    std::shared_ptr<HmlDevice> hmlDevice;
-
-    VkDeviceSize sizeBytes;
-    VkBuffer       storageBuffer;
-    VkDeviceMemory storageBufferMemory;
-    void* mappedPtr = nullptr;
-
-    void map() noexcept;
-    void unmap() noexcept;
-    void update(void* newData) noexcept;
-    ~HmlStorageBuffer() noexcept;
+    void update(const void* newData) noexcept;
+    ~HmlBuffer() noexcept;
 };
 
 
@@ -106,11 +88,15 @@ struct HmlResourceManager {
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands) noexcept;
     ~HmlResourceManager() noexcept;
-    std::unique_ptr<HmlUniformBuffer> createUniformBuffer(VkDeviceSize sizeBytes) noexcept;
-    // TODO add options for VERTEX_INPUT etc.
-    std::unique_ptr<HmlStorageBuffer> createStorageBuffer(VkDeviceSize sizeBytes) noexcept;
-    std::unique_ptr<HmlTextureResource> newTextureResource(const char* fileName, VkFilter filter) noexcept;
-    std::unique_ptr<HmlDepthResource> newDepthResource(VkExtent2D extent) noexcept;
+    // TODO consistency between new and create
+    std::unique_ptr<HmlBuffer> createStagingBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createUniformBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createStorageBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlImageResource> newTextureResource(const char* fileName, VkFilter filter) noexcept;
+    std::unique_ptr<HmlImageResource> newImageResource(VkExtent2D extent) noexcept;
+    std::unique_ptr<HmlImageResource> newDepthResource(VkExtent2D extent) noexcept;
+    std::unique_ptr<HmlImageResource> newBlankImageResource(
+        VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlagBits aspect) noexcept;
     // Model with color
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) noexcept;
     // Model with texture
@@ -119,16 +105,13 @@ struct HmlResourceManager {
     // NOTE: unused
     // TODO remove
     void createVertexBufferHost(VkBuffer& vertexBuffer,
-            VkDeviceMemory& vertexBufferMemory, const void* vertices, size_t sizeBytes) noexcept;
+            VkDeviceMemory& vertexBufferMemory, const void* vertices, VkDeviceSize sizeBytes) noexcept;
 
     void createVertexBufferThroughStaging(VkBuffer& vertexBuffer,
-            VkDeviceMemory& vertexBufferMemory, const void* vertices, size_t sizeBytes) noexcept;
+            VkDeviceMemory& vertexBufferMemory, const void* vertices, VkDeviceSize sizeBytes) noexcept;
     void createIndexBufferThroughStaging(VkBuffer& indexBuffer,
             VkDeviceMemory& indexBufferMemory, const std::vector<uint32_t>& indices) noexcept;
     // ========================================================================
-    std::optional<std::pair<uint32_t, uint32_t>> createTextureImage(
-        VkImage& textureImage, VkDeviceMemory& textureImageMemory, const char* fileName) noexcept;
-    VkImageView createTextureImageView(VkImage textureImage) noexcept;
     VkSampler createTextureSampler(VkFilter magFilter, VkFilter minFilter) noexcept;
     // ========================================================================
     bool createImage(uint32_t width, uint32_t height, VkFormat format,
@@ -140,8 +123,6 @@ struct HmlResourceManager {
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
             VkImageTiling tiling, VkFormatFeatureFlags features) const noexcept;
     VkFormat findDepthFormat() const noexcept;
-    // bool createDepthResources(VkImage& depthImage, VkDeviceMemory& depthImageMemory,
-    //         VkImageView& depthImageView, VkExtent2D extent) noexcept;
     // ========================================================================
     // TODO add device, physicalDevice, memProperties
     // VkBufferUsageFlagBits:
@@ -155,7 +136,7 @@ struct HmlResourceManager {
     // VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
     // VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
     bool createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-            VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) noexcept;
+        VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) const noexcept;
     // ========================================================================
     // VkAccessFlags:
     // VK_ACCESS_INDIRECT_COMMAND_READ_BIT
@@ -178,25 +159,24 @@ struct HmlResourceManager {
     // etc...
 
     // Use VK_QUEUE_FAMILY_IGNORED if the family does not change
-    struct BufferTransition {
-        VkBuffer buffer;
-        VkAccessFlags currentAccess;
-        VkAccessFlags newAccess;
-        uint32_t currentQueueFamily;
-        uint32_t newQueueFamily;
-    };
+    // struct BufferTransition {
+    //     VkBuffer buffer;
+    //     VkAccessFlags currentAccess;
+    //     VkAccessFlags newAccess;
+    //     uint32_t currentQueueFamily;
+    //     uint32_t newQueueFamily;
+    // };
 
     // Before the barrier, we wait for stages in stagesBeforeBarrier, and once
     // those stages complete, we unblock the pipeline stages in stagesAfterBarrier
-    void transitionBuffer(const std::vector<BufferTransition>& bufferTransitions,
-            VkPipelineStageFlags stagesBeforeBarrier, VkPipelineStageFlags stagesAfterBarrier) noexcept;
+    // void transitionBuffer(const std::vector<BufferTransition>& bufferTransitions,
+    //     VkPipelineStageFlags stagesBeforeBarrier, VkPipelineStageFlags stagesAfterBarrier) noexcept;
     static bool hasStencilComponent(VkFormat format) noexcept;
-    bool transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) noexcept;
     // ========================================================================
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const noexcept;
     // ========================================================================
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) noexcept;
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) noexcept;
+    void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D extent) noexcept;
 };
 
 #endif

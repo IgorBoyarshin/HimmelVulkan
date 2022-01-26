@@ -25,6 +25,7 @@ struct HmlRenderPass {
         // std::vector<VkImageView> imageViews;
         VkImageView imageView;
         std::optional<VkClearDepthStencilValue> clearColor;
+        bool saveDepth;
     };
 
 
@@ -32,7 +33,6 @@ struct HmlRenderPass {
         std::vector<ColorAttachment> colorAttachments;
         std::optional<DepthStencilAttachment> depthStencilAttachment;
         VkExtent2D extent;
-        bool saveDepth;
         bool hasPrevious;
         bool hasNext;
     };

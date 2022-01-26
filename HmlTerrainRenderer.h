@@ -106,8 +106,8 @@ struct HmlTerrainRenderer {
 
     std::vector<VkCommandBuffer> commandBuffers;
 
-    std::unique_ptr<HmlTextureResource> heightmapTexture;
-    std::unique_ptr<HmlTextureResource> grassTexture;
+    std::unique_ptr<HmlImageResource> heightmapTexture;
+    std::unique_ptr<HmlImageResource> grassTexture;
 
 
     static std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,

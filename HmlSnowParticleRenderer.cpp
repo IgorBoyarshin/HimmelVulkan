@@ -108,7 +108,7 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
 
     for (size_t imageIndex = 0; imageIndex < hmlRenderPass->imageCount(); imageIndex++) {
         const auto set = hmlRenderer->descriptorSet_instances_2_perImage[imageIndex];
-        const auto buffer = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->storageBuffer;
+        const auto buffer = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->buffer;
         const auto size = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->sizeBytes;
         HmlDescriptorSetUpdater(set).storageBufferAt(0, buffer, size).update(hmlDevice);
     }
@@ -118,7 +118,7 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
     std::vector<VkImageView> imageViews;
     for (const auto& resource : hmlRenderer->snowTextureResources) {
         samplers.push_back(resource->sampler);
-        imageViews.push_back(resource->imageView);
+        imageViews.push_back(resource->view);
     }
     HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
 

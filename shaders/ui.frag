@@ -6,6 +6,7 @@ layout(set = 0, binding = 0) uniform sampler2D texSamplers[MAX_TEXTURES_COUNT];
 // XXX sync with Vertex shader
 layout(push_constant) uniform PushConstants {
     int textureIndex;
+    float shift;
 } push;
 
 layout(location = 0) in vec2 inTexCoord;

@@ -128,7 +128,7 @@ void HmlRenderer::updateDescriptorSetTextures() noexcept {
         mustDefaultInit = false;
         for (uint32_t i = nextFreeTextureIndex; i < MAX_TEXTURES_COUNT; i++) {
             samplers[i] = anyModelWithTexture->textureResource->sampler;
-            imageViews[i] = anyModelWithTexture->textureResource->imageView;
+            imageViews[i] = anyModelWithTexture->textureResource->view;
         }
     }
 
@@ -138,7 +138,7 @@ void HmlRenderer::updateDescriptorSetTextures() noexcept {
         const auto& model = entitiesToRenderForModel[modelId][0]->modelResource;
         if (!model->textureResource) continue;
         samplers[textureIndex] = model->textureResource->sampler;
-        imageViews[textureIndex] = model->textureResource->imageView;
+        imageViews[textureIndex] = model->textureResource->view;
     }
 
     HmlDescriptorSetUpdater(descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);

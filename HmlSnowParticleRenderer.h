@@ -58,7 +58,7 @@ struct HmlSnowParticleRenderer {
     std::vector<SnowInstance> snowInstances;
     std::vector<glm::vec3> snowVelocities;
     // NOTE for the case when we use SnowCameraBounds, having multiple buffers is redundant
-    std::vector<std::unique_ptr<HmlStorageBuffer>> snowInstancesStorageBuffers;
+    std::vector<std::unique_ptr<HmlBuffer>> snowInstancesStorageBuffers;
 
     struct SnowBoxBounds {
         float xMin;
@@ -71,7 +71,7 @@ struct HmlSnowParticleRenderer {
     using SnowCameraBounds = float;
     using SnowBounds = std::variant<SnowBoxBounds, SnowCameraBounds>;
     SnowBounds snowBounds;
-    std::vector<std::unique_ptr<HmlTextureResource>> snowTextureResources;
+    std::vector<std::unique_ptr<HmlImageResource>> snowTextureResources;
 
 
     static std::unique_ptr<HmlPipeline> createSnowPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,

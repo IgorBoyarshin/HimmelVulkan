@@ -138,10 +138,10 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
     HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_heightmap_1)
         .textureAt(0,
             hmlRenderer->heightmapTexture->sampler,
-            hmlRenderer->heightmapTexture->imageView)
+            hmlRenderer->heightmapTexture->view)
         .textureAt(1,
             hmlRenderer->grassTexture->sampler,
-            hmlRenderer->grassTexture->imageView)
+            hmlRenderer->grassTexture->view)
         .update(hmlDevice);
     return hmlRenderer;
 }

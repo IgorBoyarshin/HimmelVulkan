@@ -74,7 +74,7 @@ std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(
     std::vector<VkSampler> samplers;
     std::vector<VkImageView> imageViews;
     samplers.push_back(hmlRenderer->textureResource->sampler);
-    imageViews.push_back(hmlRenderer->textureResource->imageView);
+    imageViews.push_back(hmlRenderer->textureResource->view);
     for (size_t i = 0; i < hmlRenderPass->imageCount(); i++) {
         HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_textures_0_perImage[i]).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
     }
@@ -178,6 +178,7 @@ VkCommandBuffer HmlUiRenderer::draw(uint32_t frameIndex, uint32_t imageIndex) no
 
     PushConstant pushConstant{
         .textureIndex = 0, // TODO
+        .shift = 0.5,
     };
     vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
         hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);

@@ -69,10 +69,10 @@ bool Himmel::init() noexcept {
     for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imageCount(); imageIndex++) {
         HmlDescriptorSetUpdater(generalDescriptorSet_0_perImage[imageIndex])
             .uniformBufferAt(0,
-                viewProjUniformBuffers[imageIndex]->uniformBuffer,
+                viewProjUniformBuffers[imageIndex]->buffer,
                 sizeof(GeneralUbo))
             .uniformBufferAt(1,
-                lightUniformBuffers[imageIndex]->uniformBuffer,
+                lightUniformBuffers[imageIndex]->buffer,
                 sizeof(LightUbo))
             .update(hmlDevice);
     }
@@ -297,7 +297,7 @@ bool Himmel::init() noexcept {
 
 std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
         std::shared_ptr<HmlSwapchain> hmlSwapchain,
-        std::shared_ptr<HmlDepthResource> hmlDepthResource,
+        std::shared_ptr<HmlImageResource> hmlDepthResource,
         const Weather& weather) const noexcept {
     // std::array<VkClearValue, 2> clearValues{};
     // clearValues[0].color = {{weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0}};
@@ -309,14 +309,14 @@ std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
     };
     const HmlRenderPass::DepthStencilAttachment depthAttachment{
         .imageFormat = hmlDepthResource->format,
-        .imageView = hmlDepthResource->imageView,
+        .imageView = hmlDepthResource->view,
         .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
+        .saveDepth = false,
     };
     HmlRenderPass::Config config{
         .colorAttachments = { colorAttachment },
         .depthStencilAttachment = { depthAttachment },
         .extent = hmlSwapchain->extent,
-        .saveDepth = false,
         .hasPrevious = false,
         .hasNext = true,
     };
@@ -339,7 +339,6 @@ std::unique_ptr<HmlRenderPass> Himmel::createUiRenderPass(std::shared_ptr<HmlSwa
         .colorAttachments = { colorAttachment },
         .depthStencilAttachment = std::nullopt,
         .extent = hmlSwapchain->extent,
-        .saveDepth = false,
         .hasPrevious = true,
         .hasNext = false,
     };

@@ -27,6 +27,12 @@ struct HmlDescriptorSetUpdater {
     std::vector<VkDescriptorImageInfo> imageInfos;
     std::vector<VkWriteDescriptorSet> descriptorWrites;
 
+    // NOTE because we would like the helper buffers to remain a vector (for resizability),
+    // but because they re-allocate themselves, we cannot assign addresses from them upfront.
+    // So we store the indices into them and assign the correct addresses upon build.
+    std::vector<size_t> bufferInfosIndices;
+    std::vector<size_t> imageInfosIndices;
+
 
     inline HmlDescriptorSetUpdater(VkDescriptorSet descriptorSet) noexcept : descriptorSet(descriptorSet) {}
 
@@ -36,7 +42,7 @@ struct HmlDescriptorSetUpdater {
     HmlDescriptorSetUpdater& textureArrayAt(uint32_t binding, const std::vector<VkSampler>& textureSamplers,
             const std::vector<VkImageView>& textureImageViews) noexcept;
 
-    void update(std::shared_ptr<HmlDevice> hmlDevice) const noexcept;
+    void update(std::shared_ptr<HmlDevice> hmlDevice) noexcept;
 };
 // ============================================================================
 // ============================================================================
@@ -45,7 +51,6 @@ struct HmlDescriptors {
     std::shared_ptr<HmlDevice> hmlDevice;
 
     static std::unique_ptr<HmlDescriptors> create(std::shared_ptr<HmlDevice> hmlDevice) noexcept;
-    void updateDescriptorSetUniformBuffer(VkDescriptorSet descriptorSet, VkBuffer uniformBuffer, VkDeviceSize sizeBytes) noexcept;
     std::vector<VkDescriptorSet> createDescriptorSets(uint32_t count, VkDescriptorSetLayout layout, VkDescriptorPool descriptorPool) noexcept;
 
 

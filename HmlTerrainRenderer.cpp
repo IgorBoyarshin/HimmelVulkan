@@ -135,38 +135,14 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
 
     hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(hmlRenderPass->imageCount(), hmlCommands->commandPoolOnetimeFrames);
 
-    // std::vector<VkSampler> samplers;
-    // std::vector<VkImageView> imageViews;
-    //     samplers.push_back(hmlRenderer->heightmapTexture->sampler);
-    //     imageViews.push_back(hmlRenderer->heightmapTexture->imageView);
-    //     samplers.push_back(hmlRenderer->grassTexture->sampler);
-    //     imageViews.push_back(hmlRenderer->grassTexture->imageView);
-    // HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_heightmap_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
-
-    // HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_heightmap_1)
-    //     .textureAt(0,
-    //         hmlRenderer->heightmapTexture->sampler,
-    //         hmlRenderer->heightmapTexture->imageView)
-    //     .textureAt(1,
-    //         hmlRenderer->grassTexture->sampler,
-    //         hmlRenderer->grassTexture->imageView)
-    //     .update(hmlDevice);
-    // TODO
-    // TODO
-    // TODO Why does not work in bulk and have to do by one??
-    // TODO
-    // TODO
     HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_heightmap_1)
         .textureAt(0,
             hmlRenderer->heightmapTexture->sampler,
             hmlRenderer->heightmapTexture->imageView)
-        .update(hmlDevice);
-    HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_heightmap_1)
         .textureAt(1,
             hmlRenderer->grassTexture->sampler,
             hmlRenderer->grassTexture->imageView)
         .update(hmlDevice);
-
     return hmlRenderer;
 }
 

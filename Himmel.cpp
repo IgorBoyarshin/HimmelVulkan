@@ -66,22 +66,14 @@ bool Himmel::init() noexcept {
         hmlSwapchain->imageCount(), generalDescriptorSetLayout, generalDescriptorPool);
     if (generalDescriptorSet_0_perImage.empty()) return false;
     for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imageCount(); imageIndex++) {
-        const auto set = generalDescriptorSet_0_perImage[imageIndex];
-        // TODO
-        // TODO
-        // TODO Why does not work in bulk and have to do by one??
-        // TODO
-        // TODO
-        {
-            const auto buffer = viewProjUniformBuffers[imageIndex]->uniformBuffer;
-            const auto size = sizeof(GeneralUbo);
-            HmlDescriptorSetUpdater(set).uniformBufferAt(0, buffer, size).update(hmlDevice);
-        }
-        {
-            const auto buffer = lightUniformBuffers[imageIndex]->uniformBuffer;
-            const auto size = sizeof(LightUbo);
-            HmlDescriptorSetUpdater(set).uniformBufferAt(1, buffer, size).update(hmlDevice);
-        }
+        HmlDescriptorSetUpdater(generalDescriptorSet_0_perImage[imageIndex])
+            .uniformBufferAt(0,
+                viewProjUniformBuffers[imageIndex]->uniformBuffer,
+                sizeof(GeneralUbo))
+            .uniformBufferAt(1,
+                lightUniformBuffers[imageIndex]->uniformBuffer,
+                sizeof(LightUbo))
+            .update(hmlDevice);
     }
 
 

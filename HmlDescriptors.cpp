@@ -3,6 +3,7 @@
 
 HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::storageBufferAt(
         uint32_t binding, VkBuffer buffer, VkDeviceSize sizeBytes) noexcept {
+    bufferInfosIndices.push_back(bufferInfos.size());
     bufferInfos.push_back(VkDescriptorBufferInfo{
         .buffer = buffer,
         .offset = 0,
@@ -28,6 +29,7 @@ HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::storageBufferAt(
 
 HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::uniformBufferAt(
         uint32_t binding, VkBuffer buffer, VkDeviceSize sizeBytes) noexcept {
+    bufferInfosIndices.push_back(bufferInfos.size());
     bufferInfos.push_back(VkDescriptorBufferInfo{
         .buffer = buffer,
         .offset = 0,
@@ -53,6 +55,7 @@ HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::uniformBufferAt(
 
 HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::textureAt(
         uint32_t binding, VkSampler textureSampler, VkImageView textureImageView) noexcept {
+    imageInfosIndices.push_back(imageInfos.size());
     imageInfos.push_back(VkDescriptorImageInfo{
         .sampler = textureSampler,
         .imageView = textureImageView,
@@ -81,6 +84,7 @@ HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::textureArrayAt(
     assert((textureSamplers.size() == textureImageViews.size()) && "::> Passed vector size while updating textures array do not match.");
     const auto count = textureSamplers.size();
 
+    imageInfosIndices.push_back(imageInfos.size());
     for (size_t i = 0; i < count; i++) {
         imageInfos.push_back(VkDescriptorImageInfo{
             .sampler = textureSamplers[i],
@@ -106,7 +110,27 @@ HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::textureArrayAt(
 }
 
 
-void HmlDescriptorSetUpdater::update(std::shared_ptr<HmlDevice> hmlDevice) const noexcept {
+void HmlDescriptorSetUpdater::update(std::shared_ptr<HmlDevice> hmlDevice) noexcept {
+    // Fix addresses
+    auto itImages = imageInfosIndices.cbegin();
+    auto itBuffers = bufferInfosIndices.cbegin();
+    for (auto& descriptorWrite : descriptorWrites) {
+        switch (descriptorWrite.descriptorType) {
+            case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+                descriptorWrite.pImageInfo = &imageInfos[*itImages];
+                std::advance(itImages, 1);
+                break;
+            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: [[fallthrough]];
+            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+                descriptorWrite.pBufferInfo = &bufferInfos[*itBuffers];
+                std::advance(itBuffers, 1);
+                break;
+            default:
+                std::cerr << "::> Unhandled switch case in HmlDescriptorSetUpdater: " << descriptorWrite.descriptorType << ".\n";
+        }
+    }
+
+    // Update
     vkUpdateDescriptorSets(hmlDevice->device,
         static_cast<uint32_t>(descriptorWrites.size()),
         descriptorWrites.data(), 0, nullptr);
@@ -118,30 +142,6 @@ std::unique_ptr<HmlDescriptors> HmlDescriptors::create(std::shared_ptr<HmlDevice
     auto hmlDescriptors = std::make_unique<HmlDescriptors>();
     hmlDescriptors->hmlDevice = hmlDevice;
     return hmlDescriptors;
-}
-
-
-void HmlDescriptors::updateDescriptorSetUniformBuffer(VkDescriptorSet descriptorSet,
-        VkBuffer uniformBuffer, VkDeviceSize sizeBytes) noexcept {
-    VkDescriptorBufferInfo bufferInfo{
-        .buffer = uniformBuffer,
-        .offset = 0,
-        .range = sizeBytes
-    };
-    VkWriteDescriptorSet descriptorWrite{
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .pNext = nullptr,
-        .dstSet = descriptorSet,
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .pImageInfo       = nullptr,
-        .pBufferInfo      = &bufferInfo,
-        .pTexelBufferView = nullptr
-    };
-
-    vkUpdateDescriptorSets(hmlDevice->device, 1, &descriptorWrite, 0, nullptr);
 }
 
 

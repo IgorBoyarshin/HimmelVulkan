@@ -73,6 +73,8 @@ struct HmlGraphicsPipelineConfig {
     float lineWidth;
 
     uint32_t colorAttachmentCount;
+
+    bool withBlending;
 };
 
 

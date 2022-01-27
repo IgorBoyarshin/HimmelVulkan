@@ -10,6 +10,10 @@
 
 
 struct HmlImageResource {
+    enum class Type {
+        BLANK, TEXTURE, RENDER_TARGET, DEPTH
+    } type;
+
     std::shared_ptr<HmlDevice> hmlDevice;
 
     VkImage        image;

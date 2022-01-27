@@ -1,5 +1,5 @@
-#ifndef HML_UI_RENDERER
-#define HML_UI_RENDERER
+#ifndef HML_DEFERRED_RENDERER
+#define HML_DEFERRED_RENDERER
 
 #include <memory>
 #include <vector>
@@ -21,11 +21,11 @@
 // In theory, it is easily possible to also recreate desriptor stuff upon
 // swapchain recreation by recreating the whole Renderer object.
 // NOTE
-struct HmlUiRenderer {
-    struct PushConstant {
-        int32_t textureIndex;
-        float shift;
-    };
+struct HmlDeferredRenderer {
+    // struct PushConstant {
+    //     int32_t textureIndex;
+    //     float shift;
+    // };
 
 
     std::shared_ptr<HmlWindow> hmlWindow;
@@ -46,9 +46,9 @@ struct HmlUiRenderer {
     std::vector<std::shared_ptr<HmlImageResource>> imageResources;
 
 
-    static constexpr uint32_t MAX_TEXTURES_COUNT = 3; // XXX must match the shader
+    static constexpr uint32_t G_COUNT = 3; // XXX must match the shader
     // static constexpr int32_t NO_TEXTURE_MARK = -1;
-    uint32_t texturesCount = 0;
+    // uint32_t texturesCount = 0;
 
     // std::shared_ptr<HmlModelResource> anyModelWithTexture;
     // std::unordered_map<HmlModelResource::Id, int32_t> textureIndexFor;
@@ -60,7 +60,7 @@ struct HmlUiRenderer {
 
     static std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
-    static std::unique_ptr<HmlUiRenderer> create(
+    static std::unique_ptr<HmlDeferredRenderer> create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,
@@ -68,8 +68,8 @@ struct HmlUiRenderer {
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         uint32_t framesInFlight) noexcept;
-    ~HmlUiRenderer() noexcept;
-    void specify(const std::vector<std::vector<std::shared_ptr<HmlImageResource>>>& resources) noexcept;
+    ~HmlDeferredRenderer() noexcept;
+    void specify(const std::array<std::vector<std::shared_ptr<HmlImageResource>>, G_COUNT>& resources) noexcept;
     VkCommandBuffer draw(uint32_t frameIndex, uint32_t imageIndex) noexcept;
 
     // TODO in order for each type of Renderer to properly replace its pipeline,

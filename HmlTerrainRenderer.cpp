@@ -10,7 +10,7 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
         .hmlShaders = HmlShaders()
             .addVertex("shaders/out/terrain.vert.spv")
             .addTessellationControl("shaders/out/terrain.tesc.spv")
-            .addTessellationEvaluation("shaders/out/terrain.tese.spv")
+            .addTessellationEvaluation("shaders/out/terrain_deferred.tese.spv")
             .addFragment("shaders/out/terrain_deferred.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
@@ -24,7 +24,8 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
         .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 4,
         .lineWidth = 1.0f,
-        .colorAttachmentCount = 2,
+        .colorAttachmentCount = 3,
+        .withBlending = true,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));

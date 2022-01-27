@@ -14,6 +14,7 @@
 #include "HmlSnowParticleRenderer.h"
 #include "HmlTerrainRenderer.h"
 #include "HmlUiRenderer.h"
+#include "HmlDeferredRenderer.h"
 #include "HmlModel.h"
 #include "HmlCamera.h"
 #include "util.h"
@@ -58,14 +59,20 @@ struct Himmel {
     std::shared_ptr<HmlCommands> hmlCommands;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
-    std::shared_ptr<HmlRenderPass> hmlRenderPassGeneral;
+    std::shared_ptr<HmlRenderPass> hmlRenderPassDeferredPrep;
+    std::shared_ptr<HmlRenderPass> hmlRenderPassDeferred;
     std::shared_ptr<HmlRenderPass> hmlRenderPassUi;
     std::shared_ptr<HmlRenderer> hmlRenderer;
     std::shared_ptr<HmlUiRenderer> hmlUiRenderer;
+    std::shared_ptr<HmlDeferredRenderer> hmlDeferredRenderer;
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
     std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
 
-    std::vector<std::shared_ptr<HmlImageResource>> secondImageResources;
+    // std::vector<std::shared_ptr<HmlImageResource>> secondImageResources;
+
+    std::vector<std::shared_ptr<HmlImageResource>> gBufferPositions;
+    std::vector<std::shared_ptr<HmlImageResource>> gBufferNormals;
+    std::vector<std::shared_ptr<HmlImageResource>> gBufferColors;
 
 
     HmlCamera camera;
@@ -73,8 +80,9 @@ struct Himmel {
     std::pair<int32_t, int32_t> cursor;
 
 
-    std::vector<VkCommandBuffer> commandBuffers;
-    std::vector<VkCommandBuffer> commandBuffers2;
+    std::vector<VkCommandBuffer> commandBuffersDeferredPrep;
+    std::vector<VkCommandBuffer> commandBuffersDeferred;
+    std::vector<VkCommandBuffer> commandBuffersUi;
 
 
     const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
@@ -84,7 +92,8 @@ struct Himmel {
     uint32_t maxFramesInFlight = 2;
     std::vector<VkSemaphore> imageAvailableSemaphores; // for each frame in flight
     std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
-    std::vector<VkSemaphore> generalFinishedSemaphores; // for each frame in flight
+    std::vector<VkSemaphore> deferredPrepFinishedSemaphores; // for each frame in flight
+    std::vector<VkSemaphore> deferredFinishedSemaphores; // for each frame in flight
     std::vector<VkFence> inFlightFences;               // for each frame in flight
     std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
@@ -113,10 +122,13 @@ struct Himmel {
     bool drawFrame() noexcept;
     void recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex) noexcept;
     void recordDrawEnd(VkCommandBuffer commandBuffer) noexcept;
+    bool createGBuffers() noexcept;
     std::unique_ptr<HmlRenderPass> createGeneralRenderPass(
             std::shared_ptr<HmlSwapchain> hmlSwapchain,
             std::shared_ptr<HmlImageResource> hmlDepthResource,
             const Weather& weather) const noexcept;
+    std::unique_ptr<HmlRenderPass> createDeferredRenderPass(
+            std::shared_ptr<HmlSwapchain> hmlSwapchain) const noexcept;
     std::unique_ptr<HmlRenderPass> createUiRenderPass(
             std::shared_ptr<HmlSwapchain> hmlSwapchain) const noexcept;
     void recreateSwapchain() noexcept;

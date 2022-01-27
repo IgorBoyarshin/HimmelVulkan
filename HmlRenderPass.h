@@ -22,7 +22,6 @@ struct HmlRenderPass {
     };
     struct DepthStencilAttachment {
         VkFormat imageFormat;
-        // std::vector<VkImageView> imageViews;
         VkImageView imageView;
         std::optional<VkClearDepthStencilValue> clearColor;
         bool saveDepth;

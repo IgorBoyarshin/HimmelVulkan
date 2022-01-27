@@ -21,7 +21,8 @@ std::unique_ptr<HmlPipeline> HmlSnowParticleRenderer::createSnowPipeline(std::sh
         .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 0,
         .lineWidth = 1.0f,
-        .colorAttachmentCount = 2,
+        .colorAttachmentCount = 3,
+        .withBlending = true,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));

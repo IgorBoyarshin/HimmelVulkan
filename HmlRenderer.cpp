@@ -8,7 +8,7 @@ std::unique_ptr<HmlPipeline> HmlRenderer::createPipeline(std::shared_ptr<HmlDevi
         .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .hmlShaders = HmlShaders()
-            .addVertex("shaders/out/simple.vert.spv")
+            .addVertex("shaders/out/simple_deferred.vert.spv")
             .addFragment("shaders/out/simple_deferred.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
@@ -21,7 +21,8 @@ std::unique_ptr<HmlPipeline> HmlRenderer::createPipeline(std::shared_ptr<HmlDevi
         .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 0,
         .lineWidth = 1.0f,
-        .colorAttachmentCount = 2,
+        .colorAttachmentCount = 3,
+        .withBlending = true,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));

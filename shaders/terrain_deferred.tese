@@ -47,6 +47,8 @@ layout(location = 1) in float inSegments[];
 layout(location = 0) out vec2  outTexCoord;
 layout(location = 1) out float outVisibility;
 layout(location = 2) out vec3  outFragColor;
+layout(location = 3) out vec3  outPosition;
+layout(location = 4) out vec3  outNormal;
 
 void main() {
     vec2 t = mix(
@@ -100,4 +102,7 @@ void main() {
     } else {
         outVisibility = 1.0;
     }
+
+    outNormal = normal;
+    outPosition = v0.xyz;
 }

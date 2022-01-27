@@ -5,7 +5,12 @@
 
 
 HmlImageResource::~HmlImageResource() noexcept {
-    std::cout << ":> Destroying HmlImageResource.\n";
+    switch (type) {
+        case Type::BLANK:         std::cout << ":> Destroying HmlImageResource (blank).\n"; break;
+        case Type::TEXTURE:       std::cout << ":> Destroying HmlImageResource (texture).\n"; break;
+        case Type::RENDER_TARGET: std::cout << ":> Destroying HmlImageResource (render target).\n"; break;
+        case Type::DEPTH:         std::cout << ":> Destroying HmlImageResource (depth).\n"; break;
+    }
 
     if (sampler) vkDestroySampler(hmlDevice->device, sampler, nullptr);
     vkDestroyImageView(hmlDevice->device, view, nullptr);
@@ -148,6 +153,7 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const c
     }
 
     // ======== Finish initializing resource members
+    resource->type = HmlImageResource::Type::TEXTURE;
     resource->width = width;
     resource->height = height;
     resource->sampler = createTextureSampler(filter, filter); // TODO
@@ -166,6 +172,7 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newBlankImageResource(
 
     auto resource = std::make_unique<HmlImageResource>();
     resource->hmlDevice = hmlDevice;
+    resource->type = HmlImageResource::Type::BLANK;
     resource->format = format;
     if (!createImage(extent.width, extent.height, format, tiling, usage, memoryType, resource->image, resource->memory)) return { nullptr };
     resource->view = createImageView(resource->image, format, aspect);
@@ -179,6 +186,7 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newRenderTargetImageResour
     const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     auto resource = newBlankImageResource(extent, format, usage, aspect);
     resource->sampler = createTextureSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST); // TODO XXX does not belong with this function name
+    resource->type = HmlImageResource::Type::RENDER_TARGET;
 
     if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, hmlCommands)) {
         std::cerr << "::> Failed to create HmlImageResource as a render target.\n";
@@ -194,6 +202,7 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newDepthResource(VkExtent2
     const VkFormat              format = findDepthFormat();
     const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
     auto resource = newBlankImageResource(extent, format, usage, aspect);
+    resource->type = HmlImageResource::Type::DEPTH;
 
     if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, hmlCommands)) {
         std::cerr << "::> Failed to create HmlImageResource as a depth resource.\n";

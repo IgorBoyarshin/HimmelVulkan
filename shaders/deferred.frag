@@ -75,5 +75,11 @@ void main() {
         light = mix(uboGeneral.fogColor, light, visibility);
     }
 
+    // Tone mapping and gamma correcton
+    const float exposure = 0.1;
+    const float gamma = 1.2;
+    vec3 mapped = vec3(1.0) - exp(-light * exposure);
+    light = pow(mapped, vec3(1.0 / gamma));
+
     outColor = vec4(light, 1.0);
 }

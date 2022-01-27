@@ -157,7 +157,7 @@ bool Himmel::init() noexcept {
         );
         pointLights.push_back(PointLight{
             .color = color,
-            .intensity = 3000.0f,
+            .intensity = 4000.0f,
             .position = pos,
             .reserved = 0.0f,
         });

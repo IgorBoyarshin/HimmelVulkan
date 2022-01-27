@@ -61,6 +61,7 @@ struct Himmel {
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
     std::shared_ptr<HmlRenderPass> hmlRenderPassDeferredPrep;
     std::shared_ptr<HmlRenderPass> hmlRenderPassDeferred;
+    std::shared_ptr<HmlRenderPass> hmlRenderPassForward;
     std::shared_ptr<HmlRenderPass> hmlRenderPassUi;
     std::shared_ptr<HmlRenderer> hmlRenderer;
     std::shared_ptr<HmlUiRenderer> hmlUiRenderer;
@@ -82,6 +83,7 @@ struct Himmel {
 
     std::vector<VkCommandBuffer> commandBuffersDeferredPrep;
     std::vector<VkCommandBuffer> commandBuffersDeferred;
+    std::vector<VkCommandBuffer> commandBuffersForward;
     std::vector<VkCommandBuffer> commandBuffersUi;
 
 
@@ -94,6 +96,7 @@ struct Himmel {
     std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
     std::vector<VkSemaphore> deferredPrepFinishedSemaphores; // for each frame in flight
     std::vector<VkSemaphore> deferredFinishedSemaphores; // for each frame in flight
+    std::vector<VkSemaphore> forwardFinishedSemaphores; // for each frame in flight
     std::vector<VkFence> inFlightFences;               // for each frame in flight
     std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
@@ -123,10 +126,13 @@ struct Himmel {
     void recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex) noexcept;
     void recordDrawEnd(VkCommandBuffer commandBuffer) noexcept;
     bool createGBuffers() noexcept;
-    std::unique_ptr<HmlRenderPass> createGeneralRenderPass(
+    std::unique_ptr<HmlRenderPass> createDeferredPrepRenderPass(
             std::shared_ptr<HmlSwapchain> hmlSwapchain,
             std::shared_ptr<HmlImageResource> hmlDepthResource,
             const Weather& weather) const noexcept;
+    std::unique_ptr<HmlRenderPass> createForwardRenderPass(
+            std::shared_ptr<HmlSwapchain> hmlSwapchain,
+            std::shared_ptr<HmlImageResource> hmlDepthResource) const noexcept;
     std::unique_ptr<HmlRenderPass> createDeferredRenderPass(
             std::shared_ptr<HmlSwapchain> hmlSwapchain) const noexcept;
     std::unique_ptr<HmlRenderPass> createUiRenderPass(

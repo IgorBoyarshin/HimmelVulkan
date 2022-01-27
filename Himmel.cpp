@@ -25,6 +25,7 @@ bool Himmel::init() noexcept {
 
     commandBuffersDeferredPrep = hmlCommands->allocatePrimary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames);
     commandBuffersDeferred = hmlCommands->allocatePrimary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames);
+    commandBuffersForward = hmlCommands->allocatePrimary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames);
     commandBuffersUi = hmlCommands->allocatePrimary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames);
 
 
@@ -93,12 +94,16 @@ bool Himmel::init() noexcept {
     if (!createGBuffers()) return false;
 
     // DeferredPrep RenderPass
-    hmlRenderPassDeferredPrep = createGeneralRenderPass(hmlSwapchain, hmlDepthResource, weather);
+    hmlRenderPassDeferredPrep = createDeferredPrepRenderPass(hmlSwapchain, hmlDepthResource, weather);
     if (!hmlRenderPassDeferredPrep) return false;
 
     // Deferred RenderPass
     hmlRenderPassDeferred = createDeferredRenderPass(hmlSwapchain);
     if (!hmlRenderPassDeferred) return false;
+
+    // Forward RenderPass
+    hmlRenderPassForward = createForwardRenderPass(hmlSwapchain, hmlDepthResource);
+    if (!hmlRenderPassForward) return false;
 
     // Ui RenderPass
     hmlRenderPassUi = createUiRenderPass(hmlSwapchain);
@@ -126,7 +131,7 @@ bool Himmel::init() noexcept {
     const auto HEIGHT_MAP = 70.0f;
     const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ SIZE_SNOW };
     hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlWindow,
-        hmlDevice, hmlCommands, hmlRenderPassDeferredPrep, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
+        hmlDevice, hmlCommands, hmlRenderPassForward, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlSnowRenderer) return false;
 
 
@@ -328,7 +333,7 @@ bool Himmel::createGBuffers() noexcept {
 }
 
 
-std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
+std::unique_ptr<HmlRenderPass> Himmel::createDeferredPrepRenderPass(
         std::shared_ptr<HmlSwapchain> hmlSwapchain,
         std::shared_ptr<HmlImageResource> hmlDepthResource,
         const Weather& weather) const noexcept {
@@ -366,7 +371,8 @@ std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
         .imageFormat = hmlDepthResource->format,
         .imageView = hmlDepthResource->view,
         .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
-        .saveDepth = false,
+        .saveDepth = true,
+        .hasPrevious = false,
     };
     HmlRenderPass::Config config{
         .colorAttachments = std::move(colorAttachments),
@@ -401,6 +407,38 @@ std::unique_ptr<HmlRenderPass> Himmel::createDeferredRenderPass(std::shared_ptr<
     auto hmlRenderPass = HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
     if (!hmlRenderPass) {
         std::cerr << "::> Failed to create Deferred HmlRenderPass.\n";
+        return { nullptr };
+    }
+    return hmlRenderPass;
+}
+
+
+std::unique_ptr<HmlRenderPass> Himmel::createForwardRenderPass(
+        std::shared_ptr<HmlSwapchain> hmlSwapchain,
+        std::shared_ptr<HmlImageResource> hmlDepthResource) const noexcept {
+    const HmlRenderPass::ColorAttachment colorAttachment{
+        .imageFormat = hmlSwapchain->imageFormat,
+        .imageViews = hmlSwapchain->imageViews,
+        .clearColor = std::nullopt,
+    };
+    const HmlRenderPass::DepthStencilAttachment depthAttachment{
+        .imageFormat = hmlDepthResource->format,
+        .imageView = hmlDepthResource->view,
+        .clearColor = std::nullopt,
+        .saveDepth = false, // not used after this RenderPass
+        .hasPrevious = true,
+    };
+    HmlRenderPass::Config config{
+        .colorAttachments = { colorAttachment },
+        .depthStencilAttachment = { depthAttachment },
+        .extent = hmlSwapchain->extent,
+        .hasPrevious = true,
+        .hasNext = true,
+    };
+
+    auto hmlRenderPass = HmlRenderPass::create(hmlDevice, hmlCommands, std::move(config));
+    if (!hmlRenderPass) {
+        std::cerr << "::> Failed to create Forward HmlRenderPass.\n";
         return { nullptr };
     }
     return hmlRenderPass;
@@ -604,7 +642,7 @@ bool Himmel::drawFrame() noexcept {
 
     updateForImage(imageIndex);
 
-    // NOTE Only this part depends on a Renderer (commandBuffers)
+    // DeferredPrep RenderPass
     {
         const auto commandBuffer = commandBuffersDeferredPrep[imageIndex];
         hmlRenderPassDeferredPrep->begin(commandBuffer, imageIndex);
@@ -613,7 +651,6 @@ bool Himmel::drawFrame() noexcept {
             std::vector<VkCommandBuffer> secondaryCommandBuffers;
             secondaryCommandBuffers.push_back(hmlTerrainRenderer->draw(imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
             secondaryCommandBuffers.push_back(hmlRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
-            secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
             vkCmdExecuteCommands(commandBuffer, secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
         }
         hmlRenderPassDeferredPrep->end(commandBuffer);
@@ -654,6 +691,7 @@ bool Himmel::drawFrame() noexcept {
     gBufferNormals[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands);
     gBufferColors[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands);
 
+    // Deferred RenderPass
     {
         const auto commandBuffer = commandBuffersDeferred[imageIndex];
         hmlRenderPassDeferred->begin(commandBuffer, imageIndex);
@@ -689,12 +727,49 @@ bool Himmel::drawFrame() noexcept {
         }
     }
 
+    // Forward RenderPass
+    {
+        const auto commandBuffer = commandBuffersForward[imageIndex];
+        hmlRenderPassForward->begin(commandBuffer, imageIndex);
+        {
+            // NOTE These are parallelizable
+            std::vector<VkCommandBuffer> secondaryCommandBuffers;
+            secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
+            vkCmdExecuteCommands(commandBuffer, secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
+        }
+        hmlRenderPassForward->end(commandBuffer);
+
+        VkSemaphore waitSemaphores[] = { deferredFinishedSemaphores[currentFrame] };
+        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        VkSemaphore signalSemaphores[] = { forwardFinishedSemaphores[currentFrame] };
+
+        VkSubmitInfo submitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = waitSemaphores,
+            .pWaitDstStageMask = waitStages,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &commandBuffer,
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = signalSemaphores,
+        };
+
+        // vkResetFences(hmlDevice->device, 1, &inFlightFences[currentFrame]);
+        // The specified fence will get signaled when the command buffer finishes executing.
+        if (vkQueueSubmit(hmlDevice->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+            std::cerr << "::> Failed to submit draw command buffer.\n";
+            return false;
+        }
+    }
+
     // NOTE
     // Swapchain views have the correct layout because the Deferred RenderPass
     // transitions them from UNDEFINED to COLOR_ATTACHMENT, and the Ui Renderpass
     // transitions them from COLOR_ATTACHMENT to PRESENT_SRC.
     // NOTE
 
+    // UI RenderPass
     {
         const auto commandBuffer = commandBuffersUi[imageIndex];
         hmlRenderPassUi->begin(commandBuffer, imageIndex);
@@ -706,7 +781,7 @@ bool Himmel::drawFrame() noexcept {
         }
         hmlRenderPassUi->end(commandBuffer);
 
-        VkSemaphore waitSemaphores[] = { deferredFinishedSemaphores[currentFrame] };
+        VkSemaphore waitSemaphores[] = { forwardFinishedSemaphores[currentFrame] };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
         VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
 
@@ -786,12 +861,16 @@ void Himmel::recreateSwapchain() noexcept {
     if (!createGBuffers()) return;
 
     // DeferredPrep RenderPass
-    hmlRenderPassDeferredPrep = createGeneralRenderPass(hmlSwapchain, hmlDepthResource, weather);
+    hmlRenderPassDeferredPrep = createDeferredPrepRenderPass(hmlSwapchain, hmlDepthResource, weather);
     if (!hmlRenderPassDeferredPrep) return;
 
     // Deferred RenderPass
     hmlRenderPassDeferred = createDeferredRenderPass(hmlSwapchain);
     if (!hmlRenderPassDeferred) return;
+
+    // Forward RenderPass
+    hmlRenderPassForward = createForwardRenderPass(hmlSwapchain, hmlDepthResource);
+    if (!hmlRenderPassForward) return;
 
     // Ui RenderPass
     hmlRenderPassUi = createUiRenderPass(hmlSwapchain);
@@ -800,7 +879,7 @@ void Himmel::recreateSwapchain() noexcept {
 
     // TODO foreach Renderer
     hmlRenderer->replaceRenderPass(hmlRenderPassDeferredPrep);
-    hmlSnowRenderer->replaceRenderPass(hmlRenderPassDeferredPrep);
+    hmlSnowRenderer->replaceRenderPass(hmlRenderPassForward);
     hmlTerrainRenderer->replaceRenderPass(hmlRenderPassDeferredPrep);
     hmlDeferredRenderer->replaceRenderPass(hmlRenderPassDeferred);
     hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
@@ -820,6 +899,7 @@ bool Himmel::createSyncObjects() noexcept {
     renderFinishedSemaphores.resize(maxFramesInFlight);
     deferredPrepFinishedSemaphores.resize(maxFramesInFlight);
     deferredFinishedSemaphores.resize(maxFramesInFlight);
+    forwardFinishedSemaphores.resize(maxFramesInFlight);
     inFlightFences.resize(maxFramesInFlight);
     imagesInFlight.resize(hmlSwapchain->imageCount(), VK_NULL_HANDLE); // initially not a single frame is using an image
 
@@ -838,6 +918,7 @@ bool Himmel::createSyncObjects() noexcept {
             vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i])  != VK_SUCCESS ||
             vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &deferredPrepFinishedSemaphores[i]) != VK_SUCCESS ||
             vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &deferredFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &forwardFinishedSemaphores[i]) != VK_SUCCESS ||
             vkCreateFence    (hmlDevice->device, &fenceInfo,     nullptr, &inFlightFences[i])            != VK_SUCCESS) {
 
             std::cerr << "::> Failed to create sync objects.\n";
@@ -862,6 +943,7 @@ Himmel::~Himmel() noexcept {
         vkDestroySemaphore(hmlDevice->device, renderFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(hmlDevice->device, deferredPrepFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(hmlDevice->device, deferredFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(hmlDevice->device, forwardFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(hmlDevice->device, imageAvailableSemaphores[i], nullptr);
         vkDestroyFence(hmlDevice->device, inFlightFences[i], nullptr);
     }

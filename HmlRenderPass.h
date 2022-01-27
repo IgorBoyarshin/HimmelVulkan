@@ -25,6 +25,7 @@ struct HmlRenderPass {
         VkImageView imageView;
         std::optional<VkClearDepthStencilValue> clearColor;
         bool saveDepth;
+        bool hasPrevious;
     };
 
 

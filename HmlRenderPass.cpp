@@ -80,11 +80,10 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
             .format = attachment.imageFormat,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = attachment.clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
-            // Because won't be used after the drawing has finished:
             .storeOp = (config.depthStencilAttachment->saveDepth) ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .initialLayout = (attachment.hasPrevious) ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED,
             .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         });
     }

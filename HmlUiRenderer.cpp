@@ -21,6 +21,7 @@ std::unique_ptr<HmlPipeline> HmlUiRenderer::createPipeline(std::shared_ptr<HmlDe
         .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 0,
         .lineWidth = 1.0f,
+        .colorAttachmentCount = 1,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -43,7 +44,7 @@ std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(
     hmlRenderer->hmlResourceManager = hmlResourceManager;
     hmlRenderer->hmlDescriptors = hmlDescriptors;
 
-    hmlRenderer->textureResource = hmlResourceManager->newTextureResource("models/girl.png", VK_FILTER_LINEAR);
+    // hmlRenderer->textureResource = hmlResourceManager->newTextureResource("models/girl.png", VK_FILTER_LINEAR);
 
 
     hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
@@ -71,13 +72,13 @@ std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(
     hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames);
 
 
-    std::vector<VkSampler> samplers;
-    std::vector<VkImageView> imageViews;
-    samplers.push_back(hmlRenderer->textureResource->sampler);
-    imageViews.push_back(hmlRenderer->textureResource->view);
-    for (size_t i = 0; i < hmlRenderPass->imageCount(); i++) {
-        HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_textures_0_perImage[i]).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
-    }
+    // std::vector<VkSampler> samplers;
+    // std::vector<VkImageView> imageViews;
+    // samplers.push_back(hmlRenderer->textureResource->sampler);
+    // imageViews.push_back(hmlRenderer->textureResource->view);
+    // for (size_t i = 0; i < hmlRenderPass->imageCount(); i++) {
+    //     HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_textures_0_perImage[i]).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
+    // }
 
     return hmlRenderer;
 }
@@ -91,6 +92,18 @@ HmlUiRenderer::~HmlUiRenderer() noexcept {
     // DescriptorSets are freed automatically upon the deletion of the pool
     vkDestroyDescriptorPool(hmlDevice->device, descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(hmlDevice->device, descriptorSetLayoutTextures, nullptr);
+}
+
+
+void HmlUiRenderer::specify(const std::vector<std::shared_ptr<HmlImageResource>>& resources) noexcept {
+    for (size_t i = 0; i < hmlRenderPass->imageCount(); i++) {
+        std::vector<VkSampler> samplers;
+        std::vector<VkImageView> imageViews;
+        samplers.push_back(resources[i]->sampler);
+        imageViews.push_back(resources[i]->view);
+        HmlDescriptorSetUpdater(descriptorSet_textures_0_perImage[i])
+            .textureArrayAt(0, samplers, imageViews).update(hmlDevice);
+    }
 }
 
 

@@ -89,6 +89,11 @@ bool Himmel::init() noexcept {
     // General RenderPass
     hmlDepthResource = hmlResourceManager->newDepthResource(hmlSwapchain->extent);
     if (!hmlDepthResource) return false;
+    for (size_t i = 0; i < hmlSwapchain->imageCount(); i++) {
+        // NOTE creates
+        secondImageResources.push_back(hmlResourceManager->newRenderTargetImageResource(hmlSwapchain->extent));
+        if (!secondImageResources[i]) return false;
+    }
     hmlRenderPassGeneral = createGeneralRenderPass(hmlSwapchain, hmlDepthResource, weather);
     if (!hmlRenderPassGeneral) return false;
     // UI RenderPass
@@ -103,6 +108,7 @@ bool Himmel::init() noexcept {
     hmlUiRenderer = HmlUiRenderer::create(hmlWindow, hmlDevice, hmlCommands,
         hmlRenderPassUi, hmlResourceManager, hmlDescriptors, maxFramesInFlight);
     if (!hmlUiRenderer) return false;
+    hmlUiRenderer->specify(secondImageResources);
 
 
     const auto SIZE_MAP = 250.0f;
@@ -307,6 +313,16 @@ std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
         .imageViews = hmlSwapchain->imageViews,
         .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
     };
+
+    const auto format = secondImageResources[0]->format;
+    std::vector<VkImageView> secondImageViews;
+    for (const auto& res : secondImageResources) secondImageViews.push_back(res->view);
+    const HmlRenderPass::ColorAttachment colorAttachment2{
+        .imageFormat = format,
+        .imageViews = std::move(secondImageViews),
+        .clearColor = {{ 1.0f, 0.0f, 0.0f, 1.0f }},
+    };
+
     const HmlRenderPass::DepthStencilAttachment depthAttachment{
         .imageFormat = hmlDepthResource->format,
         .imageView = hmlDepthResource->view,
@@ -314,7 +330,7 @@ std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
         .saveDepth = false,
     };
     HmlRenderPass::Config config{
-        .colorAttachments = { colorAttachment },
+        .colorAttachments = { colorAttachment, colorAttachment2 },
         .depthStencilAttachment = { depthAttachment },
         .extent = hmlSwapchain->extent,
         .hasPrevious = false,
@@ -571,6 +587,9 @@ bool Himmel::drawFrame() noexcept {
     // NOTE because otherwise right now we take advantage from the fact that
     // NOTE the first submission is already being processed while we record the second commandBuffer
     // NOTE
+
+    secondImageResources[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands);
+
     {
         const auto commandBuffer = commandBuffers2[imageIndex];
         hmlRenderPassUi->begin(commandBuffer, imageIndex);
@@ -605,6 +624,8 @@ bool Himmel::drawFrame() noexcept {
             return false;
         }
     }
+
+    secondImageResources[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, hmlCommands);
 
     {
         VkSemaphore waitSemaphores[] = { renderFinishedSemaphores[currentFrame] };
@@ -656,6 +677,11 @@ void Himmel::recreateSwapchain() noexcept {
     // General RenderPass
     hmlDepthResource = hmlResourceManager->newDepthResource(hmlSwapchain->extent);
     if (!hmlDepthResource) return;
+    for (size_t i = 0; i < hmlSwapchain->imageCount(); i++) {
+        // NOTE replaces by index
+        secondImageResources[i] = hmlResourceManager->newRenderTargetImageResource(hmlSwapchain->extent);
+        if (!secondImageResources[i]) return;
+    }
     hmlRenderPassGeneral = createGeneralRenderPass(hmlSwapchain, hmlDepthResource, weather);
     if (!hmlRenderPassGeneral) return;
     // UI RenderPass
@@ -668,6 +694,7 @@ void Himmel::recreateSwapchain() noexcept {
     hmlSnowRenderer->replaceRenderPass(hmlRenderPassGeneral);
     hmlTerrainRenderer->replaceRenderPass(hmlRenderPassGeneral);
     hmlUiRenderer->replaceRenderPass(hmlRenderPassUi);
+    hmlUiRenderer->specify(secondImageResources);
     // TODO maybe store this as as flag inside the Renderer so that it knows automatically
     // hmlTerrainRenderer->bake(generalDescriptorSet_0_perImage);
 

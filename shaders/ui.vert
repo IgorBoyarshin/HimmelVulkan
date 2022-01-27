@@ -8,27 +8,19 @@ layout(push_constant) uniform PushConstants {
 
 layout(location = 0) out vec2 outTexCoord;
 
-/* const vec2 positionFor[6] = vec2[]( */
-/*     vec2(-0.5, -0.5), */
-/*     vec2(+0.5, -0.5), */
-/*     vec2(+0.5, +0.5), */
-/*     vec2(+0.5, +0.5), */
-/*     vec2(-0.5, +0.5), */
-/*     vec2(-0.5, -0.5) */
-/* ); */
 const vec2 positionFor[6] = vec2[](
     vec2(-0.0, -0.0),
-    vec2(+0.5, -0.0),
-    vec2(+0.5, +0.5),
-    vec2(+0.5, +0.5),
     vec2(-0.0, +0.5),
-    vec2(-0.0, -0.0)
+    vec2(+0.5, +0.5),
+    vec2(-0.0, -0.0),
+    vec2(+0.5, +0.5),
+    vec2(+0.5, -0.0)
 );
 const vec2 texCoordFor[6] = vec2[](
-    vec2(1.0, 0.0),
     vec2(0.0, 0.0),
     vec2(0.0, 1.0),
-    vec2(0.0, 1.0),
+    vec2(1.0, 1.0),
+    vec2(0.0, 0.0),
     vec2(1.0, 1.0),
     vec2(1.0, 0.0)
 );

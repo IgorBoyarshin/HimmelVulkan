@@ -9,9 +9,9 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
         .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
         .hmlShaders = HmlShaders()
             .addVertex("shaders/out/terrain.vert.spv")
-            .addFragment("shaders/out/terrain.frag.spv")
             .addTessellationControl("shaders/out/terrain.tesc.spv")
-            .addTessellationEvaluation("shaders/out/terrain.tese.spv"),
+            .addTessellationEvaluation("shaders/out/terrain.tese.spv")
+            .addFragment("shaders/out/terrain_deferred.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
         // .polygoneMode = VK_POLYGON_MODE_LINE,
@@ -24,6 +24,7 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
         .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 4,
         .lineWidth = 1.0f,
+        .colorAttachmentCount = 2,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));

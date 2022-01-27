@@ -173,6 +173,22 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newBlankImageResource(
 }
 
 
+std::unique_ptr<HmlImageResource> HmlResourceManager::newRenderTargetImageResource(VkExtent2D extent) noexcept {
+    const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    const VkFormat              format = VK_FORMAT_R8G8B8A8_SRGB;
+    const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    auto resource = newBlankImageResource(extent, format, usage, aspect);
+    resource->sampler = createTextureSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST); // TODO XXX does not belong with this function name
+
+    if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, hmlCommands)) {
+        std::cerr << "::> Failed to create HmlImageResource as a render target.\n";
+        return { nullptr };
+    }
+
+    return resource;
+}
+
+
 std::unique_ptr<HmlImageResource> HmlResourceManager::newDepthResource(VkExtent2D extent) noexcept {
     const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     const VkFormat              format = findDepthFormat();
@@ -548,8 +564,6 @@ bool HmlImageResource::transitionLayoutTo(VkImageLayout newLayout, std::shared_p
     // memory barrier to do this for buffers.
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    // Use VK_IMAGE_LAYOUT_UNDEFINED as oldLayout if you don't care about
-    // the existing contents of the image.
     barrier.oldLayout = oldLayout;
     barrier.newLayout = newLayout;
     // If you are using the barrier to transfer queue family ownership,
@@ -572,6 +586,45 @@ bool HmlImageResource::transitionLayoutTo(VkImageLayout newLayout, std::shared_p
 
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
+/*
+    VkAccessFlagBits:
+    VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+    VK_ACCESS_INDEX_READ_BIT
+    VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
+    VK_ACCESS_UNIFORM_READ_BIT
+    VK_ACCESS_INPUT_ATTACHMENT_READ_BIT
+    VK_ACCESS_SHADER_READ_BIT
+    VK_ACCESS_SHADER_WRITE_BIT
+    VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+    VK_ACCESS_TRANSFER_READ_BIT
+    VK_ACCESS_TRANSFER_WRITE_BIT
+    VK_ACCESS_HOST_READ_BIT
+    VK_ACCESS_HOST_WRITE_BIT
+    VK_ACCESS_MEMORY_READ_BIT
+    VK_ACCESS_MEMORY_WRITE_BIT
+
+    VkPipelineStageFlagBits:
+    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+    VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
+    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT
+    VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
+    VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT
+    VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT
+    VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT
+    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+    VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT
+    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+    VK_PIPELINE_STAGE_TRANSFER_BIT
+    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+    VK_PIPELINE_STAGE_HOST_BIT
+    VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
+    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
+ */
     if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         // The writes don't have to wait on anything
         barrier.srcAccessMask = 0;
@@ -579,6 +632,27 @@ bool HmlImageResource::transitionLayoutTo(VkImageLayout newLayout, std::shared_p
 
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT; // no stage
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+        // NOTE To render target
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT; // no stage
+        destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+        // NOTE From render sampler to render target
+        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        // NOTE From render target to render sampler
+        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;

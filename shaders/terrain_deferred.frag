@@ -17,6 +17,7 @@ layout(location = 1) in float inVisibility;
 layout(location = 2) in vec3  inFragColor;
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outColor1;
 
 void main() {
     vec4 heightColor = texture(heightmap, inTexCoord);
@@ -27,4 +28,5 @@ void main() {
     outColor *= vec4(inFragColor, 1.0);
     vec4 fogColor = vec4(uboGeneral.fogColor_density.rgb, 1.0);
     outColor = mix(fogColor, outColor, inVisibility);
+    outColor1 = outColor;
 }

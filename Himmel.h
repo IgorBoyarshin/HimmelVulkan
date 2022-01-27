@@ -65,6 +65,8 @@ struct Himmel {
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
     std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
 
+    std::vector<std::shared_ptr<HmlImageResource>> secondImageResources;
+
 
     HmlCamera camera;
     glm::mat4 proj;

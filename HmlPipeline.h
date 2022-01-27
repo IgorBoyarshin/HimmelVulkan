@@ -71,6 +71,8 @@ struct HmlGraphicsPipelineConfig {
     // TODO Later will probably be an optional
     uint32_t tessellationPatchPoints;
     float lineWidth;
+
+    uint32_t colorAttachmentCount;
 };
 
 

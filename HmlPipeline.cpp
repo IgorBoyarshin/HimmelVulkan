@@ -165,13 +165,15 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
     // You can find all of the possible operations in the VkBlendFactor and
     // VkBlendOp enumerations in the specification.
 
+    std::vector<VkPipelineColorBlendAttachmentState> blendAttachments(hmlPipelineConfig.colorAttachmentCount, colorBlendAttachment);
+
     // Global color blending settings
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.attachmentCount = blendAttachments.size();
+    colorBlending.pAttachments = blendAttachments.data();
     colorBlending.blendConstants[0] = 0.0f; // Optional
     colorBlending.blendConstants[1] = 0.0f; // Optional
     colorBlending.blendConstants[2] = 0.0f; // Optional

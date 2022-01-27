@@ -8,10 +8,12 @@ layout(location = 1) flat in int   textureIndex;
 layout(location = 2)      in float inAmbient;
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outColor1; // NOTE temporary
 
 void main() {
     outColor = texture(texSamplers[textureIndex], fragTexCoord);
     if (outColor.a < 0.1) discard;
     if (outColor.r < 0.1) discard;
     outColor.rgb *= inAmbient;
+    outColor1 = outColor; // NOTE temporary
 }

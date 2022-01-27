@@ -42,7 +42,8 @@ struct HmlUiRenderer {
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts; // NOTE stores only 1 (for textures)
     VkDescriptorSetLayout descriptorSetLayoutTextures;
 
-    std::unique_ptr<HmlImageResource> textureResource;
+    // std::unique_ptr<HmlImageResource> textureResource;
+    std::vector<std::shared_ptr<HmlImageResource>> imageResources;
 
 
     static constexpr uint32_t MAX_TEXTURES_COUNT = 1; // XXX must match the shader
@@ -68,6 +69,7 @@ struct HmlUiRenderer {
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         uint32_t framesInFlight) noexcept;
     ~HmlUiRenderer() noexcept;
+    void specify(const std::vector<std::shared_ptr<HmlImageResource>>& resources) noexcept;
     // void specifyEntitiesToRender(const std::vector<std::shared_ptr<Entity>>& entities) noexcept;
     // void updateDescriptorSetTextures() noexcept;
     VkCommandBuffer draw(uint32_t frameIndex, uint32_t imageIndex) noexcept;

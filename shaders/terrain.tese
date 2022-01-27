@@ -45,10 +45,8 @@ layout(location = 0) in vec2  inTexCoord[];
 layout(location = 1) in float inSegments[];
 
 layout(location = 0) out vec2  outTexCoord;
-/* layout(location = 1) out float outFragIllumIntensity; */
 layout(location = 1) out float outVisibility;
 layout(location = 2) out vec3 outFragColor;
-/* layout(location = 2) out vec3  outNormal; */
 
 void main() {
     vec2 t = mix(

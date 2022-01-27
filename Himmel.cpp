@@ -110,7 +110,7 @@ bool Himmel::init() noexcept {
     if (!hmlRenderer) return false;
 
     hmlDeferredRenderer = HmlDeferredRenderer::create(hmlWindow, hmlDevice, hmlCommands,
-        hmlRenderPassDeferred, hmlResourceManager, hmlDescriptors, maxFramesInFlight);
+        hmlRenderPassDeferred, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlDeferredRenderer) return false;
     hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
 
@@ -317,9 +317,9 @@ bool Himmel::createGBuffers() noexcept {
     gBufferNormals.resize(count);
     gBufferColors.resize(count);
     for (size_t i = 0; i < count; i++) {
-        gBufferPositions[i] = hmlResourceManager->newRenderTargetImageResource(extent);
-        gBufferNormals[i]   = hmlResourceManager->newRenderTargetImageResource(extent);
-        gBufferColors[i]    = hmlResourceManager->newRenderTargetImageResource(extent);
+        gBufferPositions[i] = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        gBufferNormals[i]   = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT); // TODO can be lower
+        gBufferColors[i]    = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         if (!gBufferPositions[i]) return false;
         if (!gBufferNormals[i]) return false;
         if (!gBufferColors[i]) return false;
@@ -344,10 +344,11 @@ std::unique_ptr<HmlRenderPass> Himmel::createGeneralRenderPass(
     //     .imageViews = hmlSwapchain->imageViews,
     //     .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
     // });
+    const float VERY_FAR = 10000.0f;
     colorAttachments.push_back({
         .imageFormat = gBufferPositions[0]->format,
         .imageViews = viewsFrom(gBufferPositions),
-        .clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }}, // TODO
+        .clearColor = {{ VERY_FAR, VERY_FAR, VERY_FAR, 1.0f }}, // TODO
     });
     colorAttachments.push_back({
         .imageFormat = gBufferNormals[0]->format,
@@ -446,10 +447,10 @@ bool Himmel::run() noexcept {
 
         if (!drawFrame()) return false;
 
-        // const auto fps = 1.0 / deltaSeconds;
-        // std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]"
-        //     << " Update = " << updateMs << "ms"
-        //     << '\n';
+        const auto fps = 1.0 / deltaSeconds;
+        std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]"
+            // << " Update = " << updateMs << "ms"
+            << '\n';
     }
     vkDeviceWaitIdle(hmlDevice->device);
     return true;
@@ -659,7 +660,7 @@ bool Himmel::drawFrame() noexcept {
         {
             // NOTE These are parallelizable
             std::vector<VkCommandBuffer> secondaryCommandBuffers;
-            secondaryCommandBuffers.push_back(hmlDeferredRenderer->draw(currentFrame, imageIndex));
+            secondaryCommandBuffers.push_back(hmlDeferredRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
             vkCmdExecuteCommands(commandBuffer, secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
         }
         hmlRenderPassDeferred->end(commandBuffer);

@@ -180,9 +180,9 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newBlankImageResource(
 }
 
 
-std::unique_ptr<HmlImageResource> HmlResourceManager::newRenderTargetImageResource(VkExtent2D extent) noexcept {
+std::unique_ptr<HmlImageResource> HmlResourceManager::newRenderTargetImageResource(VkExtent2D extent, VkFormat format) noexcept {
     const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    const VkFormat              format = VK_FORMAT_R8G8B8A8_SRGB;
+    // const VkFormat              format = VK_FORMAT_R8G8B8A8_SRGB;
     const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     auto resource = newBlankImageResource(extent, format, usage, aspect);
     resource->sampler = createTextureSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST); // TODO XXX does not belong with this function name

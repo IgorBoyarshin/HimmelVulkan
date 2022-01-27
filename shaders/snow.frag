@@ -7,7 +7,6 @@ layout(location = 0)      in vec2  fragTexCoord;
 layout(location = 1) flat in int   textureIndex;
 layout(location = 2)      in float inAmbient;
 
-/* layout(location = 0) out vec4 outColor; */
 layout(location = 0) out vec4 gPosition;
 layout(location = 1) out vec4 gNormal;
 layout(location = 2) out vec4 gColor;
@@ -19,5 +18,4 @@ void main() {
     gColor.rgb *= inAmbient;
     gPosition = vec4(0.0);
     gNormal = vec4(0.0);
-    /* gColor = vec4(0.0); */
 }

@@ -96,7 +96,7 @@ struct HmlResourceManager {
     std::unique_ptr<HmlBuffer> createStagingBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createUniformBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createStorageBuffer(VkDeviceSize sizeBytes) const noexcept;
-    std::unique_ptr<HmlImageResource> newRenderTargetImageResource(VkExtent2D extent) noexcept;
+    std::unique_ptr<HmlImageResource> newRenderTargetImageResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newTextureResource(const char* fileName, VkFilter filter) noexcept;
     std::unique_ptr<HmlImageResource> newImageResource(VkExtent2D extent) noexcept;
     std::unique_ptr<HmlImageResource> newDepthResource(VkExtent2D extent) noexcept;

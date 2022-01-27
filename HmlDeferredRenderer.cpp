@@ -36,6 +36,7 @@ std::unique_ptr<HmlDeferredRenderer> HmlDeferredRenderer::create(
         std::shared_ptr<HmlRenderPass> hmlRenderPass,
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
+        VkDescriptorSetLayout viewProjDescriptorSetLayout,
         uint32_t framesInFlight) noexcept {
     auto hmlRenderer = std::make_unique<HmlDeferredRenderer>();
     hmlRenderer->hmlWindow = hmlWindow;
@@ -52,15 +53,18 @@ std::unique_ptr<HmlDeferredRenderer> HmlDeferredRenderer::create(
         .build(hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
+    // TODO NOTE set number is specified implicitly by vector index
+    hmlRenderer->descriptorSetLayouts.push_back(viewProjDescriptorSetLayout);
+
     hmlRenderer->descriptorSetLayoutTextures = hmlDescriptors->buildDescriptorSetLayout()
         .withTextureArrayAt(0, VK_SHADER_STAGE_FRAGMENT_BIT, G_COUNT)
         .build(hmlDevice);
     if (!hmlRenderer->descriptorSetLayoutTextures) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutTextures);
 
-    hmlRenderer->descriptorSet_textures_0_perImage = hmlDescriptors->createDescriptorSets(hmlRenderPass->imageCount(),
+    hmlRenderer->descriptorSet_textures_1_perImage = hmlDescriptors->createDescriptorSets(hmlRenderPass->imageCount(),
         hmlRenderer->descriptorSetLayoutTextures, hmlRenderer->descriptorPool);
-    if (hmlRenderer->descriptorSet_textures_0_perImage.empty()) return { nullptr };
+    if (hmlRenderer->descriptorSet_textures_1_perImage.empty()) return { nullptr };
 
 
     hmlRenderer->hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent,
@@ -94,13 +98,13 @@ void HmlDeferredRenderer::specify(const std::array<std::vector<std::shared_ptr<H
             samplers.push_back(texture->sampler);
             views.push_back(texture->view);
         }
-        HmlDescriptorSetUpdater(descriptorSet_textures_0_perImage[imageIndex])
+        HmlDescriptorSetUpdater(descriptorSet_textures_1_perImage[imageIndex])
             .textureArrayAt(0, samplers, views).update(hmlDevice);
     }
 }
 
 
-VkCommandBuffer HmlDeferredRenderer::draw(uint32_t frameIndex, uint32_t imageIndex) noexcept {
+VkCommandBuffer HmlDeferredRenderer::draw(uint32_t frameIndex, uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept {
     auto commandBuffer = commandBuffers[frameIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
@@ -116,18 +120,11 @@ VkCommandBuffer HmlDeferredRenderer::draw(uint32_t frameIndex, uint32_t imageInd
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
-    std::array<VkDescriptorSet, 1> descriptorSets = {
-        descriptorSet_textures_0_perImage[imageIndex]
+    std::array<VkDescriptorSet, 2> descriptorSets = {
+        descriptorSet_0, descriptorSet_textures_1_perImage[imageIndex]
     };
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-
-    // PushConstant pushConstant{
-    //     .textureIndex = i,
-    //     .shift = (2.0f / G_COUNT) * i,
-    // };
-    // vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
-    //     hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
 
     const uint32_t instanceCount = 1;
     const uint32_t firstInstance = 0;

@@ -384,25 +384,25 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
             descriptorSet_0, descriptorSet_heightmap_1
         };
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+            hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
         for (const auto& subTerrain : subTerrains) {
             for (const auto& patch : subTerrain.patches) {
                 if (patch.isParent()) continue;
                 PushConstant pushConstant{
                     .center = patch.center,
-                        .size = patch.size,
-                        .texCoordStart = patch.texCoordStart,
-                        .texCoordStep = patch.texCoordStep,
-                        .tessLevelLeft  = static_cast<float>(1 << (patch.tessPowerLeft  ? patch.tessPowerLeft  : patch.tessPower)),
-                        .tessLevelDown  = static_cast<float>(1 << (patch.tessPowerDown  ? patch.tessPowerDown  : patch.tessPower)),
-                        .tessLevelRight = static_cast<float>(1 << (patch.tessPowerRight ? patch.tessPowerRight : patch.tessPower)),
-                        .tessLevelUp    = static_cast<float>(1 << (patch.tessPowerUp    ? patch.tessPowerUp    : patch.tessPower)),
-                        .offsetY = bounds.yOffset,
-                        .maxHeight = bounds.height,
+                    .size = patch.size,
+                    .texCoordStart = patch.texCoordStart,
+                    .texCoordStep = patch.texCoordStep,
+                    .tessLevelLeft  = static_cast<float>(1 << (patch.tessPowerLeft  ? patch.tessPowerLeft  : patch.tessPower)),
+                    .tessLevelDown  = static_cast<float>(1 << (patch.tessPowerDown  ? patch.tessPowerDown  : patch.tessPower)),
+                    .tessLevelRight = static_cast<float>(1 << (patch.tessPowerRight ? patch.tessPowerRight : patch.tessPower)),
+                    .tessLevelUp    = static_cast<float>(1 << (patch.tessPowerUp    ? patch.tessPowerUp    : patch.tessPower)),
+                    .offsetY = bounds.yOffset,
+                    .maxHeight = bounds.height,
                 };
                 vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
-                        hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
+                    hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
 
                 const uint32_t instanceCount = 1;
                 const uint32_t firstInstance = 0;

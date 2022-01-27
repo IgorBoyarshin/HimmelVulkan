@@ -1,11 +1,5 @@
 #version 450
 
-// XXX sync with Fragment shader
-/* layout(push_constant) uniform PushConstants { */
-/*     int textureIndex; */
-/*     float shift; */
-/* } push; */
-
 layout(location = 0) out vec2 outTexCoord;
 
 #define UNIT 1.0

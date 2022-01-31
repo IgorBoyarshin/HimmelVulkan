@@ -35,11 +35,25 @@ layout(set = 1, binding = 0) uniform sampler2D texSamplers[G_COUNT];
 layout(location = 0) in vec2 inTexCoord;
 layout(location = 0) out vec4 outColor;
 
+float distToLine(vec3 v0, vec3 v1, vec3 p) {
+    float line0 = length(v0 - p);
+    float line1 = length(v1 - p);
+    float r;
+    if (line0 < line1) {
+        r = line0 / line1 * 0.5;
+    } else {
+        r = 1.0 - line1 / line0 * 0.5;
+    }
+    vec3 mid = mix(v0, v1, r);
+    return distance(p, mid);
+}
+
 void main() {
     vec3 pos       = texture(texSamplers[G_POSITION], inTexCoord).rgb;
     vec3 normal    = texture(texSamplers[G_NORMAL], inTexCoord).rgb;
     vec3 albedo    = texture(texSamplers[G_COLOR], inTexCoord).rgb;
     float specular = texture(texSamplers[G_COLOR], inTexCoord).a;
+    float distToCamera = length(uboGeneral.cameraPos - pos);
 
     const vec3 GLOBAL_COLOR = vec3(1.0, 1.0, 1.0);
 
@@ -53,25 +67,28 @@ void main() {
     float diffuseStrength = max(dot(normal, globalLightDir), 0.0);
     light += DIRECT_INTENSITY * diffuseStrength * albedo * GLOBAL_COLOR;
 
-    // Diffuse from point lights
+    // Diffuse from point lights; fog color
+    vec3 fogColor = vec3(0.0);
     for(int i = 0; i < uboLights.count; i++) {
         float intensity = uboLights.pointLights[i].intensity;
         vec3 position   = uboLights.pointLights[i].position;
         vec3 color      = uboLights.pointLights[i].color;
 
+        // Diffuse
         vec3 lightDir = position - pos;
         float dist2 = dot(lightDir, lightDir);
         float strength = max(dot(normal, normalize(lightDir)), 0.0);
         float attenuation = strength * intensity / dist2;
         light += attenuation * albedo * color;
+
+        // Fog
+        /* float h = distToLine(uboGeneral.cameraPos, pos, position); */
+        /* fogColor += sqrt(intensity) * color * atan(distToCamera / h) / h; */
     }
 
     // Apply simple fog
     if (uboGeneral.fogDensity > 0) {
-        /* vec3 posCameraSpace = (uboGeneral.view * vec4(pos, 1.0)).xyz; */
-        /* float dist = length(posCameraSpace); */
-        float dist = length(pos - uboGeneral.cameraPos);
-        float visibility = clamp(exp(-pow((dist * uboGeneral.fogDensity), fogGradient)), 0.0, 1.0);
+        float visibility = clamp(exp(-pow((distToCamera * uboGeneral.fogDensity), fogGradient)), 0.0, 1.0);
         light = mix(uboGeneral.fogColor, light, visibility);
     }
 

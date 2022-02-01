@@ -8,8 +8,8 @@ std::unique_ptr<HmlPipeline> HmlRenderer::createPipeline(std::shared_ptr<HmlDevi
         .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .hmlShaders = HmlShaders()
-            .addVertex("shaders/out/simple_deferred.vert.spv")
-            .addFragment("shaders/out/simple_deferred.frag.spv"),
+            .addVertex("../shaders/out/simple_deferred.vert.spv")
+            .addFragment("../shaders/out/simple_deferred.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
         .polygoneMode = VK_POLYGON_MODE_FILL,
@@ -95,7 +95,7 @@ void HmlRenderer::specifyEntitiesToRender(const std::vector<std::shared_ptr<Enti
     for (const auto& entity : entities) {
         const auto& model = entity->modelResource;
         const auto id = model->id;
-        if (!textureIndexFor.contains(id)) {
+        if (textureIndexFor.find(id) == textureIndexFor.cend()) {
             entitiesToRenderForModel[id] = {};
             if (model->textureResource) {
                 if (!anyModelWithTexture) anyModelWithTexture = model;

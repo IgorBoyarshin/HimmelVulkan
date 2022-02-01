@@ -1,7 +1,7 @@
 #include "HmlResourceManager.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "libs/stb_image.h"
+#include "../libs/stb_image.h"
 
 
 HmlImageResource::~HmlImageResource() noexcept {
@@ -123,7 +123,7 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const c
     // NOTE Will force alpha even if it is not present
     stbi_uc* pixels = stbi_load(fileName, &width, &height, &channels, STBI_rgb_alpha);
     if (!pixels) {
-        std::cerr << "::> Failed to load texture image using stb library.\n";
+        std::cerr << "::> Failed to load texture image using stb library: " << fileName << ".\n";
         return { nullptr };
     }
 

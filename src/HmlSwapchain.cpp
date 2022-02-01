@@ -122,7 +122,7 @@ VkExtent2D HmlSwapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabi
         const auto maxWidth  = capabilities.maxImageExtent.width;
         const auto minHeight = capabilities.minImageExtent.height;
         const auto maxHeight = capabilities.maxImageExtent.height;
-        return {
+        return VkExtent2D{
             std::clamp(framebufferSize.first, minWidth, maxWidth),
             std::clamp(framebufferSize.second, minHeight, maxHeight)
         };

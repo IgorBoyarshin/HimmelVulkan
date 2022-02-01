@@ -8,10 +8,10 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
         .attributeDescriptions = {},
         .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
         .hmlShaders = HmlShaders()
-            .addVertex("shaders/out/terrain.vert.spv")
-            .addTessellationControl("shaders/out/terrain.tesc.spv")
-            .addTessellationEvaluation("shaders/out/terrain_deferred.tese.spv")
-            .addFragment("shaders/out/terrain_deferred.frag.spv"),
+            .addVertex("../shaders/out/terrain.vert.spv")
+            .addTessellationControl("../shaders/out/terrain.tesc.spv")
+            .addTessellationEvaluation("../shaders/out/terrain_deferred.tese.spv")
+            .addFragment("../shaders/out/terrain_deferred.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
         // .polygoneMode = VK_POLYGON_MODE_LINE,

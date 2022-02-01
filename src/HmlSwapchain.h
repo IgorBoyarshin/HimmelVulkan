@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <optional>
+#include <algorithm>
 
 #include "HmlWindow.h"
 #include "HmlDevice.h"

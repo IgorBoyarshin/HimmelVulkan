@@ -8,8 +8,8 @@ std::unique_ptr<HmlPipeline> HmlSnowParticleRenderer::createSnowPipeline(std::sh
         .attributeDescriptions = {},
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .hmlShaders = HmlShaders()
-            .addVertex("shaders/out/snow.vert.spv")
-            .addFragment("shaders/out/snow.frag.spv"),
+            .addVertex("../shaders/out/snow.vert.spv")
+            .addFragment("../shaders/out/snow.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
         .polygoneMode = VK_POLYGON_MODE_FILL,
@@ -64,8 +64,8 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
     }
 
 
-    hmlRenderer->snowTextureResources.push_back(hmlResourceManager->newTextureResource("models/snow/snowflake1.png", VK_FILTER_NEAREST));
-    hmlRenderer->snowTextureResources.push_back(hmlResourceManager->newTextureResource("models/snow/snowflake2.png", VK_FILTER_NEAREST));
+    hmlRenderer->snowTextureResources.push_back(hmlResourceManager->newTextureResource("../models/snow/snowflake1.png", VK_FILTER_NEAREST));
+    hmlRenderer->snowTextureResources.push_back(hmlResourceManager->newTextureResource("../models/snow/snowflake2.png", VK_FILTER_NEAREST));
 
 
     hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()

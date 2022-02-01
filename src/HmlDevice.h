@@ -40,10 +40,10 @@ struct HmlDevice {
 
 
     static constexpr bool enableValidationLayers = true;
-    static constexpr auto requiredValidationLayers = {
+    static constexpr std::array requiredValidationLayers = {
         "VK_LAYER_KHRONOS_validation"
     };
-    static constexpr auto requiredDeviceExtensions = {
+    static constexpr std::array requiredDeviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
@@ -59,7 +59,7 @@ struct HmlDevice {
     private:
 
     static VkInstance createInstance(const char* applicationName) noexcept;
-    static bool checkValidationLayerSupport(const std::vector<const char*>& requestedValidationLayers) noexcept;
+    static bool checkValidationLayerSupport(const auto& requestedValidationLayers) noexcept;
     static std::vector<VkLayerProperties> getAvailableLayers() noexcept;
     static std::vector<const char*> getRequiredExtensions(bool enableValidationLayers) noexcept;
     static VkSurfaceKHR createSurface(VkInstance instance, GLFWwindow* window) noexcept;
@@ -81,7 +81,7 @@ struct HmlDevice {
     static VkPhysicalDevice pickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface) noexcept;
     static void describePhysicalDevice(VkPhysicalDevice physicalDevice) noexcept;
     static bool isPhysicalDeviceSuitable(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface) noexcept;
-    static bool checkDeviceExtensionSupport(const VkPhysicalDevice& physicalDevice, const std::vector<const char*>& requiredDeviceExtensions) noexcept;
+    static bool checkDeviceExtensionSupport(const VkPhysicalDevice& physicalDevice, const auto& requiredDeviceExtensions) noexcept;
     static std::vector<VkQueueFamilyProperties> queryQueueFamilies(VkPhysicalDevice physicalDevice) noexcept;
     static QueueFamilyIndices pickQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) noexcept;
     static VkDevice createLogicalDevice(VkPhysicalDevice physicalDevice,

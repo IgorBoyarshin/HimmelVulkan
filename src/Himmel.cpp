@@ -142,7 +142,7 @@ bool Himmel::init() noexcept {
         .yOffset = 0.0f,
     };
     const uint32_t granularity = 4;
-    hmlTerrainRenderer = HmlTerrainRenderer::create("models/heightmap.png", granularity, "models/grass-small.png",
+    hmlTerrainRenderer = HmlTerrainRenderer::create("../models/heightmap.png", granularity, "../models/grass-small.png",
         terrainBounds, generalDescriptorSet_0_perImage, hmlWindow,
         hmlDevice, hmlCommands, hmlRenderPassDeferredPrep, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlTerrainRenderer) return false;
@@ -253,17 +253,17 @@ bool Himmel::init() noexcept {
             std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "models/girl.png", VK_FILTER_LINEAR);
+            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/girl.png", VK_FILTER_LINEAR);
             models.push_back(model);
         }
 
         {
             std::vector<HmlSimpleModel::Vertex> vertices;
             std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("models/viking_room.obj", vertices, indices)) return false;
+            if (!HmlSimpleModel::load("../models/viking_room.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            // const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "models/viking_room.png", VK_FILTER_LINEAR);
+            // const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
             const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
             models.push_back(model);
         }
@@ -271,7 +271,7 @@ bool Himmel::init() noexcept {
         {
             std::vector<HmlSimpleModel::Vertex> vertices;
             std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("models/plane.obj", vertices, indices)) return false;
+            if (!HmlSimpleModel::load("../models/plane.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
             const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);

@@ -8,8 +8,8 @@ std::unique_ptr<HmlPipeline> HmlUiRenderer::createPipeline(std::shared_ptr<HmlDe
         .attributeDescriptions = {},
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .hmlShaders = HmlShaders()
-            .addVertex("shaders/out/ui.vert.spv")
-            .addFragment("shaders/out/ui.frag.spv"),
+            .addVertex("../shaders/out/ui.vert.spv")
+            .addFragment("../shaders/out/ui.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
         .polygoneMode = VK_POLYGON_MODE_FILL,

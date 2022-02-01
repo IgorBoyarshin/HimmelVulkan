@@ -8,8 +8,8 @@ std::unique_ptr<HmlPipeline> HmlDeferredRenderer::createPipeline(std::shared_ptr
         .attributeDescriptions = {},
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .hmlShaders = HmlShaders()
-            .addVertex("shaders/out/deferred.vert.spv")
-            .addFragment("shaders/out/deferred.frag.spv"),
+            .addVertex("../shaders/out/deferred.vert.spv")
+            .addFragment("../shaders/out/deferred.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
         .polygoneMode = VK_POLYGON_MODE_FILL,

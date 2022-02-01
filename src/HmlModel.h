@@ -14,7 +14,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
-#include "libs/tiny_obj_loader.h"
+#include "../libs/tiny_obj_loader.h"
 
 
 struct HmlSimpleModel {

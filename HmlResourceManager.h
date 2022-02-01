@@ -27,7 +27,8 @@ struct HmlImageResource {
     uint32_t width;
     uint32_t height;
 
-    bool transitionLayoutTo(VkImageLayout newLayout, std::shared_ptr<HmlCommands> hmlCommands) noexcept;
+    bool blockingTransitionLayoutTo(VkImageLayout newLayout, std::shared_ptr<HmlCommands> hmlCommands) noexcept;
+    bool transitionLayoutTo(VkImageLayout newLayout, VkCommandBuffer commandBuffer) noexcept;
     bool hasStencilComponent() const noexcept;
 
     ~HmlImageResource() noexcept;

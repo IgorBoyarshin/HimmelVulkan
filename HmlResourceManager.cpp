@@ -142,12 +142,12 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const c
     auto resource = newBlankImageResource(extent, format, usage, aspect);
 
     // ======== Copy data from the staging buffer to the image resource
-    if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, hmlCommands)) {
+    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, hmlCommands)) {
         std::cerr << "::> Failed to create HmlImageResource as a texture resource.\n";
         return { nullptr };
     }
     copyBufferToImage(stagingBuffer->buffer, resource->image, extent);
-    if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands)) {
+    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands)) {
         std::cerr << "::> Failed to create HmlImageResource as a texture resource.\n";
         return { nullptr };
     }
@@ -188,7 +188,7 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newRenderTargetImageResour
     resource->sampler = createTextureSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST); // TODO XXX does not belong with this function name
     resource->type = HmlImageResource::Type::RENDER_TARGET;
 
-    if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, hmlCommands)) {
+    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, hmlCommands)) {
         std::cerr << "::> Failed to create HmlImageResource as a render target.\n";
         return { nullptr };
     }
@@ -204,7 +204,7 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newDepthResource(VkExtent2
     auto resource = newBlankImageResource(extent, format, usage, aspect);
     resource->type = HmlImageResource::Type::DEPTH;
 
-    if (!resource->transitionLayoutTo(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, hmlCommands)) {
+    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, hmlCommands)) {
         std::cerr << "::> Failed to create HmlImageResource as a depth resource.\n";
         return { nullptr };
     }
@@ -560,9 +560,17 @@ bool HmlImageResource::hasStencilComponent() const noexcept {
 }
 
 
-bool HmlImageResource::transitionLayoutTo(VkImageLayout newLayout, std::shared_ptr<HmlCommands> hmlCommands) noexcept {
-    const auto oldLayout = layout;
+bool HmlImageResource::blockingTransitionLayoutTo(VkImageLayout newLayout, std::shared_ptr<HmlCommands> hmlCommands) noexcept {
     VkCommandBuffer commandBuffer = hmlCommands->beginSingleTimeCommands();
+    const auto res = transitionLayoutTo(newLayout, commandBuffer);
+    if (!res) return false;
+    hmlCommands->endSingleTimeCommands(commandBuffer);
+    return true;
+}
+
+
+bool HmlImageResource::transitionLayoutTo(VkImageLayout newLayout, VkCommandBuffer commandBuffer) noexcept {
+    const auto oldLayout = layout;
 
     // One of the most common ways to perform layout transitions is using
     // an image memory barrier. A pipeline barrier like that is generally
@@ -697,8 +705,6 @@ bool HmlImageResource::transitionLayoutTo(VkImageLayout newLayout, std::shared_p
         0, nullptr,
         1, &barrier
     );
-
-    hmlCommands->endSingleTimeCommands(commandBuffer);
 
     layout = newLayout;
 

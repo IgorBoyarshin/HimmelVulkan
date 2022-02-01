@@ -32,6 +32,10 @@ HmlCommands::~HmlCommands() noexcept {
     vkDestroyCommandPool(hmlDevice->device, commandPoolOnetime, nullptr);
     vkDestroyCommandPool(hmlDevice->device, commandPoolGeneral, nullptr);
     vkDestroyCommandPool(hmlDevice->device, commandPoolOnetimeFrames, nullptr);
+
+    for (const auto& fence : singleTimeCommandFences) {
+        vkDestroyFence(hmlDevice->device, fence, nullptr);
+    }
 }
 
 
@@ -191,4 +195,90 @@ void HmlCommands::endSingleTimeCommands(VkCommandBuffer commandBuffer) noexcept 
     // be better if we had multiple transfers to wait on.
 
     vkFreeCommandBuffers(hmlDevice->device, commandPoolOnetime, 1, &commandBuffer);
+}
+
+
+VkCommandBuffer HmlCommands::beginLongTermSingleTimeCommand() noexcept {
+    freeFinishedLongTermSingleTimeCommands();
+
+    size_t i = 0;
+    for (; i < singleTimeCommands.size(); i++) {
+        if (!singleTimeCommands[i]) break; // found empty(free)
+    }
+    if (i == singleTimeCommands.size()) {
+        singleTimeCommands.push_back(VK_NULL_HANDLE);
+        singleTimeCommandFences.push_back({});
+
+        VkFenceCreateInfo fenceInfo = {};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        if (vkCreateFence(hmlDevice->device, &fenceInfo, nullptr, &singleTimeCommandFences[i]) != VK_SUCCESS) {
+            std::cerr << "::> Failed to create a VkFence for long-term single-time command buffer.\n";
+            return VK_NULL_HANDLE;
+        }
+    }
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPoolOnetime;
+    allocInfo.commandBufferCount = 1;
+
+    auto& commandBuffer = singleTimeCommands[i];
+    vkAllocateCommandBuffers(hmlDevice->device, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    return commandBuffer;
+}
+
+
+void HmlCommands::endLongTermSingleTimeCommand(VkCommandBuffer commandBuffer) noexcept {
+    // Errors of recording are reported only here
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        std::cerr << "::> There wa a problem recording a long-term one-time command buffer.";
+        return;
+    }
+
+    size_t i = 0;
+    for (; i < singleTimeCommands.size(); i++) {
+        // There must be exactly one match
+        if (singleTimeCommands[i] == commandBuffer) break;
+    }
+    assert((i < singleTimeCommands.size()) && "::> Could not find a previously begun long-term single-time VkCommandBuffer.");
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkResetFences(hmlDevice->device, 1, &singleTimeCommandFences[i]);
+    if (vkQueueSubmit(onetimeQueue, 1, &submitInfo, singleTimeCommandFences[i]) != VK_SUCCESS) {
+        std::cerr << "::> Failed to submit a long-term one-time command buffer.\n";
+        return;
+    }
+}
+
+
+void HmlCommands::freeFinishedLongTermSingleTimeCommands() noexcept {
+    assert((singleTimeCommands.size() == singleTimeCommandFences.size())
+        && "::> singleTimeCommands vectors sizes do not match.");
+    for (size_t i = 0; i < singleTimeCommands.size(); i++) {
+        auto& command = singleTimeCommands[i];
+        auto& fence   = singleTimeCommandFences[i];
+        if (!command) continue;
+        const auto result = vkWaitForFences(hmlDevice->device, 1, &fence, VK_TRUE, 0);
+        if (result == VK_TIMEOUT) continue; // not signaled yet
+        if (result != VK_SUCCESS) {
+            std::cerr << "::> Unexpected result from VkWaitForFences.\n";
+            continue;
+        }
+
+        vkFreeCommandBuffers(hmlDevice->device, commandPoolOnetime, 1, &command);
+        command = VK_NULL_HANDLE;
+        // We reset the fence upon submission, so nothing to do here
+    }
 }

@@ -687,9 +687,13 @@ bool Himmel::drawFrame() noexcept {
     // NOTE the first submission is already being processed while we record the second commandBuffer
     // NOTE
 
-    gBufferPositions[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands);
-    gBufferNormals[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands);
-    gBufferColors[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands);
+    {
+        const auto commandBuffer = hmlCommands->beginLongTermSingleTimeCommand();
+        gBufferPositions[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        gBufferNormals[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        gBufferColors[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        hmlCommands->endLongTermSingleTimeCommand(commandBuffer);
+    }
 
     // Deferred RenderPass
     {
@@ -805,9 +809,13 @@ bool Himmel::drawFrame() noexcept {
         }
     }
 
-    gBufferPositions[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, hmlCommands);
-    gBufferNormals[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, hmlCommands);
-    gBufferColors[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, hmlCommands);
+    {
+        const auto commandBuffer = hmlCommands->beginLongTermSingleTimeCommand();
+        gBufferPositions[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
+        gBufferNormals[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
+        gBufferColors[imageIndex]->transitionLayoutTo(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
+        hmlCommands->endLongTermSingleTimeCommand(commandBuffer);
+    }
 
     {
         VkSemaphore waitSemaphores[] = { renderFinishedSemaphores[currentFrame] };

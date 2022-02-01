@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <cassert>
 
 #include "HmlDevice.h"
 
@@ -31,6 +32,10 @@ struct HmlCommands {
     uint32_t onetimeQueueIndex;
     uint32_t onetimeFrameQueueIndex;
 
+    // We track them manually
+    std::vector<VkCommandBuffer> singleTimeCommands;
+    std::vector<VkFence> singleTimeCommandFences;
+
     // Cleaned automatically upon CommandPool destruction
     // std::vector<VkCommandBuffer> commandBuffers;
 
@@ -51,6 +56,10 @@ struct HmlCommands {
     void endRecording(VkCommandBuffer commandBuffer) noexcept;
     VkCommandBuffer beginSingleTimeCommands() noexcept;
     void endSingleTimeCommands(VkCommandBuffer commandBuffer) noexcept;
+
+    VkCommandBuffer beginLongTermSingleTimeCommand() noexcept;
+    void endLongTermSingleTimeCommand(VkCommandBuffer commandBuffer) noexcept;
+    void freeFinishedLongTermSingleTimeCommands() noexcept;
 };
 
 #endif

@@ -19,30 +19,17 @@
 
 
 struct HmlTerrainRenderer {
-    const uint32_t MAX_PATCHES = 1 + 1*4 + 4*4 + 4*4*4 + 4*4*4*4; // TODO make constexpr func
     struct Patch {
-        Patch* leftUp    = nullptr;
-        Patch* rightUp   = nullptr;
-        Patch* leftDown  = nullptr;
-        Patch* rightDown = nullptr;
-
-        inline bool isParent() const noexcept { return leftUp != nullptr; }
-        inline bool isTerminal() const noexcept { return leftUp == nullptr; }
-        // inline Patch() noexcept {}
         inline Patch(const glm::vec2& center, const glm::vec2& size,
-                const glm::vec2& texCoordStart, const glm::vec2& texCoordStep, int level, int tessPower) noexcept
-            : center(center), size(size), texCoordStart(texCoordStart), texCoordStep(texCoordStep), level(level), tessPower(tessPower) {}
+                const glm::vec2& texCoordStart, const glm::vec2& texCoordStep, int level) noexcept
+            : center(center), size(size), texCoordStart(texCoordStart), texCoordStep(texCoordStep), level(level) {}
 
         glm::vec2 center;
         glm::vec2 size;
         glm::vec2 texCoordStart;
         glm::vec2 texCoordStep;
         int level; // 0 for root
-        int tessPower;
-        int tessPowerUp = 0;
-        int tessPowerDown = 0;
-        int tessPowerLeft = 0;
-        int tessPowerRight = 0;
+        bool isParent = false;
     };
 
     struct SubTerrain {
@@ -58,27 +45,14 @@ struct HmlTerrainRenderer {
     std::vector<SubTerrain> subTerrains;
     uint32_t granularity;
 
-    void doAll(Patch& patch) const noexcept;
-    int findUpFor(const Patch& patch) const noexcept;
-    int findDownFor(const Patch& patch) const noexcept;
-    int findLeftFor(const Patch& patch) const noexcept;
-    int findRightFor(const Patch& patch) const noexcept;
-    void propagateUpFor(Patch& patch, int tessPower) const noexcept;
-    void propagateDownFor(Patch& patch, int tessPower) const noexcept;
-    void propagateLeftFor(Patch& patch, int tessPower) const noexcept;
-    void propagateRightFor(Patch& patch, int tessPower) const noexcept;
-
     struct PushConstant {
         glm::vec2 center;
         glm::vec2 size;
         glm::vec2 texCoordStart;
         glm::vec2 texCoordStep;
-        float tessLevelLeft;
-        float tessLevelDown;
-        float tessLevelRight;
-        float tessLevelUp;
         float offsetY;
         float maxHeight;
+        int level;
     };
 
     struct Bounds {

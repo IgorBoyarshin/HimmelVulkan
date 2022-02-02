@@ -39,11 +39,11 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
 //         .attributeDescriptions = {},
 //         .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
 //         .hmlShaders = HmlShaders()
-//             .addVertex("shaders/out/terrain.vert.spv")
-//             .addTessellationControl("shaders/out/terrain.tesc.spv")
-//             .addTessellationEvaluation("shaders/out/terrain_debug.tese.spv")
-//             .addGeometry("shaders/out/terrain_debug.geom.spv")
-//             .addFragment("shaders/out/terrain_debug.frag.spv"),
+//             .addVertex("../shaders/out/terrain.vert.spv")
+//             .addTessellationControl("../shaders/out/terrain.tesc.spv")
+//             .addTessellationEvaluation("../shaders/out/terrain_debug.tese.spv")
+//             .addGeometry("../shaders/out/terrain_debug.geom.spv")
+//             .addFragment("../shaders/out/terrain_debug.frag.spv"),
 //         .renderPass = renderPass,
 //         .extent = extent,
 //         // .polygoneMode = VK_POLYGON_MODE_LINE,
@@ -56,6 +56,8 @@ std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<
 //         .pushConstantsSizeBytes = sizeof(PushConstant),
 //         .tessellationPatchPoints = 4,
 //         .lineWidth = 2.0f,
+//         .colorAttachmentCount = 3,
+//         .withBlending = true,
 //     };
 //
 //     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -163,203 +165,67 @@ HmlTerrainRenderer::~HmlTerrainRenderer() noexcept {
 
 
 void HmlTerrainRenderer::constructTree(SubTerrain& subTerrain, const glm::vec3& cameraPos) const noexcept {
-    static const auto tryJustIncreasingTessPower = [](Patch& patch, const glm::vec3& camera, float yOffset){
-        static constexpr float RATIO = 64.0f;
-        // NOTE must be 3 to absolutely ensure perfect stitching.
-        // However, in practice due to the linear nature of tesselation change,
-        // we can get away with higher numbers. Especially with a good algorithm.
-        // NOTE After the introduction of SubTerrain, this value might need to
-        // be decremented... not sure. The aforementioned logic still applies, tho.
-        static constexpr int MAX_TESS_POWER = 3; // 3
+    static const auto shouldSubdivide = [](Patch& patch, const glm::vec3& camera, float yOffset){
+        static constexpr int PATCH_MAX_LEVEL = 3;
+        if (patch.level >= PATCH_MAX_LEVEL) return false;
+
+        static constexpr float RATIO = 128.0f; // inversely proportional to LOD
         const auto center = glm::vec3(patch.center.x, yOffset, patch.center.y);
         const float dist = glm::distance(center, camera);
-        float edge = 0.5f * (patch.size.x + patch.size.y) / (1 << patch.tessPower);
-        while (dist / edge < RATIO) {
-            if (patch.tessPower >= MAX_TESS_POWER) return false;
-            edge /= 2.0f;
-            patch.tessPower++;
-        }
-
-        return true;
+        float edge = 0.5f * (patch.size.x + patch.size.y);
+        return (dist / edge < RATIO);
     };
-
-    static const auto canMatchNoNeedToSubdivide = [](Patch& patch, const glm::vec3& camera, float yOffset){
-        const bool enough = tryJustIncreasingTessPower(patch, camera, yOffset);
-        if (enough) return true;
-
-        static constexpr int PATCH_MAX_LEVEL = 4; // 4
-        if (patch.level >= PATCH_MAX_LEVEL) return true;
-
-        return false;
-    };
-
 
     // Create all patches starting from root
     auto& patches = subTerrain.patches;
     patches.clear();
-    patches.reserve(MAX_PATCHES);
+    // No need to reserve because we do not store addresses anymore.
+    // The size is amortized now.
     const auto texCoordStart = subTerrain.texCoordStart;
     const auto texCoordStep  = subTerrain.texCoordStep;
-    patches.emplace_back(subTerrain.center, subTerrain.size, texCoordStart, texCoordStep, 0, 0); // root
-    for (size_t i = 0; i < patches.size(); i++) {
+    patches.emplace_back(subTerrain.center, subTerrain.size, texCoordStart, texCoordStep, 0); // root
+    for (size_t i = 0; i < patches.size(); i++) { // NOTE size is dynamic
         auto& patch = patches[i];
-        if (canMatchNoNeedToSubdivide(patch, cameraPos, bounds.yOffset)) continue;
+        if (!shouldSubdivide(patch, cameraPos, bounds.yOffset)) continue;
+        patch.isParent = true;
 
         const auto texCoordStep = 0.5f * patch.texCoordStep;
         const auto quaterSize = 0.25f * patch.size;
-
-        // NOTE prefer to start tesselationPower from 0 rather than (patch.tessPower - 1)
-        // to ensure we avoid unnecessary geometry (if it's possible).
 
         patches.emplace_back(
             glm::vec2{ patch.center.x - quaterSize.x, patch.center.y + quaterSize.y },
             0.5f * patch.size,
             glm::vec2{ patch.texCoordStart.x, patch.texCoordStart.y + texCoordStep.y },
             texCoordStep,
-            patch.level + 1,
-            0
+            patch.level + 1
         );
-        patch.leftUp = &patches.back();
-
         patches.emplace_back(
             glm::vec2{ patch.center.x + quaterSize.x, patch.center.y + quaterSize.y },
             0.5f * patch.size,
             glm::vec2{ patch.texCoordStart.x + texCoordStep.x, patch.texCoordStart.y + texCoordStep.y },
             texCoordStep,
-            patch.level + 1,
-            0
+            patch.level + 1
         );
-        patch.rightUp = &patches.back();
-
         patches.emplace_back(
             glm::vec2{ patch.center.x - quaterSize.x, patch.center.y - quaterSize.y },
             0.5f * patch.size,
             glm::vec2{ patch.texCoordStart.x, patch.texCoordStart.y },
             texCoordStep,
-            patch.level + 1,
-            0
+            patch.level + 1
         );
-        patch.leftDown = &patches.back();
-
         patches.emplace_back(
             glm::vec2{ patch.center.x + quaterSize.x, patch.center.y - quaterSize.y },
             0.5f * patch.size,
             glm::vec2{ patch.texCoordStart.x + texCoordStep.x, patch.texCoordStart.y },
             texCoordStep,
-            patch.level + 1,
-            0
+            patch.level + 1
         );
-        patch.rightDown = &patches.back();
-    }
-
-    // Ensure stitching
-    doAll(patches[0]); // root
-}
-
-
-// TODO is done twice for each edge. Make traversal directional
-void HmlTerrainRenderer::doAll(Patch& patch) const noexcept {
-    if (patch.isTerminal()) return;
-
-    int max;
-
-    max = std::max(findUpFor(*patch.leftDown), findDownFor(*patch.leftUp));
-    propagateUpFor(*patch.leftDown, max);
-    propagateDownFor(*patch.leftUp, max);
-
-    max = std::max(findUpFor(*patch.rightDown), findDownFor(*patch.rightUp));
-    propagateUpFor(*patch.rightDown, max);
-    propagateDownFor(*patch.rightUp, max);
-
-    max = std::max(findRightFor(*patch.leftDown), findLeftFor(*patch.rightDown));
-    propagateRightFor(*patch.leftDown, max);
-    propagateLeftFor(*patch.rightDown, max);
-
-    max = std::max(findRightFor(*patch.leftUp), findLeftFor(*patch.rightUp));
-    propagateRightFor(*patch.leftUp, max);
-    propagateLeftFor(*patch.rightUp, max);
-
-    doAll(*patch.leftUp);
-    doAll(*patch.leftDown);
-    doAll(*patch.rightUp);
-    doAll(*patch.rightDown);
-}
-
-
-// TODO is done twice for each edge. Make traversal directional
-// NOTE The max between the original power and the edge-based one is there so
-// that we don't need to assign all edged the original value before the start of
-// the traversal algorithm. The reason we would have to do that is so that
-// inter-Subterrain part of the algorithm gets proper values.
-int HmlTerrainRenderer::findUpFor(const Patch& patch) const noexcept {
-    if (patch.isTerminal()) return std::max(patch.tessPower, patch.tessPowerUp);
-    return 1 + std::max(findUpFor(*patch.leftUp), findUpFor(*patch.rightUp));
-}
-int HmlTerrainRenderer::findDownFor(const Patch& patch) const noexcept {
-    if (patch.isTerminal()) return std::max(patch.tessPower, patch.tessPowerDown);
-    return 1 + std::max(findDownFor(*patch.leftDown), findDownFor(*patch.rightDown));
-}
-int HmlTerrainRenderer::findLeftFor(const Patch& patch) const noexcept {
-    if (patch.isTerminal()) return std::max(patch.tessPower, patch.tessPowerLeft);
-    return 1 + std::max(findLeftFor(*patch.leftDown), findLeftFor(*patch.leftUp));
-}
-int HmlTerrainRenderer::findRightFor(const Patch& patch) const noexcept {
-    if (patch.isTerminal()) return std::max(patch.tessPower, patch.tessPowerRight);
-    return 1 + std::max(findRightFor(*patch.rightDown), findRightFor(*patch.rightUp));
-}
-
-
-// TODO is done twice for each edge. Make traversal directional
-void HmlTerrainRenderer::propagateUpFor(Patch& patch, int tessPower) const noexcept {
-    if (patch.isTerminal()) patch.tessPowerUp = (tessPower > 6) ? 6 : tessPower;
-    else {
-        propagateUpFor(*patch.leftUp,  tessPower - 1);
-        propagateUpFor(*patch.rightUp, tessPower - 1);
-    }
-}
-void HmlTerrainRenderer::propagateDownFor(Patch& patch, int tessPower) const noexcept {
-    if (patch.isTerminal()) patch.tessPowerDown = (tessPower > 6) ? 6 : tessPower;
-    else {
-        propagateDownFor(*patch.leftDown,  tessPower - 1);
-        propagateDownFor(*patch.rightDown, tessPower - 1);
-    }
-}
-void HmlTerrainRenderer::propagateLeftFor(Patch& patch, int tessPower) const noexcept {
-    if (patch.isTerminal()) patch.tessPowerLeft = (tessPower > 6) ? 6 : tessPower;
-    else {
-        propagateLeftFor(*patch.leftDown, tessPower - 1);
-        propagateLeftFor(*patch.leftUp,   tessPower - 1);
-    }
-}
-void HmlTerrainRenderer::propagateRightFor(Patch& patch, int tessPower) const noexcept {
-    if (patch.isTerminal()) patch.tessPowerRight = (tessPower > 6) ? 6 : tessPower;
-    else {
-        propagateRightFor(*patch.rightDown, tessPower - 1);
-        propagateRightFor(*patch.rightUp,   tessPower - 1);
     }
 }
 
 
 void HmlTerrainRenderer::update(const glm::vec3& cameraPos) noexcept {
     for (auto& subTerrain : subTerrains) constructTree(subTerrain, cameraPos);
-
-    for (uint32_t x = 0; x < granularity; x++) {
-        for (uint32_t y = 0; y < granularity; y++) {
-            auto& root  = subTerrains[granularity * (x + 0) + (y + 0)].patches[0];
-            if (y + 1 < granularity) {
-                auto& rootUp = subTerrains[granularity * (x + 0) + (y + 1)].patches[0];
-                const auto max = std::max(findUpFor(root), findDownFor(rootUp));
-                propagateUpFor(root, max);
-                propagateDownFor(rootUp, max);
-            }
-            if (x + 1 < granularity) {
-                auto& rootRight = subTerrains[granularity * (x + 1) + (y + 0)].patches[0];
-                const auto max = std::max(findRightFor(root), findLeftFor(rootRight));
-                propagateRightFor(root, max);
-                propagateLeftFor(rootRight, max);
-            }
-        }
-    }
 }
 
 
@@ -388,18 +254,15 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
 
         for (const auto& subTerrain : subTerrains) {
             for (const auto& patch : subTerrain.patches) {
-                if (patch.isParent()) continue;
+                if (patch.isParent) continue;
                 PushConstant pushConstant{
                     .center = patch.center,
                     .size = patch.size,
                     .texCoordStart = patch.texCoordStart,
                     .texCoordStep = patch.texCoordStep,
-                    .tessLevelLeft  = static_cast<float>(1 << (patch.tessPowerLeft  ? patch.tessPowerLeft  : patch.tessPower)),
-                    .tessLevelDown  = static_cast<float>(1 << (patch.tessPowerDown  ? patch.tessPowerDown  : patch.tessPower)),
-                    .tessLevelRight = static_cast<float>(1 << (patch.tessPowerRight ? patch.tessPowerRight : patch.tessPower)),
-                    .tessLevelUp    = static_cast<float>(1 << (patch.tessPowerUp    ? patch.tessPowerUp    : patch.tessPower)),
                     .offsetY = bounds.yOffset,
                     .maxHeight = bounds.height,
+                    .level = patch.level,
                 };
                 vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
                     hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
@@ -423,18 +286,15 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
     //
     //     for (const auto& subTerrain : subTerrains) {
     //         for (const auto& patch : subTerrain.patches) {
-    //             if (patch.isParent()) continue;
+    //             if (patch.isParent) continue;
     //             PushConstant pushConstant{
     //                 .center = patch.center,
-    //                     .size = patch.size,
-    //                     .texCoordStart = patch.texCoordStart,
-    //                     .texCoordStep = patch.texCoordStep,
-    //                     .tessLevelLeft  = static_cast<float>(1 << (patch.tessPowerLeft  ? patch.tessPowerLeft  : patch.tessPower)),
-    //                     .tessLevelDown  = static_cast<float>(1 << (patch.tessPowerDown  ? patch.tessPowerDown  : patch.tessPower)),
-    //                     .tessLevelRight = static_cast<float>(1 << (patch.tessPowerRight ? patch.tessPowerRight : patch.tessPower)),
-    //                     .tessLevelUp    = static_cast<float>(1 << (patch.tessPowerUp    ? patch.tessPowerUp    : patch.tessPower)),
-    //                     .offsetY = bounds.yOffset,
-    //                     .maxHeight = bounds.height,
+    //                 .size = patch.size,
+    //                 .texCoordStart = patch.texCoordStart,
+    //                 .texCoordStep = patch.texCoordStep,
+    //                 .offsetY = bounds.yOffset,
+    //                 .maxHeight = bounds.height,
+    //                 .level = patch.level,
     //             };
     //             vkCmdPushConstants(commandBuffer, hmlPipelineDebug->layout,
     //                     hmlPipelineDebug->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);

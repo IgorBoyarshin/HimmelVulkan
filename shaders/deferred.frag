@@ -93,10 +93,13 @@ void main() {
     }
 
     // Tone mapping and gamma correcton
-    const float exposure = 0.1;
+    const float exposure = 0.2;
     const float gamma = 1.2;
     vec3 mapped = vec3(1.0) - exp(-light * exposure);
     light = pow(mapped, vec3(1.0 / gamma));
+
+    const float VERY_FAR = 1000.0;
+    if (distToCamera > VERY_FAR) light = uboGeneral.fogColor;
 
     outColor = vec4(light, 1.0);
 }

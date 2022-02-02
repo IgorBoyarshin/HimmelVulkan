@@ -19,9 +19,9 @@ layout(push_constant) uniform PushConstants {
     vec2 size;
     vec2 texCoordStart;
     vec2 texCoordStep;
-    vec4 tessLevelLeftDownRightUp;
     float offsetY;
     float maxHeight;
+    int level;
 } push;
 
 layout(set = 1, binding = 0) uniform sampler2D heightmap;

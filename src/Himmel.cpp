@@ -141,7 +141,7 @@ bool Himmel::init() noexcept {
         .height = HEIGHT_MAP,
         .yOffset = 0.0f,
     };
-    const uint32_t granularity = 4;
+    const uint32_t granularity = 1;
     hmlTerrainRenderer = HmlTerrainRenderer::create("../models/heightmap.png", granularity, "../models/grass-small.png",
         terrainBounds, generalDescriptorSet_0_perImage, hmlWindow,
         hmlDevice, hmlCommands, hmlRenderPassDeferredPrep, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);

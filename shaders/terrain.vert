@@ -16,9 +16,9 @@ layout(push_constant) uniform PushConstants {
     vec2 size;
     vec2 texCoordStart;
     vec2 texCoordStep;
-    vec4 tessLevelLeftDownRightUp;
     float offsetY;
     float maxHeight;
+    int level;
 } push;
 
 layout(location = 0) out vec2 outTexCoord;

@@ -23,7 +23,7 @@ void generateLine(vec4 p1, vec4 p2) {
 }
 
 void main() {
-    const vec4 normalColor = vec4(1.0, 0.0, 0.0, 1.0);
+    const vec4 normalColor = vec4(1.0, 1.0, 1.0, 1.0);
     const vec4 triangleColor = vec4(1.0, 1.0, 0.0, 1.0);
     const vec4 off = vec4(0.0, 0.001, 0.0, 0.0);
     vec4 p0 = gl_in[0].gl_Position + off;

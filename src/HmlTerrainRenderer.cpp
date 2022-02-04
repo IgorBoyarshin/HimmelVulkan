@@ -188,37 +188,38 @@ void HmlTerrainRenderer::constructTree(SubTerrain& subTerrain, const glm::vec3& 
         auto& patch = patches[i];
         if (!shouldSubdivide(patch, cameraPos, bounds.yOffset)) continue;
         patch.isParent = true;
+        const auto parent = patch; // need a copy because we're gonna reallocate the parent
 
-        const auto texCoordStep = 0.5f * patch.texCoordStep;
-        const auto quaterSize = 0.25f * patch.size;
+        const auto texCoordStep = 0.5f * parent.texCoordStep;
+        const auto quaterSize = 0.25f * parent.size;
 
         patches.emplace_back(
-            glm::vec2{ patch.center.x - quaterSize.x, patch.center.y + quaterSize.y },
-            0.5f * patch.size,
-            glm::vec2{ patch.texCoordStart.x, patch.texCoordStart.y + texCoordStep.y },
+            glm::vec2{ parent.center.x - quaterSize.x, parent.center.y + quaterSize.y },
+            0.5f * parent.size,
+            glm::vec2{ parent.texCoordStart.x, parent.texCoordStart.y + texCoordStep.y },
             texCoordStep,
-            patch.level + 1
+            parent.level + 1
         );
         patches.emplace_back(
-            glm::vec2{ patch.center.x + quaterSize.x, patch.center.y + quaterSize.y },
-            0.5f * patch.size,
-            glm::vec2{ patch.texCoordStart.x + texCoordStep.x, patch.texCoordStart.y + texCoordStep.y },
+            glm::vec2{ parent.center.x + quaterSize.x, parent.center.y + quaterSize.y },
+            0.5f * parent.size,
+            glm::vec2{ parent.texCoordStart.x + texCoordStep.x, parent.texCoordStart.y + texCoordStep.y },
             texCoordStep,
-            patch.level + 1
+            parent.level + 1
         );
         patches.emplace_back(
-            glm::vec2{ patch.center.x - quaterSize.x, patch.center.y - quaterSize.y },
-            0.5f * patch.size,
-            glm::vec2{ patch.texCoordStart.x, patch.texCoordStart.y },
+            glm::vec2{ parent.center.x - quaterSize.x, parent.center.y - quaterSize.y },
+            0.5f * parent.size,
+            glm::vec2{ parent.texCoordStart.x, parent.texCoordStart.y },
             texCoordStep,
-            patch.level + 1
+            parent.level + 1
         );
         patches.emplace_back(
-            glm::vec2{ patch.center.x + quaterSize.x, patch.center.y - quaterSize.y },
-            0.5f * patch.size,
-            glm::vec2{ patch.texCoordStart.x + texCoordStep.x, patch.texCoordStart.y },
+            glm::vec2{ parent.center.x + quaterSize.x, parent.center.y - quaterSize.y },
+            0.5f * parent.size,
+            glm::vec2{ parent.texCoordStart.x + texCoordStep.x, parent.texCoordStart.y },
             texCoordStep,
-            patch.level + 1
+            parent.level + 1
         );
     }
 }

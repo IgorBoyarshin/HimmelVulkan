@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstring> // strcmp
 #include <set>
+#include <algorithm>
 
 #include "HmlWindow.h"
 

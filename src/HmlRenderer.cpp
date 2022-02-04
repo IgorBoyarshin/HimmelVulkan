@@ -96,7 +96,6 @@ void HmlRenderer::specifyEntitiesToRender(const std::vector<std::shared_ptr<Enti
         const auto& model = entity->modelResource;
         const auto id = model->id;
         if (textureIndexFor.find(id) == textureIndexFor.cend()) {
-            entitiesToRenderForModel[id] = {};
             if (model->textureResource) {
                 if (!anyModelWithTexture) anyModelWithTexture = model;
                 textureIndexFor[id] = nextFreeTextureIndex++;
@@ -104,6 +103,7 @@ void HmlRenderer::specifyEntitiesToRender(const std::vector<std::shared_ptr<Enti
                 textureIndexFor[id] = NO_TEXTURE_MARK;
             }
         }
+        // NOTE The vector will be automatically created if the entry is not present
         entitiesToRenderForModel[id].push_back(entity);
     }
 

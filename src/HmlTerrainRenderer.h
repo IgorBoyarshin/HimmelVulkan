@@ -93,7 +93,6 @@ struct HmlTerrainRenderer {
             uint32_t granularity,
             const char* grassFilename,
             const Bounds& bounds,
-            const std::vector<VkDescriptorSet>& descriptorSet_0_perImage,
             std::shared_ptr<HmlWindow> hmlWindow,
             std::shared_ptr<HmlDevice> hmlDevice,
             std::shared_ptr<HmlCommands> hmlCommands,
@@ -103,7 +102,6 @@ struct HmlTerrainRenderer {
             VkDescriptorSetLayout viewProjDescriptorSetLayout,
             uint32_t framesInFlight) noexcept;
     ~HmlTerrainRenderer() noexcept;
-    // void bake(const std::vector<VkDescriptorSet>& descriptorSet_0_perImage) noexcept;
     void constructTree(SubTerrain& subTerrain, const glm::vec3& cameraPos) const noexcept;
     void update(const glm::vec3& cameraPos) noexcept;
     VkCommandBuffer draw(uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept;

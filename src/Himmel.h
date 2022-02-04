@@ -3,6 +3,7 @@
 #include <chrono>
 #include <optional>
 #include <iostream>
+#include <algorithm>
 
 #include "HmlWindow.h"
 #include "HmlDevice.h"
@@ -15,6 +16,7 @@
 #include "HmlTerrainRenderer.h"
 #include "HmlUiRenderer.h"
 #include "HmlDeferredRenderer.h"
+#include "HmlLightRenderer.h"
 #include "HmlModel.h"
 #include "HmlCamera.h"
 #include "util.h"
@@ -32,17 +34,11 @@ struct Himmel {
         glm::vec3 cameraPos;
     };
 
-    struct PointLight {
-        glm::vec3 color;
-        float intensity;
-        glm::vec3 position;
-        float reserved;
-    };
-    std::vector<PointLight> pointLights;
+    std::vector<HmlLightRenderer::PointLight> pointLightsStatic;
+    std::vector<HmlLightRenderer::PointLight> pointLightsDynamic;
 
-    static const uint32_t MAX_POINT_LIGHTS = 32;
     struct LightUbo {
-        PointLight pointLights[MAX_POINT_LIGHTS];
+        std::array<HmlLightRenderer::PointLight, 32> pointLights;
         uint32_t count;
     };
 
@@ -68,6 +64,7 @@ struct Himmel {
     std::shared_ptr<HmlDeferredRenderer> hmlDeferredRenderer;
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
     std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
+    std::shared_ptr<HmlLightRenderer> hmlLightRenderer;
 
     // std::vector<std::shared_ptr<HmlImageResource>> secondImageResources;
 

@@ -23,14 +23,12 @@ struct HmlCommands {
 
     // TODO create a separate pool for Graphics and Presentation
     VkCommandPool commandPoolGeneral;
+    VkCommandPool commandPoolGeneralResettable;
     // TODO do not recreate a one-time command each time, just rerecord it
     VkCommandPool commandPoolOnetime;
     VkCommandPool commandPoolOnetimeFrames;
-    VkQueue generalQueue;
-    VkQueue onetimeQueue;
-    uint32_t generalQueueIndex;
-    uint32_t onetimeQueueIndex;
-    uint32_t onetimeFrameQueueIndex;
+    VkQueue queue;
+    uint32_t queueIndex;
 
     // We track them manually
     std::vector<VkCommandBuffer> singleTimeCommands;

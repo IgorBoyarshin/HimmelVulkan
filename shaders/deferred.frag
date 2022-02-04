@@ -16,7 +16,7 @@ struct PointLight {
     vec3 color;
     float intensity;
     vec3 position;
-    float _reserved;
+    float radius;
 };
 
 // XXX Sync across all shaders

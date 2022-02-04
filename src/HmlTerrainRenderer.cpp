@@ -69,7 +69,6 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
         uint32_t granularity,
         const char* grassFilename,
         const Bounds& bounds,
-        const std::vector<VkDescriptorSet>& descriptorSet_0_perImage,
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,

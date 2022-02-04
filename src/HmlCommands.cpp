@@ -4,22 +4,22 @@
 std::unique_ptr<HmlCommands> HmlCommands::create(std::shared_ptr<HmlDevice> hmlDevice) noexcept {
     auto hmlCommands = std::make_unique<HmlCommands>();
     hmlCommands->hmlDevice = hmlDevice;
+    hmlCommands->queue = hmlDevice->graphicsQueue; // XXX present !!
+    hmlCommands->queueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX present !!
 
-    hmlCommands->generalQueue = hmlDevice->graphicsQueue; // XXX queue type
-    hmlCommands->generalQueueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX queue type
-    hmlCommands->commandPoolGeneral = hmlCommands->createCommandPool(hmlCommands->generalQueueIndex,
+    hmlCommands->commandPoolGeneral = hmlCommands->createCommandPool(hmlCommands->queueIndex,
         static_cast<VkCommandPoolCreateFlagBits>(0));
     if (!hmlCommands->commandPoolGeneral) return { nullptr };
 
-    hmlCommands->onetimeQueue = hmlDevice->graphicsQueue; // XXX queue type
-    hmlCommands->onetimeQueueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX queue type
-    hmlCommands->commandPoolOnetime = hmlCommands->createCommandPool(hmlCommands->onetimeQueueIndex,
-        VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
+    hmlCommands->commandPoolGeneralResettable = hmlCommands->createCommandPool(hmlCommands->queueIndex,
+        static_cast<VkCommandPoolCreateFlagBits>(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    if (!hmlCommands->commandPoolGeneralResettable) return { nullptr };
+
+    hmlCommands->commandPoolOnetime = hmlCommands->createCommandPool(hmlCommands->queueIndex,
+        static_cast<VkCommandPoolCreateFlagBits>(VK_COMMAND_POOL_CREATE_TRANSIENT_BIT));
     if (!hmlCommands->commandPoolOnetime) return { nullptr };
 
-    hmlCommands->onetimeQueue = hmlDevice->graphicsQueue; // XXX queue type
-    hmlCommands->onetimeFrameQueueIndex = hmlDevice->queueFamilyIndices.graphicsFamily.value(); // XXX queue type
-    hmlCommands->commandPoolOnetimeFrames = hmlCommands->createCommandPool(hmlCommands->onetimeFrameQueueIndex,
+    hmlCommands->commandPoolOnetimeFrames = hmlCommands->createCommandPool(hmlCommands->queueIndex,
         static_cast<VkCommandPoolCreateFlagBits>(VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
     if (!hmlCommands->commandPoolOnetimeFrames) return { nullptr };
 
@@ -31,6 +31,7 @@ HmlCommands::~HmlCommands() noexcept {
     std::cout << ":> Destroying HmlCommands...\n";
     vkDestroyCommandPool(hmlDevice->device, commandPoolOnetime, nullptr);
     vkDestroyCommandPool(hmlDevice->device, commandPoolGeneral, nullptr);
+    vkDestroyCommandPool(hmlDevice->device, commandPoolGeneralResettable, nullptr);
     vkDestroyCommandPool(hmlDevice->device, commandPoolOnetimeFrames, nullptr);
 
     for (const auto& fence : singleTimeCommandFences) {
@@ -188,8 +189,8 @@ void HmlCommands::endSingleTimeCommands(VkCommandBuffer commandBuffer) noexcept 
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    vkQueueSubmit(onetimeQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(onetimeQueue);
+    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(queue);
     // We also could have waited for completion using the vkWaitForFences and
     // specifying a fence as the last argument to the submit call. This could
     // be better if we had multiple transfers to wait on.
@@ -256,7 +257,7 @@ void HmlCommands::endLongTermSingleTimeCommand(VkCommandBuffer commandBuffer) no
     submitInfo.pCommandBuffers = &commandBuffer;
 
     vkResetFences(hmlDevice->device, 1, &singleTimeCommandFences[i]);
-    if (vkQueueSubmit(onetimeQueue, 1, &submitInfo, singleTimeCommandFences[i]) != VK_SUCCESS) {
+    if (vkQueueSubmit(queue, 1, &submitInfo, singleTimeCommandFences[i]) != VK_SUCCESS) {
         std::cerr << "::> Failed to submit a long-term one-time command buffer.\n";
         return;
     }

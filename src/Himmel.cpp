@@ -143,12 +143,13 @@ bool Himmel::init() noexcept {
     };
     const uint32_t granularity = 1;
     hmlTerrainRenderer = HmlTerrainRenderer::create("../models/heightmap.png", granularity, "../models/grass-small.png",
-        terrainBounds, generalDescriptorSet_0_perImage, hmlWindow,
+        terrainBounds, hmlWindow,
         hmlDevice, hmlCommands, hmlRenderPassDeferredPrep, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlTerrainRenderer) return false;
 
 
     // Add lights
+    const float LIGHT_RADIUS = 2.0f;
     for (size_t i = 0; i < 20; i++) {
         const auto pos = glm::vec3(
             hml::getRandomUniformFloat(-SIZE_MAP, SIZE_MAP),
@@ -160,34 +161,38 @@ bool Himmel::init() noexcept {
             hml::getRandomUniformFloat(0.0f, 1.0f),
             hml::getRandomUniformFloat(0.0f, 1.0f)
         );
-        pointLights.push_back(PointLight{
+        pointLightsStatic.push_back(HmlLightRenderer::PointLight{
             .color = color,
             .intensity = 4000.0f,
             .position = pos,
-            .reserved = 0.0f,
+            .radius = LIGHT_RADIUS,
         });
     }
     {
-        const float unit = 40.0f;
-        pointLights.push_back(PointLight{
+        pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(1.0, 0.0, 0.0),
             .intensity = 5000.0f,
-            .position = glm::vec3(0.0, unit, 0.0),
-            .reserved = 0.0f,
+            .position = {}, // will be set in updateForDt
+            .radius = LIGHT_RADIUS,
         });
-        pointLights.push_back(PointLight{
+        pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(0.0, 1.0, 0.0),
             .intensity = 3000.0f,
-            .position = glm::vec3(3*unit, unit, 0.0),
-            .reserved = 0.0f,
+            .position = {}, // will be set in updateForDt
+            .radius = LIGHT_RADIUS,
         });
-        pointLights.push_back(PointLight{
+        pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(0.0, 0.0, 1.0),
             .intensity = 3800.0f,
-            .position = glm::vec3(-2*unit, unit, -3*unit),
-            .reserved = 0.0f,
+            .position = {}, // will be set in updateForDt
+            .radius = LIGHT_RADIUS,
         });
     }
+
+    hmlLightRenderer = HmlLightRenderer::create(hmlWindow,
+        hmlDevice, hmlCommands, hmlRenderPassForward, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, generalDescriptorSet_0_perImage);
+    if (!hmlLightRenderer) return false;
+    hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
 
     camera = HmlCamera{{ 25.0f, 30.0f, 35.0f }};
@@ -263,8 +268,8 @@ bool Himmel::init() noexcept {
             if (!HmlSimpleModel::load("../models/viking_room.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            // const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
-            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
+            // const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
             models.push_back(model);
         }
 
@@ -298,12 +303,8 @@ bool Himmel::init() noexcept {
         entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.2f, 0.2f, 0.9f }));
         entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 25.0f, 90.0f});
 
-        for (const auto& pointLight : pointLights) {
-            entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
-            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), pointLight.position);
-            entities.back()->color = pointLight.color;
-        }
-
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
+        entities.back()->modelMatrix = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0, 10.0, 10.0)), glm::vec3{40.0f, 30.0f, 70.0f});
 
         hmlRenderer->specifyEntitiesToRender(entities);
     }
@@ -496,22 +497,18 @@ bool Himmel::run() noexcept {
 
 
 void Himmel::updateForDt(float dt, float sinceStart) noexcept {
-#define LAST_COUNT 3
-    size_t index = entities.size() - LAST_COUNT;
     const float unit = 40.0f;
-    for (size_t i = 0; i < LAST_COUNT; i++) {
+    for (size_t i = 0; i < pointLightsDynamic.size(); i++) {
         glm::mat4 model(1.0);
-        if (i == 0) {
-            model = glm::translate(model, glm::vec3(0.0, unit, 2*unit));
-        } else if (i == 1) {
-            model = glm::translate(model, glm::vec3(3*unit, unit, 0.0));
-        } else if (i == 2) {
-            model = glm::translate(model, glm::vec3(-2*unit, unit, -3*unit));
+        switch (i) {
+            case 0: model = glm::translate(model, glm::vec3(0.0, unit, 2*unit)); break;
+            case 1: model = glm::translate(model, glm::vec3(3*unit, unit, 0.0)); break;
+            case 2: model = glm::translate(model, glm::vec3(-2*unit, unit, -3*unit)); break;
+            default: model = glm::translate(model, glm::vec3(i * unit, unit, -i*unit));
         }
         model = glm::rotate(model, (i+1) * 0.7f * sinceStart + i * 1.0f, glm::vec3(0.0, 1.0, 0.0));
-        model = glm::translate(model, glm::vec3(50.0f, 0.0f, 0.0f));
-        pointLights[pointLights.size() - LAST_COUNT + i].position = model[3];
-        entities[index + i]->modelMatrix = model;
+        model = glm::translate(model, glm::vec3(50.0f, 0.0f, 0.0f)); // inner radius
+        pointLightsDynamic[i].position = model[3];
     }
 
 
@@ -581,10 +578,17 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
     viewProjUniformBuffers[imageIndex]->update(&generalUbo);
 
     LightUbo lightUbo;
-    lightUbo.count = pointLights.size();
-    for (size_t i = 0; i < pointLights.size(); i++) {
-        lightUbo.pointLights[i] = pointLights[i];
-    }
+    size_t count = 0;
+    for (const auto& light : pointLightsStatic)  lightUbo.pointLights[count++] = light;
+    for (const auto& light : pointLightsDynamic) lightUbo.pointLights[count++] = light;
+    lightUbo.count = count;
+    // Sort to enable proper transparency
+    std::sort(lightUbo.pointLights.begin(), lightUbo.pointLights.begin() + count,
+            [cameraPos = camera.getPos()](const auto& l1, const auto& l2){
+        const auto v1 = cameraPos - l1.position;
+        const auto v2 = cameraPos - l2.position;
+        return glm::dot(v1, v1) > glm::dot(v2, v2);
+    });
     lightUniformBuffers[imageIndex]->update(&lightUbo);
 
     hmlSnowRenderer->updateForImage(imageIndex);
@@ -643,6 +647,7 @@ bool Himmel::drawFrame() noexcept {
     updateForImage(imageIndex);
 
     // DeferredPrep RenderPass
+    // Renders all geometry into the GBuffer
     {
         const auto commandBuffer = commandBuffersDeferredPrep[imageIndex];
         hmlRenderPassDeferredPrep->begin(commandBuffer, imageIndex);
@@ -696,6 +701,7 @@ bool Himmel::drawFrame() noexcept {
     }
 
     // Deferred RenderPass
+    // Renders a 2D texture using the GBuffer
     {
         const auto commandBuffer = commandBuffersDeferred[imageIndex];
         hmlRenderPassDeferred->begin(commandBuffer, imageIndex);
@@ -732,6 +738,7 @@ bool Himmel::drawFrame() noexcept {
     }
 
     // Forward RenderPass
+    // Renders on top of the deferred texture using the depth info from the prep pass
     {
         const auto commandBuffer = commandBuffersForward[imageIndex];
         hmlRenderPassForward->begin(commandBuffer, imageIndex);
@@ -739,6 +746,7 @@ bool Himmel::drawFrame() noexcept {
             // NOTE These are parallelizable
             std::vector<VkCommandBuffer> secondaryCommandBuffers;
             secondaryCommandBuffers.push_back(hmlSnowRenderer->draw(currentFrame, imageIndex, generalDescriptorSet_0_perImage[imageIndex]));
+            secondaryCommandBuffers.push_back(hmlLightRenderer->draw(imageIndex));
             vkCmdExecuteCommands(commandBuffer, secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
         }
         hmlRenderPassForward->end(commandBuffer);
@@ -774,6 +782,7 @@ bool Himmel::drawFrame() noexcept {
     // NOTE
 
     // UI RenderPass
+    // Renders multiple 2D textures on top of everything
     {
         const auto commandBuffer = commandBuffersUi[imageIndex];
         hmlRenderPassUi->begin(commandBuffer, imageIndex);
@@ -888,13 +897,12 @@ void Himmel::recreateSwapchain() noexcept {
     // TODO foreach Renderer
     hmlRenderer->replaceRenderPass(hmlRenderPassDeferredPrep);
     hmlSnowRenderer->replaceRenderPass(hmlRenderPassForward);
+    hmlLightRenderer->replaceRenderPass(hmlRenderPassForward);
     hmlTerrainRenderer->replaceRenderPass(hmlRenderPassDeferredPrep);
     hmlDeferredRenderer->replaceRenderPass(hmlRenderPassDeferred);
     hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
     hmlUiRenderer->replaceRenderPass(hmlRenderPassUi);
     hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
-    // TODO maybe store this as as flag inside the Renderer so that it knows automatically
-    // hmlTerrainRenderer->bake(generalDescriptorSet_0_perImage);
 
     proj = projFrom(hmlSwapchain->extentAspect());
 

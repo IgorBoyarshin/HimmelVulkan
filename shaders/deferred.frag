@@ -36,16 +36,9 @@ layout(location = 0) in vec2 inTexCoord;
 layout(location = 0) out vec4 outColor;
 
 float distToLine(vec3 v0, vec3 v1, vec3 p) {
-    float line0 = length(v0 - p);
-    float line1 = length(v1 - p);
-    float r;
-    if (line0 < line1) {
-        r = line0 / line1 * 0.5;
-    } else {
-        r = 1.0 - line1 / line0 * 0.5;
-    }
-    vec3 mid = mix(v0, v1, r);
-    return distance(p, mid);
+    vec3 I = normalize(v1 - v0);
+    vec3 P = p - v0;
+    return sqrt(dot(P, P) - dot(P, I));
 }
 
 void main() {

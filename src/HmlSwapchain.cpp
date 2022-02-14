@@ -92,6 +92,7 @@ VkSurfaceFormatKHR HmlSwapchain::chooseSwapSurfaceFormat(const std::vector<VkSur
             return availableFormat;
         }
     }
+    std::cerr << "::> The desired color attachment for the swapchain is not supported.\n";
 
     return availableFormats[0];
 }

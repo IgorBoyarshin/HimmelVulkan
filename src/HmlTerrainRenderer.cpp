@@ -72,16 +72,17 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,
-        std::shared_ptr<HmlRenderPass> hmlRenderPass,
+        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         VkDescriptorSetLayout viewProjDescriptorSetLayout,
+        uint32_t imageCount,
         uint32_t framesInFlight) noexcept {
     auto hmlRenderer = std::make_unique<HmlTerrainRenderer>();
     hmlRenderer->hmlWindow = hmlWindow;
     hmlRenderer->hmlDevice = hmlDevice;
     hmlRenderer->hmlCommands = hmlCommands;
-    hmlRenderer->hmlRenderPass = hmlRenderPass;
+    // hmlRenderer->hmlRenderPass = hmlRenderPass;
     hmlRenderer->hmlResourceManager = hmlResourceManager;
     hmlRenderer->hmlDescriptors = hmlDescriptors;
 
@@ -128,15 +129,15 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
     if (!hmlRenderer->descriptorSet_heightmap_1) return { nullptr };
 
 
-    hmlRenderer->hmlPipeline = createPipeline(hmlDevice,
-        hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
-    if (!hmlRenderer->hmlPipeline) return { nullptr };
+    // hmlRenderer->hmlPipeline = createPipeline(hmlDevice,
+    //     hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
+    // if (!hmlRenderer->hmlPipeline) return { nullptr };
     // hmlRenderer->hmlPipelineDebug = createPipelineDebug(hmlDevice,
     //     hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
     // if (!hmlRenderer->hmlPipelineDebug) return { nullptr };
 
 
-    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(hmlRenderPass->imageCount(), hmlCommands->commandPoolOnetimeFrames);
+    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(imageCount, hmlCommands->commandPoolOnetimeFrames);
 
     HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_heightmap_1)
         .textureAt(0,
@@ -229,14 +230,14 @@ void HmlTerrainRenderer::update(const glm::vec3& cameraPos) noexcept {
 }
 
 
-VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept {
-    auto commandBuffer = commandBuffers[imageIndex];
+VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept {
+    auto commandBuffer = commandBuffers[frameData.imageIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
-        .renderPass = hmlRenderPass->renderPass,
+        .renderPass = currentRenderPass->renderPass,
         .subpass = 0, // we only have a single one
-        .framebuffer = hmlRenderPass->framebuffers[imageIndex],
+        .framebuffer = currentRenderPass->framebuffers[frameData.imageIndex],
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
@@ -244,10 +245,11 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
     hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
 
     {
+        const auto& hmlPipeline = getCurrentPipeline();
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
         std::array<VkDescriptorSet, 2> descriptorSets = {
-            descriptorSet_0, descriptorSet_heightmap_1
+            frameData.generalDescriptorSet_0, descriptorSet_heightmap_1
         };
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
             hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
@@ -279,7 +281,7 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
     //     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipelineDebug->pipeline);
     //
     //     std::array<VkDescriptorSet, 2> descriptorSets = {
-    //         descriptorSet_0, descriptorSet_heightmap_1
+    //         frameData.descriptorSet_0, descriptorSet_heightmap_1
     //     };
     //     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
     //             hmlPipelineDebug->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
@@ -313,13 +315,10 @@ VkCommandBuffer HmlTerrainRenderer::draw(uint32_t imageIndex, VkDescriptorSet de
 }
 
 
-// TODO in order for each type of Renderer to properly replace its pipeline,
-// store a member in Renderer which specifies its type, and recreate the pipeline
-// based on its value.
-void HmlTerrainRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-    hmlRenderPass = newHmlRenderPass;
-    hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-    // hmlPipelineDebug = createPipelineDebug(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-    // NOTE The command pool is reset for all renderers prior to calling this function.
-    // NOTE commandBuffers must be rerecorded -- is done during baking
-}
+// void HmlTerrainRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
+//     hmlRenderPass = newHmlRenderPass;
+//     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
+//     // hmlPipelineDebug = createPipelineDebug(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
+//     // NOTE The command pool is reset for all renderers prior to calling this function.
+//     // NOTE commandBuffers must be rerecorded -- is done during baking
+// }

@@ -685,7 +685,7 @@ bool HmlImageResource::transitionLayoutTo(VkImageLayout newLayout, VkCommandBuff
         // We need to pick the earliest; the reading happens in:
         destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     } else {
-        std::cerr << "::> Provided layout transition is not implemented.\n";
+        std::cerr << "::> Provided layout transition is not implemented: " << oldLayout << "->" << newLayout << ".\n";
         return false;
     }
 

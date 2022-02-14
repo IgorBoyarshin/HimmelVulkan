@@ -15,12 +15,15 @@
 #include "HmlSnowParticleRenderer.h"
 #include "HmlTerrainRenderer.h"
 #include "HmlUiRenderer.h"
+// #include "HmlBlurRenderer.h"
+#include "HmlBloomRenderer.h"
 #include "HmlDeferredRenderer.h"
 #include "HmlLightRenderer.h"
 #include "HmlModel.h"
 #include "HmlCamera.h"
 #include "util.h"
 #include "HmlRenderPass.h"
+#include "HmlPipe.h"
 
 
 struct Himmel {
@@ -47,10 +50,10 @@ struct Himmel {
         float fogDensity;
     };
     Weather weather;
+    const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
 
     std::shared_ptr<HmlWindow> hmlWindow;
     std::shared_ptr<HmlDevice> hmlDevice;
-    std::shared_ptr<HmlImageResource> hmlDepthResource;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
     std::shared_ptr<HmlCommands> hmlCommands;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
@@ -61,16 +64,20 @@ struct Himmel {
     std::shared_ptr<HmlRenderPass> hmlRenderPassUi;
     std::shared_ptr<HmlRenderer> hmlRenderer;
     std::shared_ptr<HmlUiRenderer> hmlUiRenderer;
+    // std::shared_ptr<HmlBlurRenderer> hmlBlurRenderer;
+    std::shared_ptr<HmlBloomRenderer> hmlBloomRenderer;
     std::shared_ptr<HmlDeferredRenderer> hmlDeferredRenderer;
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
     std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
     std::shared_ptr<HmlLightRenderer> hmlLightRenderer;
 
-    // std::vector<std::shared_ptr<HmlImageResource>> secondImageResources;
-
     std::vector<std::shared_ptr<HmlImageResource>> gBufferPositions;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferNormals;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferColors;
+    std::vector<std::shared_ptr<HmlImageResource>> brightness1Textures;
+    // std::vector<std::shared_ptr<HmlImageResource>> brightness2Textures;
+    std::vector<std::shared_ptr<HmlImageResource>> mainTextures;
+    std::shared_ptr<HmlImageResource> hmlDepthResource;
 
 
     HmlCamera camera;
@@ -78,22 +85,10 @@ struct Himmel {
     std::pair<int32_t, int32_t> cursor;
 
 
-    std::vector<VkCommandBuffer> commandBuffersDeferredPrep;
-    std::vector<VkCommandBuffer> commandBuffersDeferred;
-    std::vector<VkCommandBuffer> commandBuffersForward;
-    std::vector<VkCommandBuffer> commandBuffersUi;
-
-
-    const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
-
-
     // Sync objects
-    uint32_t maxFramesInFlight = 2;
+    const uint32_t maxFramesInFlight = 2;
     std::vector<VkSemaphore> imageAvailableSemaphores; // for each frame in flight
     std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
-    std::vector<VkSemaphore> deferredPrepFinishedSemaphores; // for each frame in flight
-    std::vector<VkSemaphore> deferredFinishedSemaphores; // for each frame in flight
-    std::vector<VkSemaphore> forwardFinishedSemaphores; // for each frame in flight
     std::vector<VkFence> inFlightFences;               // for each frame in flight
     std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
@@ -106,6 +101,8 @@ struct Himmel {
     VkDescriptorPool generalDescriptorPool;
     VkDescriptorSetLayout generalDescriptorSetLayout;
     std::vector<VkDescriptorSet> generalDescriptorSet_0_perImage;
+
+    std::unique_ptr<HmlPipe> hmlPipe;
 
 
     // NOTE Later it will probably be a hashmap from model name
@@ -122,18 +119,7 @@ struct Himmel {
     bool drawFrame() noexcept;
     void recordDrawBegin(VkCommandBuffer commandBuffer, uint32_t imageIndex) noexcept;
     void recordDrawEnd(VkCommandBuffer commandBuffer) noexcept;
-    bool createGBuffers() noexcept;
-    std::unique_ptr<HmlRenderPass> createDeferredPrepRenderPass(
-            std::shared_ptr<HmlSwapchain> hmlSwapchain,
-            std::shared_ptr<HmlImageResource> hmlDepthResource,
-            const Weather& weather) const noexcept;
-    std::unique_ptr<HmlRenderPass> createForwardRenderPass(
-            std::shared_ptr<HmlSwapchain> hmlSwapchain,
-            std::shared_ptr<HmlImageResource> hmlDepthResource) const noexcept;
-    std::unique_ptr<HmlRenderPass> createDeferredRenderPass(
-            std::shared_ptr<HmlSwapchain> hmlSwapchain) const noexcept;
-    std::unique_ptr<HmlRenderPass> createUiRenderPass(
-            std::shared_ptr<HmlSwapchain> hmlSwapchain) const noexcept;
+    bool prepareResources() noexcept;
     void recreateSwapchain() noexcept;
     bool createSyncObjects() noexcept;
     ~Himmel() noexcept;

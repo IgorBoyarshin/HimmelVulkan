@@ -1,15 +1,15 @@
-#include "HmlUiRenderer.h"
+#include "HmlBloomRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlUiRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
+std::unique_ptr<HmlPipeline> HmlBloomRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
     HmlGraphicsPipelineConfig config{
         .bindingDescriptions   = {},
         .attributeDescriptions = {},
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .hmlShaders = HmlShaders()
-            .addVertex("../shaders/out/ui.vert.spv")
-            .addFragment("../shaders/out/ui.frag.spv"),
+            .addVertex("../shaders/out/bloom.vert.spv")
+            .addFragment("../shaders/out/bloom.frag.spv"),
         .renderPass = renderPass,
         .extent = extent,
         .polygoneMode = VK_POLYGON_MODE_FILL,
@@ -17,8 +17,8 @@ std::unique_ptr<HmlPipeline> HmlUiRenderer::createPipeline(std::shared_ptr<HmlDe
         .cullMode = VK_CULL_MODE_NONE,
         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
         .descriptorSetLayouts = descriptorSetLayouts,
-        .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pushConstantsSizeBytes = sizeof(PushConstant),
+        .pushConstantsStages = 0,
+        .pushConstantsSizeBytes = 0,
         .tessellationPatchPoints = 0,
         .lineWidth = 1.0f,
         .colorAttachmentCount = 1,
@@ -29,16 +29,15 @@ std::unique_ptr<HmlPipeline> HmlUiRenderer::createPipeline(std::shared_ptr<HmlDe
 }
 
 
-std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(
+std::unique_ptr<HmlBloomRenderer> HmlBloomRenderer::create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,
-        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         uint32_t imageCount,
         uint32_t framesInFlight) noexcept {
-    auto hmlRenderer = std::make_unique<HmlUiRenderer>();
+    auto hmlRenderer = std::make_unique<HmlBloomRenderer>();
     hmlRenderer->hmlWindow = hmlWindow;
     hmlRenderer->hmlDevice = hmlDevice;
     hmlRenderer->hmlCommands = hmlCommands;
@@ -48,13 +47,14 @@ std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(
 
 
     hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
-        .withTextures(imageCount * MAX_TEXTURES_COUNT)
+        .withTextures(imageCount * 2)
         .maxSets(imageCount)
         .build(hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
     hmlRenderer->descriptorSetLayoutTextures = hmlDescriptors->buildDescriptorSetLayout()
-        .withTextureArrayAt(0, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES_COUNT)
+        .withTextureAt(0, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .withTextureAt(1, VK_SHADER_STAGE_FRAGMENT_BIT)
         .build(hmlDevice);
     if (!hmlRenderer->descriptorSetLayoutTextures) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutTextures);
@@ -75,8 +75,8 @@ std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(
 }
 
 
-HmlUiRenderer::~HmlUiRenderer() noexcept {
-    std::cout << ":> Destroying HmlUiRenderer...\n";
+HmlBloomRenderer::~HmlBloomRenderer() noexcept {
+    std::cout << ":> Destroying HmlBloomRenderer...\n";
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.
@@ -86,25 +86,21 @@ HmlUiRenderer::~HmlUiRenderer() noexcept {
 }
 
 
-void HmlUiRenderer::specify(const std::vector<std::vector<std::shared_ptr<HmlImageResource>>>& resources) noexcept {
-    texturesCount = resources.size();
-    const auto imageCount = resources[0].size();
-
+void HmlBloomRenderer::specify(
+        const std::vector<std::shared_ptr<HmlImageResource>>& mainTextures,
+        const std::vector<std::shared_ptr<HmlImageResource>>& brightnessTextures
+        ) noexcept {
+    const auto imageCount = mainTextures.size();
     for (size_t imageIndex = 0; imageIndex < imageCount; imageIndex++) {
-        std::vector<VkSampler> samplers;
-        std::vector<VkImageView> views;
-        for (const auto& resource : resources) {
-            const auto& texture = resource[imageIndex];
-            samplers.push_back(texture->sampler);
-            views.push_back(texture->view);
-        }
         HmlDescriptorSetUpdater(descriptorSet_textures_0_perImage[imageIndex])
-            .textureArrayAt(0, samplers, views).update(hmlDevice);
+            .textureAt(0, mainTextures[imageIndex]->sampler, mainTextures[imageIndex]->view)
+            .textureAt(1, brightnessTextures[imageIndex]->sampler, brightnessTextures[imageIndex]->view)
+            .update(hmlDevice);
     }
 }
 
 
-VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
+VkCommandBuffer HmlBloomRenderer::draw(const HmlFrameData& frameData) noexcept {
     auto commandBuffer = commandBuffers[frameData.frameIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
@@ -127,27 +123,18 @@ VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-    for (int32_t i = 0; i < static_cast<int32_t>(texturesCount); i++) {
-        PushConstant pushConstant{
-            .textureIndex = i,
-            .shift = (2.0f / MAX_TEXTURES_COUNT) * i,
-        };
-        vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
-            hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
-
-        const uint32_t instanceCount = 1;
-        const uint32_t firstInstance = 0;
-        const uint32_t vertexCount = 6; // a simple square
-        const uint32_t firstVertex = 0;
-        vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
-    }
+    const uint32_t instanceCount = 1;
+    const uint32_t firstInstance = 0;
+    const uint32_t vertexCount = 6; // a simple square
+    const uint32_t firstVertex = 0;
+    vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
     hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }
 
 
-// void HmlUiRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
+// void HmlBloomRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
 //     hmlRenderPass = newHmlRenderPass;
 //     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
 //     // NOTE The command pool is reset for all renderers prior to calling this function.

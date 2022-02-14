@@ -61,8 +61,8 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = (config.hasPrevious) ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = (config.hasNext) ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .initialLayout = attachment.preLayout,
+            .finalLayout = attachment.postLayout,
         });
     }
 

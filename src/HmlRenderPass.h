@@ -19,6 +19,8 @@ struct HmlRenderPass {
         VkFormat imageFormat;
         std::vector<VkImageView> imageViews;
         std::optional<VkClearColorValue> clearColor;
+        VkImageLayout preLayout;
+        VkImageLayout postLayout;
     };
     struct DepthStencilAttachment {
         VkFormat imageFormat;
@@ -33,8 +35,6 @@ struct HmlRenderPass {
         std::vector<ColorAttachment> colorAttachments;
         std::optional<DepthStencilAttachment> depthStencilAttachment;
         VkExtent2D extent;
-        bool hasPrevious;
-        bool hasNext;
     };
 
 

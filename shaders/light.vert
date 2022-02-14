@@ -10,6 +10,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     float fogDensity;
     vec3 cameraPos;
 } uboGeneral;
+const float fogGradient = 2.0;
 
 struct PointLight {
     vec3 color;
@@ -26,7 +27,7 @@ layout(set = 0, binding = 1) uniform LightsUbo {
 } uboLights;
 
 layout(location = 0) out vec2  outCoord;
-layout(location = 1) out vec3  outColor;
+layout(location = 1) out vec4  outColor;
 layout(location = 2) out float outIntensity;
 
 #define UNIT 1.0
@@ -45,6 +46,16 @@ void main() {
     vec4 viewPos = centerViewPos + vec4(light.radius * positionFor[gl_VertexIndex], 0.0, 0.0);
     gl_Position = uboGeneral.proj * viewPos;
     outCoord = positionFor[gl_VertexIndex];
-    outColor = light.color;
+    outColor.rgb = light.color;
     outIntensity = light.intensity;
+
+    // Apply simple fog
+    if (uboGeneral.fogDensity > 0) {
+        // To make the light for fog-resistant
+        const float densityMult = 0.7;
+        const float gradientMult = 0.5;
+        float distToCamera = length(uboGeneral.cameraPos - light.position);
+        float visibility = clamp(exp(-pow((densityMult * distToCamera * uboGeneral.fogDensity), gradientMult * fogGradient)), 0.0, 1.0);
+        outColor = vec4(mix(uboGeneral.fogColor, outColor.rgb, visibility), visibility);
+    }
 }

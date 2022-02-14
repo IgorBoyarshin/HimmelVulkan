@@ -1,5 +1,7 @@
-#ifndef HML_DEFERRED_RENDERER
-#define HML_DEFERRED_RENDERER
+#if 0
+
+#ifndef HML_BLUR_RENDERER
+#define HML_BLUR_RENDERER
 
 #include <memory>
 #include <vector>
@@ -18,11 +20,12 @@
 #include "renderer.h"
 
 
-// NOTE
-// In theory, it is easily possible to also recreate desriptor stuff upon
-// swapchain recreation by recreating the whole Renderer object.
-// NOTE
-struct HmlDeferredRenderer : HmlDrawer {
+struct HmlBlurRenderer : HmlDrawer {
+    struct PushConstant {
+        uint32_t isHorizontal;
+    };
+
+
     std::shared_ptr<HmlWindow> hmlWindow;
     // std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
@@ -33,34 +36,56 @@ struct HmlDeferredRenderer : HmlDrawer {
     // std::unique_ptr<HmlPipeline> hmlPipeline;
 
     VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet>  descriptorSet_textures_1_perImage;
+    std::vector<VkDescriptorSet>  descriptorSet_first_0_perImage;
+    std::vector<VkDescriptorSet>  descriptorSet_second_0_perImage;
     // std::vector<VkDescriptorSetLayout> descriptorSetLayouts; // NOTE stores only 1 (for textures)
     VkDescriptorSetLayout descriptorSetLayoutTextures;
 
     std::vector<std::shared_ptr<HmlImageResource>> imageResources;
 
+    bool isVertical = true;
+    uint32_t framesInFlight; // TODO XXX
 
-    static constexpr uint32_t G_COUNT = 3; // XXX must match the shader
 
-    std::vector<VkCommandBuffer> commandBuffers;
+    std::vector<std::vector<VkCommandBuffer>> commandBuffersPerRenderPass;
+
+    inline void addRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override {
+        auto hmlPipeline = createPipeline(hmlDevice, newHmlRenderPass->extent, newHmlRenderPass->renderPass, descriptorSetLayouts);
+        pipelineForRenderPassStorage.emplace_back(newHmlRenderPass, std::move(hmlPipeline));
+        currentRenderPass = newHmlRenderPass;
+        commandBuffersPerRenderPass.push_back(hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames));
+        // TODO XXX implement commands for all renderers
+    }
+
+    inline virtual void clearRenderPasses() noexcept {
+        currentRenderPass.reset();
+        pipelineForRenderPassStorage.clear();
+        commandBuffersPerRenderPass.clear();
+    }
+
 
 
     std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
-    static std::unique_ptr<HmlDeferredRenderer> create(
+    static std::unique_ptr<HmlBlurRenderer> create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,
         // std::shared_ptr<HmlRenderPass> hmlRenderPass,
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
-        VkDescriptorSetLayout viewProjDescriptorSetLayout,
         uint32_t imageCount,
         uint32_t framesInFlight) noexcept;
-    ~HmlDeferredRenderer() noexcept;
-    void specify(const std::array<std::vector<std::shared_ptr<HmlImageResource>>, G_COUNT>& resources) noexcept;
+    ~HmlBlurRenderer() noexcept;
+    void specify(
+        const std::vector<std::shared_ptr<HmlImageResource>>& firstTextures,
+        const std::vector<std::shared_ptr<HmlImageResource>>& secondTextures) noexcept;
+    void modeHorizontal() noexcept;
+    void modeVertical() noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
     // void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override;
 };
+
+#endif
 
 #endif

@@ -15,13 +15,14 @@
 #include "HmlResourceManager.h"
 #include "HmlDescriptors.h"
 #include "HmlRenderPass.h"
+#include "renderer.h"
 
 
 // NOTE
 // In theory, it is easily possible to also recreate desriptor stuff upon
 // swapchain recreation by recreating the whole Renderer object.
 // NOTE
-struct HmlRenderer {
+struct HmlRenderer : HmlDrawer {
     struct PushConstant {
         alignas(16) glm::mat4 model;
         glm::vec4 color;
@@ -48,17 +49,17 @@ struct HmlRenderer {
 
 
     std::shared_ptr<HmlWindow> hmlWindow;
-    std::shared_ptr<HmlDevice> hmlDevice;
+    // std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
-    std::shared_ptr<HmlRenderPass> hmlRenderPass;
+    // std::shared_ptr<HmlRenderPass> hmlRenderPass;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
 
-    std::unique_ptr<HmlPipeline> hmlPipeline;
+    // std::unique_ptr<HmlPipeline> hmlPipeline;
 
     VkDescriptorPool descriptorPool;
     VkDescriptorSet  descriptorSet_textures_1;
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    // std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
     VkDescriptorSetLayout descriptorSetLayoutTextures;
 
 
@@ -74,26 +75,22 @@ struct HmlRenderer {
     std::vector<VkCommandBuffer> commandBuffers;
 
 
-    static std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
+    std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
+        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlRenderer> create(
             std::shared_ptr<HmlWindow> hmlWindow,
             std::shared_ptr<HmlDevice> hmlDevice,
             std::shared_ptr<HmlCommands> hmlCommands,
-            std::shared_ptr<HmlRenderPass> hmlRenderPass,
+            // std::shared_ptr<HmlRenderPass> hmlRenderPass,
             std::shared_ptr<HmlResourceManager> hmlResourceManager,
             std::shared_ptr<HmlDescriptors> hmlDescriptors,
             VkDescriptorSetLayout generalDescriptorSetLayout,
-        uint32_t framesInFlight) noexcept;
+            uint32_t framesInFlight) noexcept;
     ~HmlRenderer() noexcept;
     void specifyEntitiesToRender(const std::vector<std::shared_ptr<Entity>>& entities) noexcept;
     void updateDescriptorSetTextures() noexcept;
-    VkCommandBuffer draw(uint32_t frameIndex, uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept;
-
-    // TODO in order for each type of Renderer to properly replace its pipeline,
-    // store a member in Renderer which specifies its type, and recreate the pipeline
-    // based on its value.
-    void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept;
+    VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
+    // void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override;
 };
 
 #endif

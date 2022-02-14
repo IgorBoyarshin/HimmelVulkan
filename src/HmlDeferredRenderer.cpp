@@ -33,23 +33,24 @@ std::unique_ptr<HmlDeferredRenderer> HmlDeferredRenderer::create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,
-        std::shared_ptr<HmlRenderPass> hmlRenderPass,
+        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         VkDescriptorSetLayout viewProjDescriptorSetLayout,
+        uint32_t imageCount,
         uint32_t framesInFlight) noexcept {
     auto hmlRenderer = std::make_unique<HmlDeferredRenderer>();
     hmlRenderer->hmlWindow = hmlWindow;
     hmlRenderer->hmlDevice = hmlDevice;
     hmlRenderer->hmlCommands = hmlCommands;
-    hmlRenderer->hmlRenderPass = hmlRenderPass;
+    // hmlRenderer->hmlRenderPass = hmlRenderPass;
     hmlRenderer->hmlResourceManager = hmlResourceManager;
     hmlRenderer->hmlDescriptors = hmlDescriptors;
 
 
     hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
-        .withTextures(hmlRenderPass->imageCount() * G_COUNT)
-        .maxSets(hmlRenderPass->imageCount())
+        .withTextures(imageCount * G_COUNT)
+        .maxSets(imageCount)
         .build(hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
@@ -62,14 +63,14 @@ std::unique_ptr<HmlDeferredRenderer> HmlDeferredRenderer::create(
     if (!hmlRenderer->descriptorSetLayoutTextures) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutTextures);
 
-    hmlRenderer->descriptorSet_textures_1_perImage = hmlDescriptors->createDescriptorSets(hmlRenderPass->imageCount(),
+    hmlRenderer->descriptorSet_textures_1_perImage = hmlDescriptors->createDescriptorSets(imageCount,
         hmlRenderer->descriptorSetLayoutTextures, hmlRenderer->descriptorPool);
     if (hmlRenderer->descriptorSet_textures_1_perImage.empty()) return { nullptr };
 
 
-    hmlRenderer->hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent,
-        hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
-    if (!hmlRenderer->hmlPipeline) return { nullptr };
+    // hmlRenderer->hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent,
+    //     hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
+    // if (!hmlRenderer->hmlPipeline) return { nullptr };
 
 
     hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames);
@@ -90,7 +91,8 @@ HmlDeferredRenderer::~HmlDeferredRenderer() noexcept {
 
 
 void HmlDeferredRenderer::specify(const std::array<std::vector<std::shared_ptr<HmlImageResource>>, G_COUNT>& resources) noexcept {
-    for (size_t imageIndex = 0; imageIndex < hmlRenderPass->imageCount(); imageIndex++) {
+    const auto imageCount = resources[0].size();
+    for (size_t imageIndex = 0; imageIndex < imageCount; imageIndex++) {
         std::vector<VkSampler> samplers;
         std::vector<VkImageView> views;
         for (const auto& resource : resources) {
@@ -104,24 +106,25 @@ void HmlDeferredRenderer::specify(const std::array<std::vector<std::shared_ptr<H
 }
 
 
-VkCommandBuffer HmlDeferredRenderer::draw(uint32_t frameIndex, uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept {
-    auto commandBuffer = commandBuffers[frameIndex];
+VkCommandBuffer HmlDeferredRenderer::draw(const HmlFrameData& frameData) noexcept {
+    auto commandBuffer = commandBuffers[frameData.frameIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
-        .renderPass = hmlRenderPass->renderPass,
+        .renderPass = currentRenderPass->renderPass,
         .subpass = 0, // we only have a single one
-        .framebuffer = hmlRenderPass->framebuffers[imageIndex],
+        .framebuffer = currentRenderPass->framebuffers[frameData.imageIndex],
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
 
+    const auto& hmlPipeline = getCurrentPipeline();
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
     std::array<VkDescriptorSet, 2> descriptorSets = {
-        descriptorSet_0, descriptorSet_textures_1_perImage[imageIndex]
+        frameData.generalDescriptorSet_0, descriptorSet_textures_1_perImage[frameData.imageIndex]
     };
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
@@ -137,12 +140,9 @@ VkCommandBuffer HmlDeferredRenderer::draw(uint32_t frameIndex, uint32_t imageInd
 }
 
 
-// TODO in order for each type of Renderer to properly replace its pipeline,
-// store a member in Renderer which specifies its type, and recreate the pipeline
-// based on its value.
-void HmlDeferredRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-    hmlRenderPass = newHmlRenderPass;
-    hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-    // NOTE The command pool is reset for all renderers prior to calling this function.
-    // NOTE commandBuffers must be rerecorded -- is done during baking
-}
+// void HmlDeferredRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
+//     hmlRenderPass = newHmlRenderPass;
+//     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
+//     // NOTE The command pool is reset for all renderers prior to calling this function.
+//     // NOTE commandBuffers must be rerecorded -- is done during baking
+// }

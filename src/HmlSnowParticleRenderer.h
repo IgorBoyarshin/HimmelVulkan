@@ -17,9 +17,10 @@
 #include "HmlResourceManager.h"
 #include "HmlDescriptors.h"
 #include "util.h"
+#include "renderer.h"
 
 
-struct HmlSnowParticleRenderer {
+struct HmlSnowParticleRenderer : HmlDrawer {
     static constexpr float SNOW_MODE_BOX = +1.0f;
     static constexpr float SNOW_MODE_CAMERA = -1.0f;
     struct PushConstant {
@@ -32,19 +33,19 @@ struct HmlSnowParticleRenderer {
 
 
     std::shared_ptr<HmlWindow> hmlWindow;
-    std::shared_ptr<HmlDevice> hmlDevice;
+    // std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
-    std::shared_ptr<HmlRenderPass> hmlRenderPass;
+    // std::shared_ptr<HmlRenderPass> hmlRenderPass;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
 
-    std::unique_ptr<HmlPipeline> hmlPipeline;
+    // std::unique_ptr<HmlPipeline> hmlPipeline;
     // HmlShaderLayout hmlShaderLayout;
 
     VkDescriptorPool descriptorPool;
     VkDescriptorSet              descriptorSet_textures_1;
     std::vector<VkDescriptorSet> descriptorSet_instances_2_perImage;
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    // std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
     std::vector<VkDescriptorSetLayout> descriptorSetLayoutsSelf;
 
 
@@ -74,29 +75,26 @@ struct HmlSnowParticleRenderer {
     std::vector<std::unique_ptr<HmlImageResource>> snowTextureResources;
 
 
-    static std::unique_ptr<HmlPipeline> createSnowPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-            VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
+    std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
+            VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlSnowParticleRenderer> createSnowRenderer(
             uint32_t snowCount,
             const std::variant<SnowBoxBounds, SnowCameraBounds>& snowBounds,
             std::shared_ptr<HmlWindow> hmlWindow,
             std::shared_ptr<HmlDevice> hmlDevice,
             std::shared_ptr<HmlCommands> hmlCommands,
-            std::shared_ptr<HmlRenderPass> hmlRenderPass,
+            // std::shared_ptr<HmlRenderPass> hmlRenderPass,
             std::shared_ptr<HmlResourceManager> hmlResourceManager,
             std::shared_ptr<HmlDescriptors> hmlDescriptors,
             VkDescriptorSetLayout viewProjDescriptorSetLayout,
+            uint32_t imageCount,
             uint32_t framesInFlight) noexcept;
     ~HmlSnowParticleRenderer() noexcept;
     void createSnow(uint32_t count, const SnowBounds& bounds) noexcept;
     void updateForDt(float dt, float timeSinceStart) noexcept;
     void updateForImage(uint32_t imageIndex) noexcept;
-    VkCommandBuffer draw(uint32_t frameIndex, uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept;
-
-    // TODO in order for each type of Renderer to properly replace its pipeline,
-    // store a member in Renderer which specifies its type, and recreate the pipeline
-    // based on its value.
-    void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept;
+    VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
+    // void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override;
 };
 
 #endif

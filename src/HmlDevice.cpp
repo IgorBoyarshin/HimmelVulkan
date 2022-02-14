@@ -113,7 +113,7 @@ VkInstance HmlDevice::createInstance(const char* applicationName) noexcept {
 }
 
 
-bool HmlDevice::checkValidationLayerSupport(const auto& requested) noexcept {
+bool HmlDevice::checkValidationLayerSupport(const std::array<const char*, 1>& requested) noexcept {
     const auto available = getAvailableLayers();
     return std::all_of(requested.cbegin(), requested.cend(), [&](const char* layerName){
         return std::any_of(available.cbegin(), available.cend(), [&](const auto& layerProperties){
@@ -345,7 +345,7 @@ bool HmlDevice::isPhysicalDeviceSuitable(const VkPhysicalDevice& physicalDevice,
 
 
 // NOTE interesting approach with erase()
-bool HmlDevice::checkDeviceExtensionSupport(const VkPhysicalDevice& physicalDevice, const auto& requiredDeviceExtensions) noexcept {
+bool HmlDevice::checkDeviceExtensionSupport(const VkPhysicalDevice& physicalDevice, const std::array<const char*, 1>& requiredDeviceExtensions) noexcept {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);

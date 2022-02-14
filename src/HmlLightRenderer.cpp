@@ -21,7 +21,7 @@ std::unique_ptr<HmlPipeline> HmlLightRenderer::createPipeline(std::shared_ptr<Hm
         .pushConstantsSizeBytes = 0,
         .tessellationPatchPoints = 0,
         .lineWidth = 1.0f,
-        .colorAttachmentCount = 1,
+        .colorAttachmentCount = 2,
         .withBlending = true,
     };
 
@@ -33,7 +33,7 @@ std::unique_ptr<HmlLightRenderer> HmlLightRenderer::create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlDevice> hmlDevice,
         std::shared_ptr<HmlCommands> hmlCommands,
-        std::shared_ptr<HmlRenderPass> hmlRenderPass,
+        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
         std::shared_ptr<HmlResourceManager> hmlResourceManager,
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         VkDescriptorSetLayout viewProjDescriptorSetLayout,
@@ -42,7 +42,7 @@ std::unique_ptr<HmlLightRenderer> HmlLightRenderer::create(
     hmlRenderer->hmlWindow = hmlWindow;
     hmlRenderer->hmlDevice = hmlDevice;
     hmlRenderer->hmlCommands = hmlCommands;
-    hmlRenderer->hmlRenderPass = hmlRenderPass;
+    // hmlRenderer->hmlRenderPass = hmlRenderPass;
     hmlRenderer->hmlResourceManager = hmlResourceManager;
     hmlRenderer->hmlDescriptors = hmlDescriptors;
 
@@ -51,9 +51,9 @@ std::unique_ptr<HmlLightRenderer> HmlLightRenderer::create(
     // TODO NOTE set number is specified implicitly by vector index
     hmlRenderer->descriptorSetLayouts.push_back(viewProjDescriptorSetLayout);
 
-    hmlRenderer->hmlPipeline = createPipeline(hmlDevice,
-        hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
-    if (!hmlRenderer->hmlPipeline) return { nullptr };
+    // hmlRenderer->hmlPipeline = createPipeline(hmlDevice,
+    //     hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
+    // if (!hmlRenderer->hmlPipeline) return { nullptr };
 
     const auto imageCount = generalDescriptorSet_0_perImage.size();
     hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(imageCount, hmlCommands->commandPoolGeneralResettable);
@@ -78,7 +78,7 @@ HmlLightRenderer::~HmlLightRenderer() noexcept {
 void HmlLightRenderer::specify(uint32_t count) noexcept {
     if (count != pointLightsCount) {
         pointLightsCount = count;
-        bake();
+        // if (currentRenderPass) bake();
     }
 }
 
@@ -89,15 +89,16 @@ void HmlLightRenderer::bake() noexcept {
         const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
             .pNext = VK_NULL_HANDLE,
-            .renderPass = hmlRenderPass->renderPass,
+            .renderPass = currentRenderPass->renderPass,
             .subpass = 0, // we only have a single one
-            .framebuffer = hmlRenderPass->framebuffers[imageIndex],
+            .framebuffer = currentRenderPass->framebuffers[imageIndex],
             .occlusionQueryEnable = VK_FALSE,
             .queryFlags = static_cast<VkQueryControlFlags>(0),
             .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
         };
         hmlCommands->beginRecordingSecondary(commandBuffer, &inheritanceInfo);
 
+        const auto& hmlPipeline = getCurrentPipeline();
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
         std::array<VkDescriptorSet, 1> descriptorSets = {
@@ -117,18 +118,15 @@ void HmlLightRenderer::bake() noexcept {
 }
 
 
-VkCommandBuffer HmlLightRenderer::draw(uint32_t imageIndex) noexcept {
-    return commandBuffers[imageIndex];
+VkCommandBuffer HmlLightRenderer::draw(const HmlFrameData& frameData) noexcept {
+    return commandBuffers[frameData.imageIndex];
 }
 
 
-// TODO in order for each type of Renderer to properly replace its pipeline,
-// store a member in Renderer which specifies its type, and recreate the pipeline
-// based on its value.
-void HmlLightRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-    hmlRenderPass = newHmlRenderPass;
-    hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-    bake();
-    // NOTE The command pool is reset for all renderers prior to calling this function.
-    // NOTE commandBuffers must be rerecorded -- is done during baking
-}
+// void HmlLightRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
+//     hmlRenderPass = newHmlRenderPass;
+//     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
+//     bake();
+//     // NOTE The command pool is reset for all renderers prior to calling this function.
+//     // NOTE commandBuffers must be rerecorded -- is done during baking
+// }

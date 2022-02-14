@@ -16,9 +16,10 @@
 #include "HmlDevice.h"
 #include "HmlResourceManager.h"
 #include "HmlDescriptors.h"
+#include "renderer.h"
 
 
-struct HmlTerrainRenderer {
+struct HmlTerrainRenderer : HmlDrawer {
     struct Patch {
         inline Patch(const glm::vec2& center, const glm::vec2& size,
                 const glm::vec2& texCoordStart, const glm::vec2& texCoordStep, int level) noexcept
@@ -64,17 +65,17 @@ struct HmlTerrainRenderer {
     Bounds bounds;
 
     std::shared_ptr<HmlWindow> hmlWindow;
-    std::shared_ptr<HmlDevice> hmlDevice;
+    // std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
-    std::shared_ptr<HmlRenderPass> hmlRenderPass;
+    // std::shared_ptr<HmlRenderPass> hmlRenderPass;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlDescriptors> hmlDescriptors;
-    std::unique_ptr<HmlPipeline> hmlPipeline;
+    // std::unique_ptr<HmlPipeline> hmlPipeline;
     // std::unique_ptr<HmlPipeline> hmlPipelineDebug;
 
     VkDescriptorPool descriptorPool;
     VkDescriptorSet              descriptorSet_heightmap_1;
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    // std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
     std::vector<VkDescriptorSetLayout> descriptorSetLayoutsSelf;
 
 
@@ -84,8 +85,8 @@ struct HmlTerrainRenderer {
     std::unique_ptr<HmlImageResource> grassTexture;
 
 
-    static std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-            VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
+    std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
+            VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     // static std::unique_ptr<HmlPipeline> createPipelineDebug(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
     //         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
     static std::unique_ptr<HmlTerrainRenderer> create(
@@ -96,20 +97,17 @@ struct HmlTerrainRenderer {
             std::shared_ptr<HmlWindow> hmlWindow,
             std::shared_ptr<HmlDevice> hmlDevice,
             std::shared_ptr<HmlCommands> hmlCommands,
-            std::shared_ptr<HmlRenderPass> hmlRenderPass,
+            // std::shared_ptr<HmlRenderPass> hmlRenderPass,
             std::shared_ptr<HmlResourceManager> hmlResourceManager,
             std::shared_ptr<HmlDescriptors> hmlDescriptors,
             VkDescriptorSetLayout viewProjDescriptorSetLayout,
+            uint32_t imageCount,
             uint32_t framesInFlight) noexcept;
     ~HmlTerrainRenderer() noexcept;
     void constructTree(SubTerrain& subTerrain, const glm::vec3& cameraPos) const noexcept;
     void update(const glm::vec3& cameraPos) noexcept;
-    VkCommandBuffer draw(uint32_t imageIndex, VkDescriptorSet descriptorSet_0) noexcept;
-
-    // TODO in order for each type of Renderer to properly replace its pipeline,
-    // store a member in Renderer which specifies its type, and recreate the pipeline
-    // based on its value.
-    void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept;
+    VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
+    // void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override;
 };
 
 #endif

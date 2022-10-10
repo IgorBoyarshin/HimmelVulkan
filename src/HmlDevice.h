@@ -7,6 +7,7 @@
 #include <cstring> // strcmp
 #include <set>
 #include <algorithm>
+#include <span>
 
 #include "HmlWindow.h"
 
@@ -60,7 +61,7 @@ struct HmlDevice {
     private:
 
     static VkInstance createInstance(const char* applicationName) noexcept;
-    static bool checkValidationLayerSupport(const std::array<const char*, 1>& requestedValidationLayers) noexcept;
+    static bool checkValidationLayerSupport(std::span<const char* const> requestedValidationLayers) noexcept;
     static std::vector<VkLayerProperties> getAvailableLayers() noexcept;
     static std::vector<const char*> getRequiredExtensions(bool enableValidationLayers) noexcept;
     static VkSurfaceKHR createSurface(VkInstance instance, GLFWwindow* window) noexcept;
@@ -82,7 +83,7 @@ struct HmlDevice {
     static VkPhysicalDevice pickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface) noexcept;
     static void describePhysicalDevice(VkPhysicalDevice physicalDevice) noexcept;
     static bool isPhysicalDeviceSuitable(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface) noexcept;
-    static bool checkDeviceExtensionSupport(const VkPhysicalDevice& physicalDevice, const std::array<const char*, 1>& requiredDeviceExtensions) noexcept;
+    static bool checkDeviceExtensionSupport(const VkPhysicalDevice& physicalDevice, std::span<const char* const> requiredDeviceExtensions) noexcept;
     static std::vector<VkQueueFamilyProperties> queryQueueFamilies(VkPhysicalDevice physicalDevice) noexcept;
     static QueueFamilyIndices pickQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) noexcept;
     static VkDevice createLogicalDevice(VkPhysicalDevice physicalDevice,

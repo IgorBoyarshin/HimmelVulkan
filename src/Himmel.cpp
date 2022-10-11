@@ -75,9 +75,11 @@ bool Himmel::init() noexcept {
 
 
     weather = Weather{
+        // Night:
         // .fogColor = glm::vec3(0.0, 0.0, 0.0),
-        .fogColor = glm::vec3(0.8f, 0.8f, 0.8f),
         // .fogDensity = -1.0f,
+        // Day:
+        .fogColor = glm::vec3(0.8f, 0.8f, 0.8f),
         .fogDensity = 0.011,
     };
 

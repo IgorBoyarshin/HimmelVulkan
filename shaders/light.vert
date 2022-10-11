@@ -46,7 +46,7 @@ void main() {
     vec4 viewPos = centerViewPos + vec4(light.radius * positionFor[gl_VertexIndex], 0.0, 0.0);
     gl_Position = uboGeneral.proj * viewPos;
     outCoord = positionFor[gl_VertexIndex];
-    outColor.rgb = light.color;
+    outColor = vec4(light.color, 1.0);
     outIntensity = light.intensity;
 
     // Apply simple fog

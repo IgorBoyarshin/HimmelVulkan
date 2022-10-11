@@ -1,3 +1,6 @@
+#ifndef HML_HIMMEL
+#define HML_HIMMEL
+
 #include <memory>
 #include <vector>
 #include <chrono>
@@ -24,6 +27,8 @@
 #include "util.h"
 #include "HmlRenderPass.h"
 #include "HmlPipe.h"
+
+#include "../libs/stb_image.h"
 
 
 struct Himmel {
@@ -290,3 +295,6 @@ struct Himmel {
     ~Himmel() noexcept;
     static glm::mat4 projFrom(float aspect_w_h) noexcept;
 };
+
+
+#endif

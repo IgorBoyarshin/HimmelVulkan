@@ -1,8 +1,5 @@
 #include "HmlResourceManager.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "../libs/stb_image.h"
-
 
 HmlImageResource::~HmlImageResource() noexcept {
     switch (type) {

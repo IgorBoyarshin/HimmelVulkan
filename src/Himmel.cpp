@@ -319,10 +319,12 @@ bool Himmel::run() noexcept {
 
         if (!drawFrame()) return false;
 
+#if LOG_DELTA
         const auto fps = 1.0 / deltaSeconds;
         std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]"
             // << " Update = " << updateMs << "ms"
             << '\n';
+#endif
     }
     vkDeviceWaitIdle(hmlDevice->device);
     return true;

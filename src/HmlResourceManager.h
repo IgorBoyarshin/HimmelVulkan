@@ -8,6 +8,8 @@
 #include "HmlDevice.h"
 #include "HmlCommands.h"
 
+#include "../libs/stb_image.h"
+
 
 struct HmlImageResource {
     enum class Type {

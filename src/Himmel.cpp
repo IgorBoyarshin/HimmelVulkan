@@ -107,20 +107,37 @@ bool Himmel::init() noexcept {
     if (!hmlBloomRenderer) return false;
 
 
-    const auto SIZE_MAP = 250.0f;
-    const auto SIZE_SNOW = 70.0f;
+    {
+        const auto worldHalfSize = 250.0f;
+        const auto worldStart  = glm::vec2(-worldHalfSize, -worldHalfSize);
+        const auto worldFinish = glm::vec2( worldHalfSize,  worldHalfSize);
+        const auto worldHeight = 70.0f;
+        world = std::make_unique<World>(worldStart, worldFinish, worldHeight, "../models/heightmap.png");
+    }
+
+
+    {
+        const auto carPos = glm::vec3{0.0f, 25.0f, 0.0f};
+        const auto carSizeScaler = 0.5f;
+        car = std::make_unique<Car>(carPos, carSizeScaler);
+    }
+
+
+    // const auto SIZE_MAP = 250.0f;
+    // const auto SIZE_SNOW = 70.0f;
+    // const auto HEIGHT_MAP = 70.0f;
     const auto snowCount = 400000;
-    const auto HEIGHT_MAP = 70.0f;
-    const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ SIZE_SNOW };
+    const auto sizeSnow = world->height;
+    const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ sizeSnow };
     hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlWindow,
         hmlDevice, hmlCommands, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
     if (!hmlSnowRenderer) return false;
 
 
     const auto terrainBounds = HmlTerrainRenderer::Bounds{
-        .posStart = glm::vec2(-SIZE_MAP, -SIZE_MAP),
-        .posFinish = glm::vec2(SIZE_MAP, SIZE_MAP),
-        .height = HEIGHT_MAP,
+        .posStart = world->start,
+        .posFinish = world->finish,
+        .height = world->height,
         .yOffset = 0.0f,
     };
     const uint32_t granularity = 1;
@@ -134,9 +151,9 @@ bool Himmel::init() noexcept {
     const float LIGHT_RADIUS = 2.0f;
     for (size_t i = 0; i < 20; i++) {
         const auto pos = glm::vec3(
-            hml::getRandomUniformFloat(-SIZE_MAP, SIZE_MAP),
-            hml::getRandomUniformFloat(HEIGHT_MAP/2.0f, HEIGHT_MAP),
-            hml::getRandomUniformFloat(-SIZE_MAP, SIZE_MAP)
+            hml::getRandomUniformFloat(world->start.x, world->finish.x),
+            hml::getRandomUniformFloat(world->height/2.0f, world->height),
+            hml::getRandomUniformFloat(world->finish.y, world->finish.y)
         );
         const auto color = glm::vec3(
             hml::getRandomUniformFloat(0.0f, 1.0f),
@@ -235,9 +252,20 @@ bool Himmel::init() noexcept {
             models.push_back(model);
         }
 
+        {
+            std::vector<HmlSimpleModel::Vertex> vertices;
+            std::vector<uint32_t> indices;
+            if (!HmlSimpleModel::load("../models/my_car.obj", vertices, indices)) return false;
+
+            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+            models.push_back(model);
+        }
+
         const auto& phonyModel = models[0];
         const auto& vikingModel = models[1];
         const auto& planeModel = models[2];
+        const auto& carModel = models[3];
 
 
         // Add Entities
@@ -257,6 +285,9 @@ bool Himmel::init() noexcept {
 
         entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
         entities.back()->modelMatrix = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0, 10.0, 10.0)), glm::vec3{40.0f, 30.0f, 70.0f});
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(carModel, glm::vec3{ 0.2f, 0.7f, 0.0f }));
+        entities.back()->modelMatrix = car->getView();
 
         hmlRenderer->specifyEntitiesToRender(entities);
     }
@@ -350,6 +381,25 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
         if (glfwGetKey(hmlWindow->window, GLFW_KEY_C) == GLFW_PRESS) {
             camera.lift(-length);
+        }
+
+        const float carSpeed = 10.0f;
+        float carDistance = carSpeed * dt;
+        if      (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) { carDistance *= 0.4f * boostUp; }
+        else if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)   { carDistance *= boostDown; }
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_RIGHT) == GLFW_PRESS) { car->moveRight(carDistance); }
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT)  == GLFW_PRESS) { car->moveRight(-carDistance); }
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_UP)    == GLFW_PRESS) { car->moveForward(carDistance); }
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_DOWN)  == GLFW_PRESS) { car->moveForward(-carDistance); }
+        if (!car->cachedViewValid) {
+            const auto worldHeight = world->heightAt(glm::vec2{car->posCenter});
+            car->setHeight(worldHeight);
+
+            // XXX We rely on the Car to be the last Entity here XXX
+            entities.back()->modelMatrix = car->getView();
+            // NOTE no need to call hmlRenderer->specifyEntitiesToRender(entities)
+            // because the Entities are stored as shared_ptr there, which we have
+            // just updated.
         }
 
         static bool pPressed = false;

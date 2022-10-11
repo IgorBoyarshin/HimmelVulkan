@@ -27,6 +27,167 @@
 
 
 struct Himmel {
+    // TODO move out
+    struct World {
+        glm::vec2 start;
+        glm::vec2 finish;
+        float height;
+
+        using Coord = std::pair<size_t, size_t>;
+
+        Coord heightmapSize;
+        std::vector<std::vector<float>> heightmap;
+
+        inline World(const glm::vec2& start, const glm::vec2& finish, float height, const char* heightmapFilepath)
+                : start(start), finish(finish), height(height) {
+            int mapWidth, mapHeight, channels;
+            stbi_uc* pixels = stbi_load(heightmapFilepath, &mapWidth, &mapHeight, &channels, STBI_grey);
+            if (!pixels) {
+                std::cerr << "::> Failed to load texture image using stb library while creating World: " << heightmapFilepath << ".\n";
+                return;
+            }
+
+            heightmapSize = { mapWidth, mapHeight };
+
+            size_t i = 0;
+            heightmap.reserve(mapWidth);
+            for (size_t x = 0; x < static_cast<size_t>(mapWidth); x++) {
+                std::vector<float> column(mapHeight);
+                for (size_t y = 0; y < static_cast<size_t>(mapHeight); y++) column[y] = static_cast<float>(pixels[i++]) / 255.0f * height;
+                heightmap.push_back(std::move(column));
+            }
+
+            stbi_image_free(pixels);
+        }
+
+
+        inline float heightAt(glm::vec2 pos) const noexcept {
+            pos = glm::clamp(pos, start, finish);
+            const auto mapSize = finish - start;
+            const auto mapPos = glm::vec2(heightmapSize.first, heightmapSize.second) * (pos - start) / mapSize;
+
+            const auto mapPosFloor = glm::vec2(std::floor(mapPos.x), std::floor(mapPos.y));
+            const Coord mapCoordFloor{ static_cast<size_t>(mapPosFloor.x), static_cast<size_t>(mapPosFloor.y) };
+            const auto t = mapPos - mapPosFloor;
+            return heightAtCoordWithT(mapCoordFloor, t);
+
+            // const glm::vec2 floorPos(std::floor(mapPos.x), std::floor(mapPos.y));
+            // const glm::vec2 ceilPos(std::ceil(mapPos.x), std::ceil(mapPos.y));
+            // const glm::vec2 ratio(
+            //     std::clamp(mapPos.x - static_cast<int>(mapPos.x), 0.0f, 1.0f),
+            //     std::clamp(mapPos.y - static_cast<int>(mapPos.y), 0.0f, 1.0f));
+            // const float floor = heightmap[floorPos.x][floorPos.y];
+            // const float ceil = heightmap[ceilPos.x][ceilPos.y];
+            // return glm::mix(floor, ceil, ratio);
+        }
+
+        private:
+        // inline Coord toCoord(const glm::vec2& pos) const noexcept {
+        //     return {
+        //         std::clamp(static_cast<size_t>(pos.x), 0, heightmapSize.first - 1),
+        //         std::clamp(static_cast<size_t>(pos.y), 0, heightmapSize.second - 1)
+        //     };
+        // }
+
+
+        // Coord is [0..size-2]
+        // t is [0..1)
+        inline float heightAtCoordWithT(Coord coord, glm::vec2 t) const noexcept {
+            // The renderer treats squares as two triangles with such diagonal orientation:
+            // [0,1]--[1,1]
+            //   |  \  |
+            //   |   \ |
+            // [0,0]--[1,0]
+            // We account for that while interpolation between the coordinates to
+            // create this edge.
+
+            const size_t x = std::clamp(coord.first,  0ul, heightmapSize.first  - 2);
+            const size_t y = std::clamp(coord.second, 0ul, heightmapSize.second - 2);
+            t = glm::clamp(t, {0.0f, 0.0f}, {1.0f, 1.0f});
+
+            const auto bottomLeftHeight  = heightmap[x    ][y];
+            const auto bottomRightHeight = heightmap[x + 1][y];
+            const auto topLeftHeight     = heightmap[x    ][y + 1];
+            const auto topRightHeight    = heightmap[x + 1][y + 1];
+            if (t.x + t.y < 1.0f) { // bottom-left triangle
+                const auto diffX = bottomRightHeight - bottomLeftHeight;
+                const auto diffY = topLeftHeight - bottomLeftHeight;
+                return bottomLeftHeight + t.x * diffX + t.y * diffY;
+            } else { // top-right triangle
+                const auto diffX = topRightHeight - topLeftHeight;
+                const auto diffY = topRightHeight - bottomRightHeight;
+                return topRightHeight - (1.0 - t.x) * diffX - (1.0 - t.y) * diffY;
+            }
+        }
+    };
+
+
+    // TODO move out
+    struct Car {
+        // float width;
+        // float length;
+        // glm::vec2 size;
+
+        Car(const glm::vec3& posCenter, float sizeScaler) : posCenter(posCenter), sizeScaler(sizeScaler) {}
+
+        bool cachedViewValid = false;
+        glm::mat4 cachedView;
+
+        glm::vec3 posCenter;
+        glm::vec3 dirForward;
+        glm::vec3 dirRight;
+        float sizeScaler;
+
+        // float deviationAngle = 0.0f;
+        //
+        // void setLeft() {
+        //     deviationAngle = -45.0f;
+        // }
+        // void setRight() {
+        //     deviationAngle = +45.0f;
+        // }
+        // void setStraight() {
+        //     deviationAngle = 0.0f;
+        // }
+
+        void moveForward(float dist) {
+            // XXX Let -Z be forward
+            cachedViewValid = false;
+            posCenter.z -= dist;
+        }
+        void moveRight(float dist) {
+            cachedViewValid = false;
+            posCenter.x += dist;
+        }
+        void setHeight(float height) {
+            cachedViewValid = false;
+            std::cout << "H = " << height << '\n';
+            posCenter.y = height;
+        }
+
+        const glm::mat4& getView() noexcept {
+            if (!cachedViewValid) [[unlikely]] {
+                cachedViewValid = true;
+
+                cachedView = glm::mat4(1.0f);
+                cachedView = glm::scale(cachedView, glm::vec3{sizeScaler, sizeScaler, sizeScaler});
+                cachedView = glm::translate(cachedView, posCenter);
+                // XXX fix model 90-degree rotation
+                cachedView = glm::rotate(cachedView, glm::radians(-90.0f), glm::vec3{0, 1, 0});
+            }
+
+            return cachedView;
+        }
+
+        // void place(float yLeftBack, float yRightBack, float yLeftFront, float yRightFront) {
+        //     glm::vec3 leftBack(posCenter.x - 0.5f * size.x, yLeftBack, posCenter.z - 0.5f * size.y);
+        //     glm::vec3 leftFront(posCenter.x - 0.5f * size.x, yLeftFront, posCenter.z + 0.5f * size.y);
+        //     glm::vec3 rightBack(posCenter.x + 0.5f * size.x, yRightBack, posCenter.z - 0.5f * size.y);
+        //     dirForward = glm::normalize(glm::vec3(size.x, size.z));
+        // }
+    };
+
+
     struct GeneralUbo {
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
@@ -78,6 +239,10 @@ struct Himmel {
     // std::vector<std::shared_ptr<HmlImageResource>> brightness2Textures;
     std::vector<std::shared_ptr<HmlImageResource>> mainTextures;
     std::shared_ptr<HmlImageResource> hmlDepthResource;
+
+
+    std::unique_ptr<World> world;
+    std::unique_ptr<Car> car;
 
 
     HmlCamera camera;

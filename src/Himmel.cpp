@@ -4,46 +4,50 @@
 bool Himmel::init() noexcept {
     const char* windowName = "Planes game";
 
-    hmlWindow = HmlWindow::create(1920, 1080, windowName);
-    if (!hmlWindow) return false;
+    hmlContext = std::make_shared<HmlContext>();
 
-    hmlDevice = HmlDevice::create(hmlWindow);
-    if (!hmlDevice) return false;
+    hmlContext->hmlWindow = HmlWindow::create(1920, 1080, windowName);
+    if (!hmlContext->hmlWindow) return false;
 
-    hmlDescriptors = HmlDescriptors::create(hmlDevice);
-    if (!hmlDescriptors) return false;
+    hmlContext->hmlDevice = HmlDevice::create(hmlContext->hmlWindow);
+    if (!hmlContext->hmlDevice) return false;
 
-    hmlCommands = HmlCommands::create(hmlDevice);
-    if (!hmlCommands) return false;
+    hmlContext->hmlDescriptors = HmlDescriptors::create(hmlContext->hmlDevice);
+    if (!hmlContext->hmlDescriptors) return false;
 
-    hmlResourceManager = HmlResourceManager::create(hmlDevice, hmlCommands);
-    if (!hmlResourceManager) return false;
+    hmlContext->hmlCommands = HmlCommands::create(hmlContext->hmlDevice);
+    if (!hmlContext->hmlCommands) return false;
 
-    hmlSwapchain = HmlSwapchain::create(hmlWindow, hmlDevice, hmlResourceManager, std::nullopt);
-    if (!hmlSwapchain) return false;
+    hmlContext->hmlResourceManager = HmlResourceManager::create(hmlContext->hmlDevice, hmlContext->hmlCommands);
+    if (!hmlContext->hmlResourceManager) return false;
+
+    hmlContext->hmlSwapchain = HmlSwapchain::create(hmlContext->hmlWindow, hmlContext->hmlDevice, hmlContext->hmlResourceManager, std::nullopt);
+    if (!hmlContext->hmlSwapchain) return false;
+
+    hmlContext->maxFramesInFlight = maxFramesInFlight;
 
 
-    for (size_t i = 0; i < hmlSwapchain->imageCount(); i++) {
+    for (size_t i = 0; i < hmlContext->hmlSwapchain->imageCount(); i++) {
         const auto size = sizeof(GeneralUbo);
-        auto ubo = hmlResourceManager->createUniformBuffer(size);
+        auto ubo = hmlContext->hmlResourceManager->createUniformBuffer(size);
         ubo->map();
         viewProjUniformBuffers.push_back(std::move(ubo));
     }
-    for (size_t i = 0; i < hmlSwapchain->imageCount(); i++) {
+    for (size_t i = 0; i < hmlContext->hmlSwapchain->imageCount(); i++) {
         const auto size = sizeof(LightUbo);
-        auto ubo = hmlResourceManager->createUniformBuffer(size);
+        auto ubo = hmlContext->hmlResourceManager->createUniformBuffer(size);
         ubo->map();
         lightUniformBuffers.push_back(std::move(ubo));
     }
 
 
-    generalDescriptorPool = hmlDescriptors->buildDescriptorPool()
-        .withUniformBuffers(hmlSwapchain->imageCount() + hmlSwapchain->imageCount()) // GeneralUbo + LightUbo
-        .maxSets(hmlSwapchain->imageCount()) // they are in the same set
-        .build(hmlDevice);
+    generalDescriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
+        .withUniformBuffers(hmlContext->hmlSwapchain->imageCount() + hmlContext->hmlSwapchain->imageCount()) // GeneralUbo + LightUbo
+        .maxSets(hmlContext->hmlSwapchain->imageCount()) // they are in the same set
+        .build(hmlContext->hmlDevice);
     if (!generalDescriptorPool) return false;
 
-    generalDescriptorSetLayout = hmlDescriptors->buildDescriptorSetLayout()
+    generalDescriptorSetLayout = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
         .withUniformBufferAt(0,
             VK_SHADER_STAGE_VERTEX_BIT |
             VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT |
@@ -56,13 +60,13 @@ bool Himmel::init() noexcept {
             VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT |
             VK_SHADER_STAGE_FRAGMENT_BIT
         )
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!generalDescriptorSetLayout) return false;
 
-    generalDescriptorSet_0_perImage = hmlDescriptors->createDescriptorSets(
-        hmlSwapchain->imageCount(), generalDescriptorSetLayout, generalDescriptorPool);
+    generalDescriptorSet_0_perImage = hmlContext->hmlDescriptors->createDescriptorSets(
+        hmlContext->hmlSwapchain->imageCount(), generalDescriptorSetLayout, generalDescriptorPool);
     if (generalDescriptorSet_0_perImage.empty()) return false;
-    for (size_t imageIndex = 0; imageIndex < hmlSwapchain->imageCount(); imageIndex++) {
+    for (size_t imageIndex = 0; imageIndex < hmlContext->hmlSwapchain->imageCount(); imageIndex++) {
         HmlDescriptorSetUpdater(generalDescriptorSet_0_perImage[imageIndex])
             .uniformBufferAt(0,
                 viewProjUniformBuffers[imageIndex]->buffer,
@@ -70,7 +74,7 @@ bool Himmel::init() noexcept {
             .uniformBufferAt(1,
                 lightUniformBuffers[imageIndex]->buffer,
                 sizeof(LightUbo))
-            .update(hmlDevice);
+            .update(hmlContext->hmlDevice);
     }
 
 
@@ -84,35 +88,31 @@ bool Himmel::init() noexcept {
     };
 
 
-    const uint32_t imagesCount = hmlSwapchain->imageCount();
+    const uint32_t imagesCount = hmlContext->hmlSwapchain->imageCount();
 
-    hmlRenderer = HmlRenderer::create(hmlWindow, hmlDevice, hmlCommands,
-        hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, maxFramesInFlight);
+    hmlRenderer = HmlRenderer::create(hmlContext, generalDescriptorSetLayout, maxFramesInFlight);
     if (!hmlRenderer) return false;
 
-    hmlDeferredRenderer = HmlDeferredRenderer::create(hmlWindow, hmlDevice, hmlCommands,
-        hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
+    hmlDeferredRenderer = HmlDeferredRenderer::create(hmlContext, generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
     if (!hmlDeferredRenderer) return false;
 
-    hmlUiRenderer = HmlUiRenderer::create(hmlWindow, hmlDevice, hmlCommands,
-        hmlResourceManager, hmlDescriptors, imagesCount, maxFramesInFlight);
+    hmlUiRenderer = HmlUiRenderer::create(hmlContext, imagesCount, maxFramesInFlight);
     if (!hmlUiRenderer) return false;
 
-    // hmlBlurRenderer = HmlBlurRenderer::create(hmlWindow, hmlDevice, hmlCommands,
-    //     hmlResourceManager, hmlDescriptors, imagesCount, maxFramesInFlight);
+    // hmlBlurRenderer = HmlBlurRenderer::create(hmlContext, imagesCount, maxFramesInFlight);
     // if (!hmlBlurRenderer) return false;
 
-    hmlBloomRenderer = HmlBloomRenderer::create(hmlWindow, hmlDevice, hmlCommands,
-        hmlResourceManager, hmlDescriptors, imagesCount, maxFramesInFlight);
+    hmlBloomRenderer = HmlBloomRenderer::create(hmlContext, imagesCount, maxFramesInFlight);
     if (!hmlBloomRenderer) return false;
 
 
+    const char* heightmapFile = "../models/heightmap.png";
     {
         const auto worldHalfSize = 250.0f;
         const auto worldStart  = glm::vec2(-worldHalfSize, -worldHalfSize);
         const auto worldFinish = glm::vec2( worldHalfSize,  worldHalfSize);
         const auto worldHeight = 70.0f;
-        world = std::make_unique<World>(worldStart, worldFinish, worldHeight, "../models/heightmap.png");
+        world = std::make_unique<World>(worldStart, worldFinish, worldHeight, heightmapFile);
     }
 
 
@@ -123,14 +123,11 @@ bool Himmel::init() noexcept {
     }
 
 
-    // const auto SIZE_MAP = 250.0f;
-    // const auto SIZE_SNOW = 70.0f;
-    // const auto HEIGHT_MAP = 70.0f;
     const auto snowCount = 400000;
     const auto sizeSnow = world->height;
     const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ sizeSnow };
-    hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlWindow,
-        hmlDevice, hmlCommands, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
+    hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlContext,
+            generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
     if (!hmlSnowRenderer) return false;
 
 
@@ -141,9 +138,8 @@ bool Himmel::init() noexcept {
         .yOffset = 0.0f,
     };
     const uint32_t granularity = 1;
-    hmlTerrainRenderer = HmlTerrainRenderer::create("../models/heightmap.png", granularity, "../models/grass-small.png",
-        terrainBounds, hmlWindow,
-        hmlDevice, hmlCommands, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
+    hmlTerrainRenderer = HmlTerrainRenderer::create(heightmapFile, granularity, "../models/grass-small.png",
+        terrainBounds, hmlContext, generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
     if (!hmlTerrainRenderer) return false;
 
 
@@ -188,16 +184,15 @@ bool Himmel::init() noexcept {
         });
     }
 
-    hmlLightRenderer = HmlLightRenderer::create(hmlWindow,
-        hmlDevice, hmlCommands, hmlResourceManager, hmlDescriptors, generalDescriptorSetLayout, generalDescriptorSet_0_perImage);
+    hmlLightRenderer = HmlLightRenderer::create(hmlContext, generalDescriptorSetLayout, generalDescriptorSet_0_perImage);
     if (!hmlLightRenderer) return false;
     hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
 
     camera = HmlCamera{{ 25.0f, 30.0f, 35.0f }};
     camera.rotateDir(-15.0f, -40.0f);
-    cursor = hmlWindow->getCursor();
-    proj = projFrom(hmlSwapchain->extentAspect());
+    cursor = hmlContext->hmlWindow->getCursor();
+    proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
 
 
     {
@@ -227,7 +222,7 @@ bool Himmel::init() noexcept {
             std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/girl.png", VK_FILTER_LINEAR);
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/girl.png", VK_FILTER_LINEAR);
             models.push_back(model);
         }
 
@@ -237,7 +232,7 @@ bool Himmel::init() noexcept {
             if (!HmlSimpleModel::load("../models/viking_room.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
             // const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
             models.push_back(model);
         }
@@ -248,7 +243,7 @@ bool Himmel::init() noexcept {
             if (!HmlSimpleModel::load("../models/plane.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
             models.push_back(model);
         }
 
@@ -258,7 +253,7 @@ bool Himmel::init() noexcept {
             if (!HmlSimpleModel::load("../models/my_car.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
             models.push_back(model);
         }
 
@@ -303,7 +298,7 @@ bool Himmel::init() noexcept {
 
 bool Himmel::run() noexcept {
     static auto startTime = std::chrono::high_resolution_clock::now();
-    while (!hmlWindow->shouldClose()) {
+    while (!hmlContext->hmlWindow->shouldClose()) {
         glfwPollEvents();
 
         static auto mark = startTime;
@@ -326,7 +321,7 @@ bool Himmel::run() noexcept {
             << '\n';
 #endif
     }
-    vkDeviceWaitIdle(hmlDevice->device);
+    vkDeviceWaitIdle(hmlContext->hmlDevice->device);
     return true;
 }
 
@@ -348,7 +343,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 
     {
-        const auto newCursor = hmlWindow->getCursor();
+        const auto newCursor = hmlContext->hmlWindow->getCursor();
         const int32_t dx = newCursor.first - cursor.first;
         const int32_t dy = newCursor.second - cursor.second;
         cursor = newCursor;
@@ -360,39 +355,39 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         constexpr float boostUp = 10.0f;
         constexpr float boostDown = 0.2f;
         float length = movementSpeed * dt;
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
             length *= boostUp;
-        } else if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
+        } else if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
             length *= boostDown;
         }
 
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_W) == GLFW_PRESS) {
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_W) == GLFW_PRESS) {
             camera.forward(length);
         }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_S) == GLFW_PRESS) {
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_S) == GLFW_PRESS) {
             camera.forward(-length);
         }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_D) == GLFW_PRESS) {
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_D) == GLFW_PRESS) {
             camera.right(length);
         }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_A) == GLFW_PRESS) {
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_A) == GLFW_PRESS) {
             camera.right(-length);
         }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS) {
             camera.lift(length);
         }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_C) == GLFW_PRESS) {
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_C) == GLFW_PRESS) {
             camera.lift(-length);
         }
 
         const float carSpeed = 10.0f;
         float carDistance = carSpeed * dt;
-        if      (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) { carDistance *= 0.4f * boostUp; }
-        else if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)   { carDistance *= boostDown; }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_RIGHT) == GLFW_PRESS) { car->moveRight(carDistance); }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT)  == GLFW_PRESS) { car->moveRight(-carDistance); }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_UP)    == GLFW_PRESS) { car->moveForward(carDistance); }
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_DOWN)  == GLFW_PRESS) { car->moveForward(-carDistance); }
+        if      (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) { carDistance *= 0.4f * boostUp; }
+        else if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)   { carDistance *= boostDown; }
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_RIGHT) == GLFW_PRESS) { car->moveRight(carDistance); }
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT)  == GLFW_PRESS) { car->moveRight(-carDistance); }
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_UP)    == GLFW_PRESS) { car->moveForward(carDistance); }
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_DOWN)  == GLFW_PRESS) { car->moveForward(-carDistance); }
         if (!car->cachedViewValid) {
             const auto worldHeight = world->heightAt(glm::vec2{car->posCenter});
             car->setHeight(worldHeight);
@@ -405,10 +400,10 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
 
         static bool pPressed = false;
-        if (!pPressed && glfwGetKey(hmlWindow->window, GLFW_KEY_P) == GLFW_PRESS) {
+        if (!pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_PRESS) {
             pPressed = true;
             camera.printStats();
-        } else if (pPressed && glfwGetKey(hmlWindow->window, GLFW_KEY_P) == GLFW_RELEASE) {
+        } else if (pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_RELEASE) {
             pPressed = false;
         }
     }
@@ -460,7 +455,7 @@ bool Himmel::drawFrame() noexcept {
     // Wait for next-in-order frame to become rendered (for its commandBuffer
     // to finish). This ensures that no more than MAX_FRAMES_IN_FLIGHT frames
     // are inside the rendering pipeline at the same time.
-    vkWaitForFences(hmlDevice->device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    vkWaitForFences(hmlContext->hmlDevice->device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     // vkAcquireNextImageKHR only specifies which image will be made
     // available next, so that we can e.g. start recording command
@@ -473,7 +468,7 @@ bool Himmel::drawFrame() noexcept {
     uint32_t imageIndex; // the available image we will be given by the presentation engine from the swapchain
     // The next-in-order imageAvailableSemaphore has already retired because
     // its inFlightFence has just been waited upon.
-    if (const VkResult result = vkAcquireNextImageKHR(hmlDevice->device, hmlSwapchain->swapchain, UINT64_MAX,
+    if (const VkResult result = vkAcquireNextImageKHR(hmlContext->hmlDevice->device, hmlContext->hmlSwapchain->swapchain, UINT64_MAX,
                 imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
             result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapchain();
@@ -489,7 +484,7 @@ bool Himmel::drawFrame() noexcept {
         // the pipeline (too slow pipeline; out-of-order acquisition;
         // MAX_FRAMES_IN_FLIGHT > swapChainImages.size()) -- we wait until
         // this particular image exits the pipeline.
-        vkWaitForFences(hmlDevice->device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+        vkWaitForFences(hmlContext->hmlDevice->device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
 
     // The image has at least finished being rendered.
@@ -519,15 +514,15 @@ bool Himmel::drawFrame() noexcept {
         presentInfo.waitSemaphoreCount = 1;
         presentInfo.pWaitSemaphores = waitSemaphores;
         presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = &(hmlSwapchain->swapchain);
+        presentInfo.pSwapchains = &(hmlContext->hmlSwapchain->swapchain);
         presentInfo.pImageIndices = &imageIndex;
 
         // NOTE We recreate the swapchain twice: first we get notified through
         // vkQueuePresentKHR and on the next iteration through framebufferResizeRequested.
         // The second call is probably redundant but non-harmful.
-        if (const VkResult result = vkQueuePresentKHR(hmlDevice->presentQueue, &presentInfo);
-                result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || hmlWindow->framebufferResizeRequested) {
-            hmlWindow->framebufferResizeRequested = false;
+        if (const VkResult result = vkQueuePresentKHR(hmlContext->hmlDevice->presentQueue, &presentInfo);
+                result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || hmlContext->hmlWindow->framebufferResizeRequested) {
+            hmlContext->hmlWindow->framebufferResizeRequested = false;
             recreateSwapchain();
         } else if (result != VK_SUCCESS) {
             std::cerr << "::> Failed to present swapchain image.\n";
@@ -547,8 +542,8 @@ bool Himmel::prepareResources() noexcept {
         return views;
     };
 
-    const auto extent = hmlSwapchain->extent;
-    const size_t count = hmlSwapchain->imageCount();
+    const auto extent = hmlContext->hmlSwapchain->extent;
+    const size_t count = hmlContext->hmlSwapchain->imageCount();
     gBufferPositions.resize(count);
     gBufferNormals.resize(count);
     gBufferColors.resize(count);
@@ -556,12 +551,12 @@ bool Himmel::prepareResources() noexcept {
     // brightness2Textures.resize(count);
     mainTextures.resize(count);
     for (size_t i = 0; i < count; i++) {
-        gBufferPositions[i]    = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
-        gBufferNormals[i]      = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
-        gBufferColors[i]       = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        brightness1Textures[i] = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        gBufferPositions[i]    = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        gBufferNormals[i]      = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        gBufferColors[i]       = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        brightness1Textures[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         // brightness2Textures[i] = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        mainTextures[i]        = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        mainTextures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         if (!gBufferPositions[i])    return false;
         if (!gBufferNormals[i])      return false;
         if (!gBufferColors[i])       return false;
@@ -569,7 +564,7 @@ bool Himmel::prepareResources() noexcept {
         // if (!brightness2Textures[i]) return false;
         if (!mainTextures[i])        return false;
     }
-    hmlDepthResource = hmlResourceManager->newDepthResource(extent);
+    hmlDepthResource = hmlContext->hmlResourceManager->newDepthResource(extent);
     if (!hmlDepthResource) return false;
 
 
@@ -580,11 +575,12 @@ bool Himmel::prepareResources() noexcept {
     // hmlBloomRenderer->specify(mainTextures);
 
 
-    hmlPipe = std::make_unique<HmlPipe>(hmlDevice, hmlCommands, hmlSwapchain,
-        imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences);
+    hmlPipe = std::make_unique<HmlPipe>(hmlContext, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences);
     const float VERY_FAR = 10000.0f;
+    bool allGood = true;
     // Renders main geometry into the GBuffer
-    hmlPipe->addStage( // deferred prep
+    hmlTerrainRenderer->setModeDebug(false);
+    allGood &= hmlPipe->addStage( // deferred prep
         { hmlTerrainRenderer, hmlRenderer }, // drawers
         { // output color attachments
             HmlRenderPass::ColorAttachment{
@@ -630,7 +626,7 @@ bool Himmel::prepareResources() noexcept {
         // }
     );
     // Renders a 2D texture using the GBuffer
-    hmlPipe->addStage( // deferred
+    allGood &= hmlPipe->addStage( // deferred
         { hmlDeferredRenderer }, // drawers
         { // output color attachments
             HmlRenderPass::ColorAttachment{
@@ -649,8 +645,9 @@ bool Himmel::prepareResources() noexcept {
         std::nullopt // post func
     );
     // Renders on top of the deferred texture using the depth info from the prep pass
-    hmlPipe->addStage( // forward
-        { hmlSnowRenderer, hmlLightRenderer }, // drawers
+    hmlTerrainRenderer->setModeDebug(true);
+    allGood &= hmlPipe->addStage( // forward
+        { hmlSnowRenderer, hmlLightRenderer, hmlTerrainRenderer },
         { // output color attachments
             HmlRenderPass::ColorAttachment{
                 .imageFormat = mainTextures[0]->format,
@@ -694,7 +691,7 @@ bool Himmel::prepareResources() noexcept {
     // hmlBlurRenderer->modeVertical();
     // hmlBlurRenderer->modeHorizontal();
     // for (auto i = 0; i < 1; i++) {
-    //     hmlPipe->addStage( // horizontal blur
+    //     allGood &= hmlPipe->addStage( // horizontal blur
     //         { hmlBlurRenderer }, // drawers
     //         { // output color attachments
     //             {
@@ -710,7 +707,7 @@ bool Himmel::prepareResources() noexcept {
     //         [hmlBlurRenderer=hmlBlurRenderer](uint32_t){ hmlBlurRenderer->modeVertical(); } // post func
     //     );
     //
-    //     hmlPipe->addStage( // vertical blur
+    //     allGood &= hmlPipe->addStage( // vertical blur
     //         { hmlBlurRenderer }, // drawers
     //         { // output color attachments
     //             HmlRenderPass::ColorAttachment{
@@ -726,12 +723,12 @@ bool Himmel::prepareResources() noexcept {
     //         [hmlBlurRenderer=hmlBlurRenderer](uint32_t){ hmlBlurRenderer->modeHorizontal(); } // post func
     //     );
     // }
-    hmlPipe->addStage( // bloom
+    allGood &= hmlPipe->addStage( // bloom
         { hmlBloomRenderer }, // drawers
         { // output color attachments
             HmlRenderPass::ColorAttachment{
-                .imageFormat = hmlSwapchain->imageFormat,
-                .imageViews = hmlSwapchain->imageViews,
+                .imageFormat = hmlContext->hmlSwapchain->imageFormat,
+                .imageViews = hmlContext->hmlSwapchain->imageViews,
                 .clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }}, // TODO confirm that validation complains otherwise
                 .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                 .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -742,12 +739,12 @@ bool Himmel::prepareResources() noexcept {
         std::nullopt // post func
     );
     // Renders multiple 2D textures on top of everything
-    hmlPipe->addStage( // ui
+    allGood &= hmlPipe->addStage( // ui
         { hmlUiRenderer }, // drawers
         { // output color attachments
             HmlRenderPass::ColorAttachment{
-                .imageFormat = hmlSwapchain->imageFormat,
-                .imageViews = hmlSwapchain->imageViews,
+                .imageFormat = hmlContext->hmlSwapchain->imageFormat,
+                .imageViews = hmlContext->hmlSwapchain->imageViews,
                 .clearColor = std::nullopt,
                 .preLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
@@ -758,7 +755,10 @@ bool Himmel::prepareResources() noexcept {
         std::nullopt // post func
     );
 
-    if (!hmlPipe->bake(maxFramesInFlight)) return false;
+    if (!allGood) {
+        std::cerr << "::> Could not create some stages in HmlPipe.\n";
+        return false;
+    }
 
     return true;
 }
@@ -769,24 +769,24 @@ void Himmel::recreateSwapchain() noexcept {
 
     // Handle window minimization
     for (;;) {
-        const auto [width, height] = hmlWindow->getFramebufferSize();
+        const auto [width, height] = hmlContext->hmlWindow->getFramebufferSize();
         if (width > 0 && height > 0) break;
         glfwWaitEvents();
     }
 
-    vkDeviceWaitIdle(hmlDevice->device);
+    vkDeviceWaitIdle(hmlContext->hmlDevice->device);
 
-    hmlSwapchain = HmlSwapchain::create(hmlWindow, hmlDevice, hmlResourceManager, { hmlSwapchain->swapchain });
+    hmlContext->hmlSwapchain = HmlSwapchain::create(hmlContext->hmlWindow, hmlContext->hmlDevice, hmlContext->hmlResourceManager, { hmlContext->hmlSwapchain->swapchain });
 
     // Because they have to be rerecorder, and for that they need to be reset first
-    hmlCommands->resetCommandPool(hmlCommands->commandPoolGeneral);
+    hmlContext->hmlCommands->resetCommandPool(hmlContext->hmlCommands->commandPoolGeneral);
 
     if (!prepareResources()) {
         std::cerr << "::> Failed to prepare resources.\n";
         return;
     }
 
-    proj = projFrom(hmlSwapchain->extentAspect());
+    proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
 
     std::cout << '\n';
 }
@@ -796,7 +796,7 @@ bool Himmel::createSyncObjects() noexcept {
     imageAvailableSemaphores.resize(maxFramesInFlight);
     renderFinishedSemaphores.resize(maxFramesInFlight);
     inFlightFences.resize(maxFramesInFlight);
-    imagesInFlight.resize(hmlSwapchain->imageCount(), VK_NULL_HANDLE); // initially not a single frame is using an image
+    imagesInFlight.resize(hmlContext->hmlSwapchain->imageCount(), VK_NULL_HANDLE); // initially not a single frame is using an image
 
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -809,9 +809,9 @@ bool Himmel::createSyncObjects() noexcept {
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (size_t i = 0; i < maxFramesInFlight; i++) {
-        if (vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-            vkCreateFence    (hmlDevice->device, &fenceInfo,     nullptr, &inFlightFences[i])           != VK_SUCCESS) {
+        if (vkCreateSemaphore(hmlContext->hmlDevice->device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(hmlContext->hmlDevice->device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence    (hmlContext->hmlDevice->device, &fenceInfo,     nullptr, &inFlightFences[i])           != VK_SUCCESS) {
 
             std::cerr << "::> Failed to create sync objects.\n";
             return false;
@@ -832,16 +832,16 @@ Himmel::~Himmel() noexcept {
     }
 
     for (size_t i = 0; i < maxFramesInFlight; i++) {
-        vkDestroySemaphore(hmlDevice->device, renderFinishedSemaphores[i], nullptr);
-        vkDestroySemaphore(hmlDevice->device, imageAvailableSemaphores[i], nullptr);
-        vkDestroyFence(hmlDevice->device, inFlightFences[i], nullptr);
+        vkDestroySemaphore(hmlContext->hmlDevice->device, renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(hmlContext->hmlDevice->device, imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(hmlContext->hmlDevice->device, inFlightFences[i], nullptr);
     }
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.
     // DescriptorSets are freed automatically upon the deletion of the pool
-    vkDestroyDescriptorPool(hmlDevice->device, generalDescriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(hmlDevice->device, generalDescriptorSetLayout, nullptr);
+    vkDestroyDescriptorPool(hmlContext->hmlDevice->device, generalDescriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, generalDescriptorSetLayout, nullptr);
 }
 
 

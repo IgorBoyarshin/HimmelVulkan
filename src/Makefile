@@ -11,7 +11,7 @@ mainFileName = main
 # Files that have .h and .cpp versions
 classFiles = Himmel HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer HmlTerrainRenderer HmlRenderPass HmlUiRenderer HmlDeferredRenderer HmlLightRenderer HmlPipe HmlBloomRenderer util
 # Files that only have the .h version
-justHeaderFiles = renderer settings
+# justHeaderFiles = renderer settings
 # Compilation flags
 OPTIMIZATION_FLAG = -O0
 LANGUAGE_LEVEL = -std=c++20
@@ -32,7 +32,7 @@ main.o: main.cpp Himmel.h
 util.o: util.cpp util.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h HmlTerrainRenderer.h util.h HmlRenderPass.h HmlUiRenderer.h HmlDeferredRenderer.h HmlLightRenderer.h HmlBloomRenderer.h renderer.h
+Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h HmlTerrainRenderer.h util.h HmlRenderPass.h HmlUiRenderer.h HmlDeferredRenderer.h HmlLightRenderer.h HmlBloomRenderer.h renderer.h HmlContext.h HmlPipe.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 HmlCamera.o: HmlCamera.cpp HmlCamera.h
@@ -53,34 +53,34 @@ HmlModel.o: HmlModel.cpp HmlModel.h
 HmlPipeline.o: HmlPipeline.cpp HmlPipeline.h HmlDevice.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-HmlPipe.o: HmlPipe.cpp HmlPipe.h HmlDevice.h HmlCommands.h HmlSwapchain.h HmlRenderPass.h
+HmlPipe.o: HmlPipe.cpp HmlPipe.h HmlDevice.h HmlCommands.h HmlSwapchain.h HmlRenderPass.h renderer.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-HmlRenderer.o: HmlRenderer.cpp HmlRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+HmlRenderer.o: HmlRenderer.cpp HmlRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h renderer.h HmlContext.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-HmlDeferredRenderer.o: HmlDeferredRenderer.cpp HmlDeferredRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+HmlDeferredRenderer.o: HmlDeferredRenderer.cpp HmlDeferredRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h renderer.h HmlContext.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-# HmlBlurRenderer.o: HmlBlurRenderer.cpp HmlBlurRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+# HmlBlurRenderer.o: HmlBlurRenderer.cpp HmlBlurRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h renderer.h HmlContext.h
 # 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-HmlBloomRenderer.o: HmlBloomRenderer.cpp HmlBloomRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+HmlBloomRenderer.o: HmlBloomRenderer.cpp HmlBloomRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h renderer.h HmlContext.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-HmlUiRenderer.o: HmlUiRenderer.cpp HmlUiRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+HmlUiRenderer.o: HmlUiRenderer.cpp HmlUiRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h renderer.h HmlContext.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 HmlResourceManager.o: HmlResourceManager.cpp HmlResourceManager.h HmlDevice.h HmlCommands.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-HmlSnowParticleRenderer.o: HmlSnowParticleRenderer.cpp HmlSnowParticleRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h util.h
+HmlSnowParticleRenderer.o: HmlSnowParticleRenderer.cpp HmlSnowParticleRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h util.h renderer.h HmlContext.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-HmlLightRenderer.o: HmlLightRenderer.cpp HmlLightRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+HmlLightRenderer.o: HmlLightRenderer.cpp HmlLightRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h renderer.h HmlContext.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
-HmlTerrainRenderer.o: HmlTerrainRenderer.cpp HmlTerrainRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h
+HmlTerrainRenderer.o: HmlTerrainRenderer.cpp HmlTerrainRenderer.h HmlDevice.h HmlWindow.h HmlPipeline.h HmlRenderPass.h HmlCommands.h HmlModel.h HmlResourceManager.h HmlDescriptors.h renderer.h HmlContext.h
 	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 HmlSwapchain.o: HmlSwapchain.cpp HmlSwapchain.h HmlWindow.h HmlDevice.h HmlResourceManager.h

@@ -3,8 +3,8 @@
 #include "HmlBlurRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlBlurRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
+std::unique_ptr<HmlPipeline> HmlBlurRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice,
+        std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
     HmlGraphicsPipelineConfig config{
         .bindingDescriptions   = {},
         .attributeDescriptions = {},
@@ -12,8 +12,8 @@ std::unique_ptr<HmlPipeline> HmlBlurRenderer::createPipeline(std::shared_ptr<Hml
         .hmlShaders = HmlShaders()
             .addVertex("../shaders/out/blur.vert.spv")
             .addFragment("../shaders/out/blur.frag.spv"),
-        .renderPass = renderPass,
-        .extent = extent,
+        .renderPass = hmlRenderPass->renderPass,
+        .extent = hmlRenderPass->extent,
         .polygoneMode = VK_POLYGON_MODE_FILL,
         // .cullMode = VK_CULL_MODE_BACK_BIT,
         .cullMode = VK_CULL_MODE_NONE,
@@ -23,7 +23,7 @@ std::unique_ptr<HmlPipeline> HmlBlurRenderer::createPipeline(std::shared_ptr<Hml
         .pushConstantsSizeBytes = sizeof(PushConstant),
         .tessellationPatchPoints = 0,
         .lineWidth = 1.0f,
-        .colorAttachmentCount = 1,
+        .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
         .withBlending = false,
     };
 
@@ -131,7 +131,9 @@ VkCommandBuffer HmlBlurRenderer::draw(const HmlFrameData& frameData) noexcept {
     };
     hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
 
-    const auto& hmlPipeline = getCurrentPipeline();
+    const auto& hmlPipelines = getCurrentPipelines();
+    assert(hmlPipelines.size() == 1 && "::> Expected only a single pipeline in HmlBlurRenderer.\n");
+    const auto& hmlPipeline = hmlPipelines[0];
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
     std::array<VkDescriptorSet, 1> descriptorSets = {

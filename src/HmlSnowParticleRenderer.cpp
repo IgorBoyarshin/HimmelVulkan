@@ -1,53 +1,49 @@
 #include "HmlSnowParticleRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlSnowParticleRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
-    HmlGraphicsPipelineConfig config{
-        .bindingDescriptions   = {},
-        .attributeDescriptions = {},
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .hmlShaders = HmlShaders()
-            .addVertex("../shaders/out/snow.vert.spv")
-            .addFragment("../shaders/out/snow.frag.spv"),
-        .renderPass = renderPass,
-        .extent = extent,
-        .polygoneMode = VK_POLYGON_MODE_FILL,
-        // .cullMode = VK_CULL_MODE_BACK_BIT,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .descriptorSetLayouts = descriptorSetLayouts,
-        .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT,
-        .pushConstantsSizeBytes = sizeof(PushConstant),
-        .tessellationPatchPoints = 0,
-        .lineWidth = 1.0f,
-        .colorAttachmentCount = 2,
-        .withBlending = true,
-    };
+std::vector<std::unique_ptr<HmlPipeline>> HmlSnowParticleRenderer::createPipelines(
+        std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
+    std::vector<std::unique_ptr<HmlPipeline>> pipelines;
 
-    return HmlPipeline::createGraphics(hmlDevice, std::move(config));
+    {
+        HmlGraphicsPipelineConfig config{
+            .bindingDescriptions   = {},
+            .attributeDescriptions = {},
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .hmlShaders = HmlShaders()
+                .addVertex("../shaders/out/snow.vert.spv")
+                .addFragment("../shaders/out/snow.frag.spv"),
+            .renderPass = hmlRenderPass->renderPass,
+            .extent = hmlRenderPass->extent,
+            .polygoneMode = VK_POLYGON_MODE_FILL,
+            // .cullMode = VK_CULL_MODE_BACK_BIT,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .descriptorSetLayouts = descriptorSetLayouts,
+            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT,
+            .pushConstantsSizeBytes = sizeof(PushConstant),
+            .tessellationPatchPoints = 0,
+            .lineWidth = 1.0f,
+            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+            .withBlending = true,
+        };
+
+        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+    }
+
+    return pipelines;
 }
 
 
 std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRenderer(
         uint32_t snowCount,
         const SnowBounds& snowBounds,
-        std::shared_ptr<HmlWindow> hmlWindow,
-        std::shared_ptr<HmlDevice> hmlDevice,
-        std::shared_ptr<HmlCommands> hmlCommands,
-        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-        std::shared_ptr<HmlResourceManager> hmlResourceManager,
-        std::shared_ptr<HmlDescriptors> hmlDescriptors,
+        std::shared_ptr<HmlContext> hmlContext,
         VkDescriptorSetLayout viewProjDescriptorSetLayout,
         uint32_t imageCount,
         uint32_t framesInFlight) noexcept {
     auto hmlRenderer = std::make_unique<HmlSnowParticleRenderer>();
-    hmlRenderer->hmlWindow = hmlWindow;
-    hmlRenderer->hmlDevice = hmlDevice;
-    hmlRenderer->hmlCommands = hmlCommands;
-    // hmlRenderer->hmlRenderPass = hmlRenderPass;
-    hmlRenderer->hmlResourceManager = hmlResourceManager;
-    hmlRenderer->hmlDescriptors = hmlDescriptors;
+    hmlRenderer->hmlContext = hmlContext;
     // if (snowCount > MAX_SNOW_COUNT) {
     //     std::cout << "::> Exceeded MAX_SNOW_COUNT while creating HmlSnowParticleRenderer.\n";
     //     return { nullptr };
@@ -56,7 +52,7 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
 
     for (size_t i = 0; i < imageCount; i++) {
         const auto size = snowCount * 4 * sizeof(float);
-        auto ssbo = hmlResourceManager->createStorageBuffer(size);
+        auto ssbo = hmlContext->hmlResourceManager->createStorageBuffer(size);
         ssbo->map();
         if (std::holds_alternative<SnowCameraBounds>(snowBounds)) {
             ssbo->update(hmlRenderer->snowInstances.data());
@@ -65,55 +61,55 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
     }
 
 
-    hmlRenderer->snowTextureResources.push_back(hmlResourceManager->newTextureResource("../models/snow/snowflake1.png", VK_FILTER_NEAREST));
-    hmlRenderer->snowTextureResources.push_back(hmlResourceManager->newTextureResource("../models/snow/snowflake2.png", VK_FILTER_NEAREST));
+    hmlRenderer->snowTextureResources.push_back(hmlContext->hmlResourceManager->newTextureResource("../models/snow/snowflake1.png", VK_FILTER_NEAREST));
+    hmlRenderer->snowTextureResources.push_back(hmlContext->hmlResourceManager->newTextureResource("../models/snow/snowflake2.png", VK_FILTER_NEAREST));
 
 
-    hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
+    hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(hmlRenderer->snowTextureResources.size())
         .withStorageBuffers(imageCount)
         .maxSets(imageCount + 1)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
     // TODO NOTE set number is specified implicitly by vector index
     hmlRenderer->descriptorSetLayouts.push_back(viewProjDescriptorSetLayout);
-    const auto descriptorSetLayoutTextures = hmlDescriptors->buildDescriptorSetLayout()
+    const auto descriptorSetLayoutTextures = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
         .withTextureArrayAt(0, VK_SHADER_STAGE_FRAGMENT_BIT, hmlRenderer->snowTextureResources.size())
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!descriptorSetLayoutTextures) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(descriptorSetLayoutTextures);
     hmlRenderer->descriptorSetLayoutsSelf.push_back(descriptorSetLayoutTextures);
 
-    const auto descriptorSetLayoutInstances = hmlDescriptors->buildDescriptorSetLayout()
+    const auto descriptorSetLayoutInstances = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
         .withStorageBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!descriptorSetLayoutInstances) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(descriptorSetLayoutInstances);
     hmlRenderer->descriptorSetLayoutsSelf.push_back(descriptorSetLayoutInstances);
 
-    hmlRenderer->descriptorSet_textures_1 = hmlDescriptors->createDescriptorSets(1,
+    hmlRenderer->descriptorSet_textures_1 = hmlContext->hmlDescriptors->createDescriptorSets(1,
         descriptorSetLayoutTextures, hmlRenderer->descriptorPool)[0];
     if (!hmlRenderer->descriptorSet_textures_1) return { nullptr };
 
-    hmlRenderer->descriptorSet_instances_2_perImage = hmlDescriptors->createDescriptorSets(imageCount,
+    hmlRenderer->descriptorSet_instances_2_perImage = hmlContext->hmlDescriptors->createDescriptorSets(imageCount,
         descriptorSetLayoutInstances, hmlRenderer->descriptorPool);
     if (hmlRenderer->descriptorSet_instances_2_perImage.empty()) return { nullptr };
 
 
-    // hmlRenderer->hmlPipeline = createSnowPipeline(hmlDevice,
+    // hmlRenderer->hmlPipeline = createSnowPipeline(hmlContext->hmlDevice,
     //     hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
     // if (!hmlRenderer->hmlPipeline) return { nullptr };
 
 
-    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames);
+    // hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames);
 
 
     for (size_t imageIndex = 0; imageIndex < imageCount; imageIndex++) {
         const auto set = hmlRenderer->descriptorSet_instances_2_perImage[imageIndex];
         const auto buffer = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->buffer;
         const auto size = hmlRenderer->snowInstancesStorageBuffers[imageIndex]->sizeBytes;
-        HmlDescriptorSetUpdater(set).storageBufferAt(0, buffer, size).update(hmlDevice);
+        HmlDescriptorSetUpdater(set).storageBufferAt(0, buffer, size).update(hmlContext->hmlDevice);
     }
 
 
@@ -123,7 +119,7 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
         samplers.push_back(resource->sampler);
         imageViews.push_back(resource->view);
     }
-    HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
+    HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlContext->hmlDevice);
 
 
     return hmlRenderer;
@@ -136,9 +132,9 @@ HmlSnowParticleRenderer::~HmlSnowParticleRenderer() noexcept {
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.
     // DescriptorSets are freed automatically upon the deletion of the pool
-    vkDestroyDescriptorPool(hmlDevice->device, descriptorPool, nullptr);
+    vkDestroyDescriptorPool(hmlContext->hmlDevice->device, descriptorPool, nullptr);
     for (auto layout : descriptorSetLayoutsSelf) {
-        vkDestroyDescriptorSetLayout(hmlDevice->device, layout, nullptr);
+        vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, layout, nullptr);
     }
 }
 
@@ -211,7 +207,7 @@ void HmlSnowParticleRenderer::updateForImage(uint32_t imageIndex) noexcept {
 
 
 VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noexcept {
-    auto commandBuffer = commandBuffers[frameData.frameIndex];
+    auto commandBuffer = getCurrentCommands()[frameData.frameIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
@@ -222,9 +218,10 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noe
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
-    hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+    hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
 
-    const auto& hmlPipeline = getCurrentPipeline();
+    assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlSnowParticleRenderer.\n");
+    const auto& hmlPipeline = getCurrentPipelines()[0];
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
     std::array<VkDescriptorSet, 3> descriptorSets = {
@@ -254,14 +251,6 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noe
     const uint32_t firstVertex = 0;
     vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
-    hmlCommands->endRecording(commandBuffer);
+    hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }
-
-
-// void HmlSnowParticleRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-//     hmlRenderPass = newHmlRenderPass;
-//     hmlPipeline = createSnowPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-//     // NOTE The command pool is reset for all renderers prior to calling this function.
-//     // NOTE commandBuffers must be rerecorded -- is done during baking
-// }

@@ -1,65 +1,61 @@
 #include "HmlUiRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlUiRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
-    HmlGraphicsPipelineConfig config{
-        .bindingDescriptions   = {},
-        .attributeDescriptions = {},
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .hmlShaders = HmlShaders()
-            .addVertex("../shaders/out/ui.vert.spv")
-            .addFragment("../shaders/out/ui.frag.spv"),
-        .renderPass = renderPass,
-        .extent = extent,
-        .polygoneMode = VK_POLYGON_MODE_FILL,
-        // .cullMode = VK_CULL_MODE_BACK_BIT,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .descriptorSetLayouts = descriptorSetLayouts,
-        .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pushConstantsSizeBytes = sizeof(PushConstant),
-        .tessellationPatchPoints = 0,
-        .lineWidth = 1.0f,
-        .colorAttachmentCount = 1,
-        .withBlending = false,
-    };
+std::vector<std::unique_ptr<HmlPipeline>> HmlUiRenderer::createPipelines(
+        std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
+    std::vector<std::unique_ptr<HmlPipeline>> pipelines;
 
-    return HmlPipeline::createGraphics(hmlDevice, std::move(config));
+    {
+        HmlGraphicsPipelineConfig config{
+            .bindingDescriptions   = {},
+            .attributeDescriptions = {},
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .hmlShaders = HmlShaders()
+                .addVertex("../shaders/out/ui.vert.spv")
+                .addFragment("../shaders/out/ui.frag.spv"),
+            .renderPass = hmlRenderPass->renderPass,
+            .extent = hmlRenderPass->extent,
+            .polygoneMode = VK_POLYGON_MODE_FILL,
+            // .cullMode = VK_CULL_MODE_BACK_BIT,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .descriptorSetLayouts = descriptorSetLayouts,
+            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pushConstantsSizeBytes = sizeof(PushConstant),
+            .tessellationPatchPoints = 0,
+            .lineWidth = 1.0f,
+            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+            .withBlending = false,
+        };
+
+        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+    }
+
+    return pipelines;
 }
 
 
 std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(
-        std::shared_ptr<HmlWindow> hmlWindow,
-        std::shared_ptr<HmlDevice> hmlDevice,
-        std::shared_ptr<HmlCommands> hmlCommands,
-        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-        std::shared_ptr<HmlResourceManager> hmlResourceManager,
-        std::shared_ptr<HmlDescriptors> hmlDescriptors,
+        std::shared_ptr<HmlContext> hmlContext,
         uint32_t imageCount,
         uint32_t framesInFlight) noexcept {
     auto hmlRenderer = std::make_unique<HmlUiRenderer>();
-    hmlRenderer->hmlWindow = hmlWindow;
-    hmlRenderer->hmlDevice = hmlDevice;
-    hmlRenderer->hmlCommands = hmlCommands;
-    // hmlRenderer->hmlRenderPass = hmlRenderPass;
-    hmlRenderer->hmlResourceManager = hmlResourceManager;
-    hmlRenderer->hmlDescriptors = hmlDescriptors;
+    hmlRenderer->hmlContext = hmlContext;
 
 
-    hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
+    hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(imageCount * MAX_TEXTURES_COUNT)
         .maxSets(imageCount)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
-    hmlRenderer->descriptorSetLayoutTextures = hmlDescriptors->buildDescriptorSetLayout()
+    hmlRenderer->descriptorSetLayoutTextures = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
         .withTextureArrayAt(0, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES_COUNT)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorSetLayoutTextures) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutTextures);
 
-    hmlRenderer->descriptorSet_textures_0_perImage = hmlDescriptors->createDescriptorSets(imageCount,
+    hmlRenderer->descriptorSet_textures_0_perImage = hmlContext->hmlDescriptors->createDescriptorSets(imageCount,
         hmlRenderer->descriptorSetLayoutTextures, hmlRenderer->descriptorPool);
     if (hmlRenderer->descriptorSet_textures_0_perImage.empty()) return { nullptr };
 
@@ -69,7 +65,7 @@ std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(
     // if (!hmlRenderer->hmlPipeline) return { nullptr };
 
 
-    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames);
+    // hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames);
 
     return hmlRenderer;
 }
@@ -81,8 +77,8 @@ HmlUiRenderer::~HmlUiRenderer() noexcept {
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.
     // DescriptorSets are freed automatically upon the deletion of the pool
-    vkDestroyDescriptorPool(hmlDevice->device, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(hmlDevice->device, descriptorSetLayoutTextures, nullptr);
+    vkDestroyDescriptorPool(hmlContext->hmlDevice->device, descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, descriptorSetLayoutTextures, nullptr);
 }
 
 
@@ -99,13 +95,13 @@ void HmlUiRenderer::specify(const std::vector<std::vector<std::shared_ptr<HmlIma
             views.push_back(texture->view);
         }
         HmlDescriptorSetUpdater(descriptorSet_textures_0_perImage[imageIndex])
-            .textureArrayAt(0, samplers, views).update(hmlDevice);
+            .textureArrayAt(0, samplers, views).update(hmlContext->hmlDevice);
     }
 }
 
 
 VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
-    auto commandBuffer = commandBuffers[frameData.frameIndex];
+    auto commandBuffer = getCurrentCommands()[frameData.frameIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
@@ -116,9 +112,10 @@ VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
-    hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+    hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
 
-    const auto& hmlPipeline = getCurrentPipeline();
+    assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlUiRenderer.\n");
+    const auto& hmlPipeline = getCurrentPipelines()[0];
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
     std::array<VkDescriptorSet, 1> descriptorSets = {
@@ -142,14 +139,6 @@ VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
         vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
     }
 
-    hmlCommands->endRecording(commandBuffer);
+    hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }
-
-
-// void HmlUiRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-//     hmlRenderPass = newHmlRenderPass;
-//     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-//     // NOTE The command pool is reset for all renderers prior to calling this function.
-//     // NOTE commandBuffers must be rerecorded -- is done during baking
-// }

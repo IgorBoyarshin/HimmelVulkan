@@ -7,13 +7,9 @@
 #include <unordered_map>
 #include <optional>
 
-#include "HmlWindow.h"
+#include "HmlContext.h"
 #include "HmlPipeline.h"
-#include "HmlCommands.h"
 #include "HmlModel.h"
-#include "HmlDevice.h"
-#include "HmlResourceManager.h"
-#include "HmlDescriptors.h"
 #include "HmlRenderPass.h"
 #include "renderer.h"
 
@@ -48,15 +44,6 @@ struct HmlRenderer : HmlDrawer {
     };
 
 
-    std::shared_ptr<HmlWindow> hmlWindow;
-    // std::shared_ptr<HmlDevice> hmlDevice;
-    std::shared_ptr<HmlCommands> hmlCommands;
-    // std::shared_ptr<HmlRenderPass> hmlRenderPass;
-    std::shared_ptr<HmlResourceManager> hmlResourceManager;
-    std::shared_ptr<HmlDescriptors> hmlDescriptors;
-
-    // std::unique_ptr<HmlPipeline> hmlPipeline;
-
     VkDescriptorPool descriptorPool;
     VkDescriptorSet  descriptorSet_textures_1;
     // std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
@@ -72,25 +59,16 @@ struct HmlRenderer : HmlDrawer {
     std::unordered_map<HmlModelResource::Id, std::vector<std::shared_ptr<Entity>>> entitiesToRenderForModel;
 
 
-    std::vector<VkCommandBuffer> commandBuffers;
-
-
-    std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
+    std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
+        std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlRenderer> create(
-            std::shared_ptr<HmlWindow> hmlWindow,
-            std::shared_ptr<HmlDevice> hmlDevice,
-            std::shared_ptr<HmlCommands> hmlCommands,
-            // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-            std::shared_ptr<HmlResourceManager> hmlResourceManager,
-            std::shared_ptr<HmlDescriptors> hmlDescriptors,
+            std::shared_ptr<HmlContext> hmlContext,
             VkDescriptorSetLayout generalDescriptorSetLayout,
             uint32_t framesInFlight) noexcept;
     ~HmlRenderer() noexcept;
     void specifyEntitiesToRender(const std::vector<std::shared_ptr<Entity>>& entities) noexcept;
     void updateDescriptorSetTextures() noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
-    // void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override;
 };
 
 #endif

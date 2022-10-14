@@ -8,6 +8,7 @@
 #include <iostream>
 #include <algorithm>
 
+#include "HmlContext.h"
 #include "HmlWindow.h"
 #include "HmlDevice.h"
 #include "HmlDescriptors.h"
@@ -114,6 +115,7 @@ struct Himmel {
             const auto bottomRightHeight = heightmap[x + 1][y];
             const auto topLeftHeight     = heightmap[x    ][y + 1];
             const auto topRightHeight    = heightmap[x + 1][y + 1];
+            std::cout << "BL;BR;TL;TR = " << bottomLeftHeight << ' ' << bottomRightHeight << ' ' << topLeftHeight << ' ' << topRightHeight << '\n';
             if (t.x + t.y < 1.0f) { // bottom-left triangle
                 const auto diffX = bottomRightHeight - bottomLeftHeight;
                 const auto diffY = topLeftHeight - bottomLeftHeight;
@@ -218,12 +220,8 @@ struct Himmel {
     Weather weather;
     const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
 
-    std::shared_ptr<HmlWindow> hmlWindow;
-    std::shared_ptr<HmlDevice> hmlDevice;
-    std::shared_ptr<HmlDescriptors> hmlDescriptors;
-    std::shared_ptr<HmlCommands> hmlCommands;
-    std::shared_ptr<HmlResourceManager> hmlResourceManager;
-    std::shared_ptr<HmlSwapchain> hmlSwapchain;
+    std::shared_ptr<HmlContext> hmlContext;
+
     std::shared_ptr<HmlRenderPass> hmlRenderPassDeferredPrep;
     std::shared_ptr<HmlRenderPass> hmlRenderPassDeferred;
     std::shared_ptr<HmlRenderPass> hmlRenderPassForward;

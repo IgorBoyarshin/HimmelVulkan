@@ -1,7 +1,7 @@
 #version 450
 
 // XXX Sync across all shaders
-layout(set = 0, binding = 0) uniform UniformBufferObject {
+layout(set = 0, binding = 0) uniform GeneralUbo {
     mat4 view;
     mat4 proj;
     vec3 globalLightDir;

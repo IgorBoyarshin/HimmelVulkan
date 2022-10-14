@@ -1,67 +1,83 @@
 #include "HmlTerrainRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
-    HmlGraphicsPipelineConfig config{
-        .bindingDescriptions   = {},
-        .attributeDescriptions = {},
-        .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
-        .hmlShaders = HmlShaders()
-            .addVertex("../shaders/out/terrain.vert.spv")
-            .addTessellationControl("../shaders/out/terrain.tesc.spv")
-            .addTessellationEvaluation("../shaders/out/terrain_deferred.tese.spv")
-            .addFragment("../shaders/out/terrain_deferred.frag.spv"),
-        .renderPass = renderPass,
-        .extent = extent,
-        // .polygoneMode = VK_POLYGON_MODE_LINE,
-        .polygoneMode = VK_POLYGON_MODE_FILL,
-        // .cullMode = VK_CULL_MODE_BACK_BIT,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .descriptorSetLayouts = descriptorSetLayouts,
-        .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
-        .pushConstantsSizeBytes = sizeof(PushConstant),
-        .tessellationPatchPoints = 4,
-        .lineWidth = 1.0f,
-        .colorAttachmentCount = 3,
-        .withBlending = true,
-    };
+std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
+        std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
+    /*
+     * There are two ways of doing this debug pipeline along with the regular one.
+     * 1) run both pipelines within the same RenderPass.
+     * For this both pipelines must be created and stored for the same RenderPass.
+     * 2) have two separate RenderPasses, each one having its own pipeline.
+     * For this the two pipelines must be created separately for each respective
+     * RenderPass and stored for them.
+     */
 
-    return HmlPipeline::createGraphics(hmlDevice, std::move(config));
+    // std::vector<std::unique_ptr<HmlPipeline>> pipelines(PIPELINE_COUNT);
+    std::vector<std::unique_ptr<HmlPipeline>> pipelines;
+
+    if (!modeDebug) { // Regular
+        HmlGraphicsPipelineConfig config{
+            .bindingDescriptions   = {},
+            .attributeDescriptions = {},
+            .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
+            .hmlShaders = HmlShaders()
+                .addVertex("../shaders/out/terrain.vert.spv")
+                .addTessellationControl("../shaders/out/terrain.tesc.spv")
+                .addTessellationEvaluation("../shaders/out/terrain_deferred.tese.spv")
+                .addFragment("../shaders/out/terrain_deferred.frag.spv"),
+            .renderPass = hmlRenderPass->renderPass,
+            .extent = hmlRenderPass->extent,
+            // .polygoneMode = VK_POLYGON_MODE_LINE,
+            .polygoneMode = VK_POLYGON_MODE_FILL,
+            // .cullMode = VK_CULL_MODE_BACK_BIT,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .descriptorSetLayouts = descriptorSetLayouts,
+            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+            .pushConstantsSizeBytes = sizeof(PushConstant),
+            .tessellationPatchPoints = 4,
+            .lineWidth = 1.0f,
+            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+            .withBlending = true,
+        };
+
+        // pipelines[PIPELINE_REGULAR_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
+        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+    }
+
+    if (modeDebug) { // Debug
+        HmlGraphicsPipelineConfig config{
+            .bindingDescriptions   = {},
+            .attributeDescriptions = {},
+            .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
+            .hmlShaders = HmlShaders()
+                .addVertex("../shaders/out/terrain.vert.spv")
+                .addTessellationControl("../shaders/out/terrain.tesc.spv")
+                .addTessellationEvaluation("../shaders/out/terrain_debug.tese.spv")
+                .addGeometry("../shaders/out/terrain_debug.geom.spv")
+                .addFragment("../shaders/out/terrain_debug.frag.spv"),
+            .renderPass = hmlRenderPass->renderPass,
+            .extent = hmlRenderPass->extent,
+            // .polygoneMode = VK_POLYGON_MODE_LINE,
+            .polygoneMode = VK_POLYGON_MODE_FILL, // NOTE does not matter, we output a line strip
+            // .cullMode = VK_CULL_MODE_BACK_BIT,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .descriptorSetLayouts = descriptorSetLayouts,
+            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+            .pushConstantsSizeBytes = sizeof(PushConstant),
+            .tessellationPatchPoints = 4,
+            .lineWidth = 2.0f,
+            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+            .withBlending = true,
+        };
+
+        // pipelines[PIPELINE_DEBUG_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
+        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+    }
+
+    return pipelines;
 }
-
-
-// std::unique_ptr<HmlPipeline> HmlTerrainRenderer::createPipelineDebug(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-//         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
-//     HmlGraphicsPipelineConfig config{
-//         .bindingDescriptions   = {},
-//         .attributeDescriptions = {},
-//         .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
-//         .hmlShaders = HmlShaders()
-//             .addVertex("../shaders/out/terrain.vert.spv")
-//             .addTessellationControl("../shaders/out/terrain.tesc.spv")
-//             .addTessellationEvaluation("../shaders/out/terrain_debug.tese.spv")
-//             .addGeometry("../shaders/out/terrain_debug.geom.spv")
-//             .addFragment("../shaders/out/terrain_debug.frag.spv"),
-//         .renderPass = renderPass,
-//         .extent = extent,
-//         // .polygoneMode = VK_POLYGON_MODE_LINE,
-//         .polygoneMode = VK_POLYGON_MODE_FILL, // NOTE does not matter, we output a line strip
-//         // .cullMode = VK_CULL_MODE_BACK_BIT,
-//         .cullMode = VK_CULL_MODE_NONE,
-//         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-//         .descriptorSetLayouts = descriptorSetLayouts,
-//         .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
-//         .pushConstantsSizeBytes = sizeof(PushConstant),
-//         .tessellationPatchPoints = 4,
-//         .lineWidth = 2.0f,
-//         .colorAttachmentCount = 3,
-//         .withBlending = true,
-//     };
-//
-//     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
-// }
 
 
 std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
@@ -69,26 +85,16 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
         uint32_t granularity,
         const char* grassFilename,
         const Bounds& bounds,
-        std::shared_ptr<HmlWindow> hmlWindow,
-        std::shared_ptr<HmlDevice> hmlDevice,
-        std::shared_ptr<HmlCommands> hmlCommands,
-        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-        std::shared_ptr<HmlResourceManager> hmlResourceManager,
-        std::shared_ptr<HmlDescriptors> hmlDescriptors,
+        std::shared_ptr<HmlContext> hmlContext,
         VkDescriptorSetLayout viewProjDescriptorSetLayout,
         uint32_t imageCount,
         uint32_t framesInFlight) noexcept {
     auto hmlRenderer = std::make_unique<HmlTerrainRenderer>();
-    hmlRenderer->hmlWindow = hmlWindow;
-    hmlRenderer->hmlDevice = hmlDevice;
-    hmlRenderer->hmlCommands = hmlCommands;
-    // hmlRenderer->hmlRenderPass = hmlRenderPass;
-    hmlRenderer->hmlResourceManager = hmlResourceManager;
-    hmlRenderer->hmlDescriptors = hmlDescriptors;
+    hmlRenderer->hmlContext = hmlContext;
 
     hmlRenderer->bounds = bounds;
-    hmlRenderer->heightmapTexture = hmlResourceManager->newTextureResource(heightmapFilename, VK_FILTER_LINEAR);
-    hmlRenderer->grassTexture = hmlResourceManager->newTextureResource(grassFilename, VK_FILTER_LINEAR);
+    hmlRenderer->heightmapTexture = hmlContext->hmlResourceManager->newTextureResource(heightmapFilename, VK_FILTER_LINEAR);
+    hmlRenderer->grassTexture = hmlContext->hmlResourceManager->newTextureResource(grassFilename, VK_FILTER_LINEAR);
     hmlRenderer->granularity = granularity;
 
     {
@@ -107,24 +113,24 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
     }
 
 
-    hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
+    hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(2)
         .maxSets(1)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
     // TODO NOTE set number is specified implicitly by vector index
     hmlRenderer->descriptorSetLayouts.push_back(viewProjDescriptorSetLayout);
 
-    const auto descriptorSetLayoutHeightmap = hmlDescriptors->buildDescriptorSetLayout()
+    const auto descriptorSetLayoutHeightmap = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
         .withTextureAt(0, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
         .withTextureAt(1, VK_SHADER_STAGE_FRAGMENT_BIT)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!descriptorSetLayoutHeightmap) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(descriptorSetLayoutHeightmap);
     hmlRenderer->descriptorSetLayoutsSelf.push_back(descriptorSetLayoutHeightmap);
 
-    hmlRenderer->descriptorSet_heightmap_1 = hmlDescriptors->createDescriptorSets(1,
+    hmlRenderer->descriptorSet_heightmap_1 = hmlContext->hmlDescriptors->createDescriptorSets(1,
         descriptorSetLayoutHeightmap, hmlRenderer->descriptorPool)[0];
     if (!hmlRenderer->descriptorSet_heightmap_1) return { nullptr };
 
@@ -137,7 +143,7 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
     // if (!hmlRenderer->hmlPipelineDebug) return { nullptr };
 
 
-    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(imageCount, hmlCommands->commandPoolOnetimeFrames);
+    // hmlRenderer->commandBuffersForRenderPass.push_back(hmlCommands->allocateSecondary(imageCount, hmlCommands->commandPoolOnetimeFrames));
 
     HmlDescriptorSetUpdater(hmlRenderer->descriptorSet_heightmap_1)
         .textureAt(0,
@@ -146,7 +152,7 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
         .textureAt(1,
             hmlRenderer->grassTexture->sampler,
             hmlRenderer->grassTexture->view)
-        .update(hmlDevice);
+        .update(hmlContext->hmlDevice);
     return hmlRenderer;
 }
 
@@ -157,9 +163,9 @@ HmlTerrainRenderer::~HmlTerrainRenderer() noexcept {
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.
     // DescriptorSets are freed automatically upon the deletion of the pool
-    vkDestroyDescriptorPool(hmlDevice->device, descriptorPool, nullptr);
+    vkDestroyDescriptorPool(hmlContext->hmlDevice->device, descriptorPool, nullptr);
     for (auto layout : descriptorSetLayoutsSelf) {
-        vkDestroyDescriptorSetLayout(hmlDevice->device, layout, nullptr);
+        vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, layout, nullptr);
     }
 }
 
@@ -231,7 +237,7 @@ void HmlTerrainRenderer::update(const glm::vec3& cameraPos) noexcept {
 
 
 VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept {
-    auto commandBuffer = commandBuffers[frameData.imageIndex];
+    auto commandBuffer = getCurrentCommands()[frameData.imageIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
@@ -242,83 +248,56 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
-    hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+    hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
 
-    {
-        const auto& hmlPipeline = getCurrentPipeline();
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
+    // const auto pipelineIndex = modeDebug ? PIPELINE_DEBUG_INDEX : PIPELINE_REGULAR_INDEX;
+    // const auto& hmlPipeline = getCurrentPipelines()[pipelineIndex];
+    assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlTerrainRenderer.\n");
+    const auto& hmlPipeline = getCurrentPipelines()[0];
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
-        std::array<VkDescriptorSet, 2> descriptorSets = {
-            frameData.generalDescriptorSet_0, descriptorSet_heightmap_1
-        };
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+    std::array<VkDescriptorSet, 2> descriptorSets = {
+        frameData.generalDescriptorSet_0, descriptorSet_heightmap_1
+    };
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-        for (const auto& subTerrain : subTerrains) {
-            for (const auto& patch : subTerrain.patches) {
-                if (patch.isParent) continue;
-                PushConstant pushConstant{
-                    .center = patch.center,
-                    .size = patch.size,
-                    .texCoordStart = patch.texCoordStart,
-                    .texCoordStep = patch.texCoordStep,
-                    .offsetY = bounds.yOffset,
-                    .maxHeight = bounds.height,
-                    .level = patch.level,
-                };
-                vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
-                    hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
+    for (const auto& subTerrain : subTerrains) {
+        for (const auto& patch : subTerrain.patches) {
+            if (patch.isParent) continue;
+            PushConstant pushConstant{
+                .center = patch.center,
+                .size = patch.size,
+                .texCoordStart = patch.texCoordStart,
+                .texCoordStep = patch.texCoordStep,
+                .offsetY = bounds.yOffset,
+                .maxHeight = bounds.height,
+                .level = patch.level,
+            };
+            vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
+                hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
 
-                const uint32_t instanceCount = 1;
-                const uint32_t firstInstance = 0;
-                const uint32_t vertexCount = 4; // a simple square
-                const uint32_t firstVertex = 0;
-                vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
-            }
+            const uint32_t instanceCount = 1;
+            const uint32_t firstInstance = 0;
+            const uint32_t vertexCount = 4; // a simple square
+            const uint32_t firstVertex = 0;
+            vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
         }
     }
-    // {
-    //     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipelineDebug->pipeline);
-    //
-    //     std::array<VkDescriptorSet, 2> descriptorSets = {
-    //         frameData.descriptorSet_0, descriptorSet_heightmap_1
-    //     };
-    //     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-    //             hmlPipelineDebug->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-    //
-    //     for (const auto& subTerrain : subTerrains) {
-    //         for (const auto& patch : subTerrain.patches) {
-    //             if (patch.isParent) continue;
-    //             PushConstant pushConstant{
-    //                 .center = patch.center,
-    //                 .size = patch.size,
-    //                 .texCoordStart = patch.texCoordStart,
-    //                 .texCoordStep = patch.texCoordStep,
-    //                 .offsetY = bounds.yOffset,
-    //                 .maxHeight = bounds.height,
-    //                 .level = patch.level,
-    //             };
-    //             vkCmdPushConstants(commandBuffer, hmlPipelineDebug->layout,
-    //                     hmlPipelineDebug->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
-    //
-    //             const uint32_t instanceCount = 1;
-    //             const uint32_t firstInstance = 0;
-    //             const uint32_t vertexCount = 4; // a simple square
-    //             const uint32_t firstVertex = 0;
-    //             vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
-    //         }
-    //     }
-    // }
 
-    hmlCommands->endRecording(commandBuffer);
+    hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }
 
 
-// void HmlTerrainRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-//     hmlRenderPass = newHmlRenderPass;
-//     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-//     // hmlPipelineDebug = createPipelineDebug(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-//     // NOTE The command pool is reset for all renderers prior to calling this function.
-//     // NOTE commandBuffers must be rerecorded -- is done during baking
-// }
+void HmlTerrainRenderer::addRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
+    currentRenderPass = newHmlRenderPass;
+
+    auto hmlPipelines = createPipelines(newHmlRenderPass, descriptorSetLayouts);
+    pipelineForRenderPassStorage.emplace_back(newHmlRenderPass, std::move(hmlPipelines));
+
+    const auto count = hmlContext->imageCount();
+    const auto pool = hmlContext->hmlCommands->commandPoolOnetimeFrames;
+    auto commands = hmlContext->hmlCommands->allocateSecondary(count, pool);
+    commandBuffersForRenderPass.push_back(std::move(commands));
+}

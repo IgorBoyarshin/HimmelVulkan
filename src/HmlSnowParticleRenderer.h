@@ -8,14 +8,10 @@
 #include <optional>
 #include <variant>
 
-#include "HmlWindow.h"
+#include "HmlContext.h"
 #include "HmlPipeline.h"
 #include "HmlRenderPass.h"
-#include "HmlCommands.h"
 #include "HmlModel.h"
-#include "HmlDevice.h"
-#include "HmlResourceManager.h"
-#include "HmlDescriptors.h"
 #include "util.h"
 #include "renderer.h"
 
@@ -33,13 +29,7 @@ struct HmlSnowParticleRenderer : HmlDrawer {
 
 
     std::shared_ptr<HmlWindow> hmlWindow;
-    // std::shared_ptr<HmlDevice> hmlDevice;
-    std::shared_ptr<HmlCommands> hmlCommands;
-    // std::shared_ptr<HmlRenderPass> hmlRenderPass;
-    std::shared_ptr<HmlResourceManager> hmlResourceManager;
-    std::shared_ptr<HmlDescriptors> hmlDescriptors;
 
-    // std::unique_ptr<HmlPipeline> hmlPipeline;
     // HmlShaderLayout hmlShaderLayout;
 
     VkDescriptorPool descriptorPool;
@@ -47,9 +37,6 @@ struct HmlSnowParticleRenderer : HmlDrawer {
     std::vector<VkDescriptorSet> descriptorSet_instances_2_perImage;
     // std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
     std::vector<VkDescriptorSetLayout> descriptorSetLayoutsSelf;
-
-
-    std::vector<VkCommandBuffer> commandBuffers;
 
 
     struct SnowInstance {
@@ -75,17 +62,12 @@ struct HmlSnowParticleRenderer : HmlDrawer {
     std::vector<std::unique_ptr<HmlImageResource>> snowTextureResources;
 
 
-    std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-            VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
+    std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
+            std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlSnowParticleRenderer> createSnowRenderer(
             uint32_t snowCount,
             const std::variant<SnowBoxBounds, SnowCameraBounds>& snowBounds,
-            std::shared_ptr<HmlWindow> hmlWindow,
-            std::shared_ptr<HmlDevice> hmlDevice,
-            std::shared_ptr<HmlCommands> hmlCommands,
-            // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-            std::shared_ptr<HmlResourceManager> hmlResourceManager,
-            std::shared_ptr<HmlDescriptors> hmlDescriptors,
+            std::shared_ptr<HmlContext> hmlContext,
             VkDescriptorSetLayout viewProjDescriptorSetLayout,
             uint32_t imageCount,
             uint32_t framesInFlight) noexcept;
@@ -94,7 +76,6 @@ struct HmlSnowParticleRenderer : HmlDrawer {
     void updateForDt(float dt, float timeSinceStart) noexcept;
     void updateForImage(uint32_t imageIndex) noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
-    // void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override;
 };
 
 #endif

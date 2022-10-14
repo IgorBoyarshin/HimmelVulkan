@@ -54,7 +54,6 @@ struct HmlBlurRenderer : HmlDrawer {
         pipelineForRenderPassStorage.emplace_back(newHmlRenderPass, std::move(hmlPipeline));
         currentRenderPass = newHmlRenderPass;
         commandBuffersPerRenderPass.push_back(hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames));
-        // TODO XXX implement commands for all renderers
     }
 
     inline virtual void clearRenderPasses() noexcept {

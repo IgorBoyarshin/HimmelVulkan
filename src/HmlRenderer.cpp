@@ -1,76 +1,72 @@
 #include "HmlRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
-    HmlGraphicsPipelineConfig config{
-        .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
-        .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .hmlShaders = HmlShaders()
-            .addVertex("../shaders/out/simple_deferred.vert.spv")
-            .addFragment("../shaders/out/simple_deferred.frag.spv"),
-        .renderPass = renderPass,
-        .extent = extent,
-        .polygoneMode = VK_POLYGON_MODE_FILL,
-        // .cullMode = VK_CULL_MODE_BACK_BIT,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .descriptorSetLayouts = descriptorSetLayouts,
-        .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pushConstantsSizeBytes = sizeof(PushConstant),
-        .tessellationPatchPoints = 0,
-        .lineWidth = 1.0f,
-        .colorAttachmentCount = 3,
-        .withBlending = true,
-    };
+std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
+        std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
+    std::vector<std::unique_ptr<HmlPipeline>> pipelines;
 
-    return HmlPipeline::createGraphics(hmlDevice, std::move(config));
+    {
+        HmlGraphicsPipelineConfig config{
+            .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
+            .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .hmlShaders = HmlShaders()
+                .addVertex("../shaders/out/simple_deferred.vert.spv")
+                .addFragment("../shaders/out/simple_deferred.frag.spv"),
+            .renderPass = hmlRenderPass->renderPass,
+            .extent = hmlRenderPass->extent,
+            .polygoneMode = VK_POLYGON_MODE_FILL,
+            // .cullMode = VK_CULL_MODE_BACK_BIT,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .descriptorSetLayouts = descriptorSetLayouts,
+            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pushConstantsSizeBytes = sizeof(PushConstant),
+            .tessellationPatchPoints = 0,
+            .lineWidth = 1.0f,
+            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+            .withBlending = true,
+        };
+
+        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+    }
+
+    return pipelines;
 }
 
 
 std::unique_ptr<HmlRenderer> HmlRenderer::create(
-        std::shared_ptr<HmlWindow> hmlWindow,
-        std::shared_ptr<HmlDevice> hmlDevice,
-        std::shared_ptr<HmlCommands> hmlCommands,
-        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-        std::shared_ptr<HmlResourceManager> hmlResourceManager,
-        std::shared_ptr<HmlDescriptors> hmlDescriptors,
+        std::shared_ptr<HmlContext> hmlContext,
         VkDescriptorSetLayout generalDescriptorSetLayout,
         uint32_t framesInFlight) noexcept {
     auto hmlRenderer = std::make_unique<HmlRenderer>();
-    hmlRenderer->hmlWindow = hmlWindow;
-    hmlRenderer->hmlDevice = hmlDevice;
-    hmlRenderer->hmlCommands = hmlCommands;
-    // hmlRenderer->hmlRenderPass = hmlRenderPass;
-    hmlRenderer->hmlResourceManager = hmlResourceManager;
-    hmlRenderer->hmlDescriptors = hmlDescriptors;
+    hmlRenderer->hmlContext = hmlContext;
 
 
-    hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
+    hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(MAX_TEXTURES_COUNT)
         .maxSets(1)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
     hmlRenderer->descriptorSetLayouts.push_back(generalDescriptorSetLayout);
-    hmlRenderer->descriptorSetLayoutTextures = hmlDescriptors->buildDescriptorSetLayout()
+    hmlRenderer->descriptorSetLayoutTextures = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
         .withTextureArrayAt(0, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES_COUNT)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorSetLayoutTextures) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutTextures);
 
-    hmlRenderer->descriptorSet_textures_1 = hmlDescriptors->createDescriptorSets(1,
+    hmlRenderer->descriptorSet_textures_1 = hmlContext->hmlDescriptors->createDescriptorSets(1,
         hmlRenderer->descriptorSetLayoutTextures, hmlRenderer->descriptorPool)[0];
     if (!hmlRenderer->descriptorSet_textures_1) return { nullptr };
 
 
-    // hmlRenderer->hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent,
+    // hmlRenderer->hmlPipeline = createPipeline(hmlContext->hmlDevice, hmlRenderPass->extent,
     //     hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
     // if (!hmlRenderer->hmlPipeline) return { nullptr };
 
 
-    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames);
+    // hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(framesInFlight, hmlCommands->commandPoolOnetimeFrames);
 
     return hmlRenderer;
 }
@@ -82,8 +78,8 @@ HmlRenderer::~HmlRenderer() noexcept {
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.
     // DescriptorSets are freed automatically upon the deletion of the pool
-    vkDestroyDescriptorPool(hmlDevice->device, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(hmlDevice->device, descriptorSetLayoutTextures, nullptr);
+    vkDestroyDescriptorPool(hmlContext->hmlDevice->device, descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, descriptorSetLayoutTextures, nullptr);
 }
 
 
@@ -143,12 +139,12 @@ void HmlRenderer::updateDescriptorSetTextures() noexcept {
         imageViews[textureIndex] = model->textureResource->view;
     }
 
-    HmlDescriptorSetUpdater(descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlDevice);
+    HmlDescriptorSetUpdater(descriptorSet_textures_1).textureArrayAt(0, samplers, imageViews).update(hmlContext->hmlDevice);
 }
 
 
 VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
-    auto commandBuffer = commandBuffers[frameData.frameIndex];
+    auto commandBuffer = getCurrentCommands()[frameData.frameIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
@@ -159,9 +155,10 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
-    hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+    hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
 
-    const auto& hmlPipeline = getCurrentPipeline();
+    assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlRenderer.\n");
+    const auto& hmlPipeline = getCurrentPipelines()[0];
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
     std::array<VkDescriptorSet, 2> descriptorSets = {
@@ -206,14 +203,6 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
         }
     }
 
-    hmlCommands->endRecording(commandBuffer);
+    hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }
-
-
-// void HmlRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-//     hmlRenderPass = newHmlRenderPass;
-//     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-//     // NOTE The command pool is reset for all renderers prior to calling this function.
-//     // NOTE commandBuffers must be rerecorded -- is done during baking
-// }

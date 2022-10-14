@@ -1,50 +1,46 @@
 #include "HmlLightRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlLightRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-        VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
-    HmlGraphicsPipelineConfig config{
-        .bindingDescriptions   = {},
-        .attributeDescriptions = {},
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .hmlShaders = HmlShaders()
-            .addVertex("../shaders/out/light.vert.spv")
-            .addFragment("../shaders/out/light.frag.spv"),
-        .renderPass = renderPass,
-        .extent = extent,
-        .polygoneMode = VK_POLYGON_MODE_FILL,
-        // .cullMode = VK_CULL_MODE_BACK_BIT,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .descriptorSetLayouts = descriptorSetLayouts,
-        .pushConstantsStages = 0,
-        .pushConstantsSizeBytes = 0,
-        .tessellationPatchPoints = 0,
-        .lineWidth = 1.0f,
-        .colorAttachmentCount = 2,
-        .withBlending = true,
-    };
+std::vector<std::unique_ptr<HmlPipeline>> HmlLightRenderer::createPipelines(
+        std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
+    std::vector<std::unique_ptr<HmlPipeline>> pipelines;
 
-    return HmlPipeline::createGraphics(hmlDevice, std::move(config));
+    {
+        HmlGraphicsPipelineConfig config{
+            .bindingDescriptions   = {},
+            .attributeDescriptions = {},
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .hmlShaders = HmlShaders()
+                .addVertex("../shaders/out/light.vert.spv")
+                .addFragment("../shaders/out/light.frag.spv"),
+            .renderPass = hmlRenderPass->renderPass,
+            .extent = hmlRenderPass->extent,
+            .polygoneMode = VK_POLYGON_MODE_FILL,
+            // .cullMode = VK_CULL_MODE_BACK_BIT,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .descriptorSetLayouts = descriptorSetLayouts,
+            .pushConstantsStages = 0,
+            .pushConstantsSizeBytes = 0,
+            .tessellationPatchPoints = 0,
+            .lineWidth = 1.0f,
+            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+            .withBlending = true,
+        };
+
+        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+    }
+
+    return pipelines;
 }
 
 
 std::unique_ptr<HmlLightRenderer> HmlLightRenderer::create(
-        std::shared_ptr<HmlWindow> hmlWindow,
-        std::shared_ptr<HmlDevice> hmlDevice,
-        std::shared_ptr<HmlCommands> hmlCommands,
-        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-        std::shared_ptr<HmlResourceManager> hmlResourceManager,
-        std::shared_ptr<HmlDescriptors> hmlDescriptors,
+        std::shared_ptr<HmlContext> hmlContext,
         VkDescriptorSetLayout viewProjDescriptorSetLayout,
         const std::vector<VkDescriptorSet>& generalDescriptorSet_0_perImage) noexcept {
     auto hmlRenderer = std::make_unique<HmlLightRenderer>();
-    hmlRenderer->hmlWindow = hmlWindow;
-    hmlRenderer->hmlDevice = hmlDevice;
-    hmlRenderer->hmlCommands = hmlCommands;
-    // hmlRenderer->hmlRenderPass = hmlRenderPass;
-    hmlRenderer->hmlResourceManager = hmlResourceManager;
-    hmlRenderer->hmlDescriptors = hmlDescriptors;
+    hmlRenderer->hmlContext = hmlContext;
 
     hmlRenderer->descriptorSet_0_perImage = generalDescriptorSet_0_perImage;
 
@@ -55,8 +51,8 @@ std::unique_ptr<HmlLightRenderer> HmlLightRenderer::create(
     //     hmlRenderPass->extent, hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
     // if (!hmlRenderer->hmlPipeline) return { nullptr };
 
-    const auto imageCount = generalDescriptorSet_0_perImage.size();
-    hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(imageCount, hmlCommands->commandPoolGeneralResettable);
+    // const auto imageCount = generalDescriptorSet_0_perImage.size();
+    // hmlRenderer->commandBuffers = hmlCommands->allocateSecondary(imageCount, hmlCommands->commandPoolGeneralResettable);
 
     return hmlRenderer;
 }
@@ -85,7 +81,7 @@ void HmlLightRenderer::specify(uint32_t count) noexcept {
 
 void HmlLightRenderer::bake() noexcept {
     for (size_t imageIndex = 0; imageIndex < descriptorSet_0_perImage.size(); imageIndex++) {
-        auto commandBuffer = commandBuffers[imageIndex];
+        auto commandBuffer = getCurrentCommands()[imageIndex];
         const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
             .pNext = VK_NULL_HANDLE,
@@ -96,9 +92,10 @@ void HmlLightRenderer::bake() noexcept {
             .queryFlags = static_cast<VkQueryControlFlags>(0),
             .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
         };
-        hmlCommands->beginRecordingSecondary(commandBuffer, &inheritanceInfo);
+        hmlContext->hmlCommands->beginRecordingSecondary(commandBuffer, &inheritanceInfo);
 
-        const auto& hmlPipeline = getCurrentPipeline();
+        assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlLightRenderer.\n");
+        const auto& hmlPipeline = getCurrentPipelines()[0];
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
         std::array<VkDescriptorSet, 1> descriptorSets = {
@@ -113,20 +110,30 @@ void HmlLightRenderer::bake() noexcept {
         const uint32_t firstVertex = 0;
         vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
-        hmlCommands->endRecording(commandBuffer);
+        hmlContext->hmlCommands->endRecording(commandBuffer);
     }
 }
 
 
 VkCommandBuffer HmlLightRenderer::draw(const HmlFrameData& frameData) noexcept {
-    return commandBuffers[frameData.imageIndex];
+    return getCurrentCommands()[frameData.imageIndex];
 }
 
 
-// void HmlLightRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-//     hmlRenderPass = newHmlRenderPass;
-//     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
-//     bake();
-//     // NOTE The command pool is reset for all renderers prior to calling this function.
-//     // NOTE commandBuffers must be rerecorded -- is done during baking
-// }
+void HmlLightRenderer::addRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
+    if (pipelineForRenderPassStorage.size() > 0) {
+        std::cerr << "::> Adding more than one HmlRenderPass for HmlLightRenderer.\n";
+        return;
+    }
+    currentRenderPass = newHmlRenderPass;
+
+    auto hmlPipelines = createPipelines(newHmlRenderPass, descriptorSetLayouts);
+    pipelineForRenderPassStorage.emplace_back(newHmlRenderPass, std::move(hmlPipelines));
+
+    const auto count = hmlContext->imageCount();
+    const auto pool = hmlContext->hmlCommands->commandPoolGeneralResettable;
+    auto commands = hmlContext->hmlCommands->allocateSecondary(count, pool);
+    commandBuffersForRenderPass.push_back(std::move(commands));
+
+    bake();
+}

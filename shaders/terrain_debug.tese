@@ -11,7 +11,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     vec4 fogColor_density;
     vec3 cameraPos;
 } ubo;
-const float fogGradient = 2.0;
+/* const float fogGradient = 2.0; */
 
 // XXX Sync with other shaders
 // Per patch
@@ -52,6 +52,7 @@ void main() {
     float hR = texture(heightmap, t + d.xy).r;
     float hD = texture(heightmap, t - d.yx).r;
     float hU = texture(heightmap, t + d.yx).r;
+    // NOTE will be normalized in FragmentShader
     vec3 normal = normalize(vec3(hL - hR, 16.0 * unit, hD - hU));
 
     gl_Position = v0;

@@ -51,6 +51,9 @@ struct HmlRenderPass {
     VkExtent2D extent;
 
 
+    uint32_t colorAttachmentCount;
+
+
     void begin(VkCommandBuffer commandBuffer, uint32_t imageIndex) const noexcept;
     void end(VkCommandBuffer commandBuffer) const noexcept;
     static std::unique_ptr<HmlRenderPass> create(

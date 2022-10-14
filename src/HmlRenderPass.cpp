@@ -133,6 +133,7 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
     hmlRenderPass->hmlCommands = hmlCommands;
     hmlRenderPass->renderPass = renderPass;
     hmlRenderPass->extent = config.extent;
+    hmlRenderPass->colorAttachmentCount = config.colorAttachments.size();
 
     if (config.depthStencilAttachment) {
         // NOTE In order to make sure the depth resource is not destroyed before we are finished

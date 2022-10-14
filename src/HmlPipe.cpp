@@ -1,84 +1,69 @@
 #include "HmlPipe.h"
 
 
-void HmlPipe::addStage(
+bool HmlPipe::addStage(
         std::vector<std::shared_ptr<HmlDrawer>>&& drawers,
         std::vector<HmlRenderPass::ColorAttachment>&& colorAttachments,
         std::optional<HmlRenderPass::DepthStencilAttachment> depthAttachment,
         std::vector<HmlTransitionRequest>&& postTransitions,
         std::optional<std::function<void(uint32_t)>> postFunc
         ) noexcept {
+    std::shared_ptr<HmlRenderPass> hmlRenderPass = HmlRenderPass::create(hmlContext->hmlDevice, hmlContext->hmlCommands, HmlRenderPass::Config{
+        .colorAttachments = std::move(colorAttachments),
+        .depthStencilAttachment = depthAttachment,
+        .extent = hmlContext->hmlSwapchain->extent,
+    });
+
+    if (!hmlRenderPass) {
+        std::cerr << "::> Failed to create a HmlRenderPass for stage #" << stages.size() << ".\n";
+        return false;
+    }
+
+
+    // NOTE This is done here to allow HmlDrawer re-configuration in-between addStages
+    for (auto& drawer : drawers) {
+        if (!clearedDrawers.contains(drawer)) {
+            clearedDrawers.insert(drawer);
+            drawer->clearRenderPasses();
+        }
+        drawer->addRenderPass(hmlRenderPass);
+    }
+
+    const auto count = hmlContext->hmlSwapchain->imageCount();
+    const auto pool = hmlContext->hmlCommands->commandPoolOnetimeFrames;
     stages.push_back(HmlStage{
         .drawers = std::move(drawers),
-        .commandBuffers = hmlCommands->allocatePrimary(hmlSwapchain->imageCount(), hmlCommands->commandPoolOnetimeFrames),
-        .renderPass = HmlRenderPass::create(hmlDevice, hmlCommands, HmlRenderPass::Config{
-            .colorAttachments = std::move(colorAttachments),
-            .depthStencilAttachment = depthAttachment,
-            .extent = hmlSwapchain->extent,
-        }),
+        .commandBuffers = hmlContext->hmlCommands->allocatePrimary(count, pool),
+        .renderPass = hmlRenderPass,
         .postTransitions = std::move(postTransitions),
         .postFunc = postFunc,
     });
+
+    // We need (stagesCount - 1) batches of semaphores, so skip the first one
+    if (stages.size() == 1) return true;
+    return addSemaphoresForNewStage();
 }
 
 
-bool HmlPipe::verify() const noexcept {
-    for (size_t i = 0; i < stages.size(); i++) {
-        if (!stages[i].renderPass) {
-            std::cerr << "::> Failed to create a HmlRenderPass for stage #" << i << ".\n";
+bool HmlPipe::addSemaphoresForNewStage() noexcept {
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    const size_t addCount = hmlContext->framesInFlight();
+    semaphoresForFrames.resize(semaphoresForFrames.size() + addCount);
+
+    for (auto it = semaphoresForFrames.end() - addCount; it != semaphoresForFrames.end(); ++it) {
+        if (vkCreateSemaphore(hmlContext->hmlDevice->device, &semaphoreInfo, nullptr, &*it) != VK_SUCCESS) {
+            std::cerr << "::> Failed to create a VkSemaphore for HmlPipe.\n";
             return false;
         }
     }
-    return true;
-}
 
-
-void HmlPipe::assignRenderPasses() noexcept {
-    for (const auto& stage : stages) {
-        for (const auto& drawer : stage.drawers) {
-            drawer->clearRenderPasses();
-        }
-    }
-
-    for (const auto& stage : stages) {
-        for (const auto& drawer : stage.drawers) {
-            drawer->addRenderPass(stage.renderPass);
-        }
-    }
-}
-
-
-bool HmlPipe::createSemaphores(uint32_t maxFramesInFlight) noexcept {
-    VkSemaphoreCreateInfo semaphoreInfo = {};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    for (uint32_t frame = 0; frame < maxFramesInFlight; frame++) {
-        std::vector<VkSemaphore> semaphores(stages.size() - 1);
-        for (size_t stage = 0; stage < stages.size() - 1; stage++) {
-            if (vkCreateSemaphore(hmlDevice->device, &semaphoreInfo, nullptr, &semaphores[stage]) != VK_SUCCESS) {
-                std::cerr << "::> Failed to create a VkSemaphore for HmlPipe.\n";
-                return false;
-            }
-        }
-        semaphoresPerFrame.push_back(std::move(semaphores));
-    }
-    return true;
-}
-
-
-bool HmlPipe::bake(uint32_t maxFramesInFlight) noexcept {
-    if (!verify()) {
-        std::cerr << "::> Not all stages have HmlRenderPass inside HmlPipe.\n";
-        return false;
-    }
-    assignRenderPasses();
-    if (!createSemaphores(maxFramesInFlight)) return false;
     return true;
 }
 
 
 void HmlPipe::run(const HmlFrameData& frameData) noexcept {
-    const auto& semaphoresFinishedStage = semaphoresPerFrame[frameData.frameIndex];
-
     for (size_t stageIndex = 0; stageIndex < stages.size(); stageIndex++) {
         const auto& stage = stages[stageIndex];
         const bool firstStage = stageIndex == 0;
@@ -101,8 +86,10 @@ void HmlPipe::run(const HmlFrameData& frameData) noexcept {
 
 
             VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-            VkSemaphore waitSemaphores[]   = { firstStage ? imageAvailableSemaphores[frameData.frameIndex] : semaphoresFinishedStage[stageIndex - 1] };
-            VkSemaphore signalSemaphores[] = { lastStage  ? renderFinishedSemaphores[frameData.frameIndex] : semaphoresFinishedStage[stageIndex] };
+            VkSemaphore waitSemaphores[]   = { firstStage ?
+                imageAvailableSemaphores[frameData.frameIndex] : semaphoreFinishedStageOfFrame(stageIndex - 1, frameData.frameIndex) };
+            VkSemaphore signalSemaphores[] = { lastStage  ?
+                renderFinishedSemaphores[frameData.frameIndex] : semaphoreFinishedStageOfFrame(stageIndex,     frameData.frameIndex) };
 
             VkSubmitInfo submitInfo{
                 .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -119,21 +106,21 @@ void HmlPipe::run(const HmlFrameData& frameData) noexcept {
             VkFence signalFence = VK_NULL_HANDLE;
             if (lastStage) {
                 // The specified fence will get signaled when the command buffer finishes executing.
-                vkResetFences(hmlDevice->device, 1, &inFlightFences[frameData.frameIndex]);
+                vkResetFences(hmlContext->hmlDevice->device, 1, &inFlightFences[frameData.frameIndex]);
                 signalFence = inFlightFences[frameData.frameIndex];
             }
-            if (vkQueueSubmit(hmlDevice->graphicsQueue, 1, &submitInfo, signalFence) != VK_SUCCESS) {
+            if (vkQueueSubmit(hmlContext->hmlDevice->graphicsQueue, 1, &submitInfo, signalFence) != VK_SUCCESS) {
                 std::cerr << "::> Failed to submit draw command buffer.\n";
                 return;
             }
         }
         // ============== Post-stage transitions
         {
-            const auto commandBuffer = hmlCommands->beginLongTermSingleTimeCommand();
+            const auto commandBuffer = hmlContext->hmlCommands->beginLongTermSingleTimeCommand();
             for (const auto& transition : stage.postTransitions) {
                 transition.resourcePerImage[frameData.imageIndex]->transitionLayoutTo(transition.dstLayout, commandBuffer);
             }
-            hmlCommands->endLongTermSingleTimeCommand(commandBuffer);
+            hmlContext->hmlCommands->endLongTermSingleTimeCommand(commandBuffer);
         }
         // ============== Post-stage funcs
         if (stage.postFunc) (*stage.postFunc)(frameData.imageIndex);

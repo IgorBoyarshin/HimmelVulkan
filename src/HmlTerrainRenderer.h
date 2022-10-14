@@ -64,12 +64,7 @@ struct HmlTerrainRenderer : HmlDrawer {
     };
     Bounds bounds;
 
-    std::shared_ptr<HmlWindow> hmlWindow;
-    // std::shared_ptr<HmlDevice> hmlDevice;
-    std::shared_ptr<HmlCommands> hmlCommands;
-    // std::shared_ptr<HmlRenderPass> hmlRenderPass;
-    std::shared_ptr<HmlResourceManager> hmlResourceManager;
-    std::shared_ptr<HmlDescriptors> hmlDescriptors;
+
     // std::unique_ptr<HmlPipeline> hmlPipeline;
     // std::unique_ptr<HmlPipeline> hmlPipelineDebug;
 
@@ -79,27 +74,24 @@ struct HmlTerrainRenderer : HmlDrawer {
     std::vector<VkDescriptorSetLayout> descriptorSetLayoutsSelf;
 
 
-    std::vector<VkCommandBuffer> commandBuffers;
-
     std::unique_ptr<HmlImageResource> heightmapTexture;
     std::unique_ptr<HmlImageResource> grassTexture;
 
+    // static constexpr size_t PIPELINE_REGULAR_INDEX = 0;
+    // static constexpr size_t PIPELINE_DEBUG_INDEX   = 1;
+    // static constexpr size_t PIPELINE_COUNT         = 2;
+    bool modeDebug = false;
 
-    std::unique_ptr<HmlPipeline> createPipeline(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-            VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
-    // static std::unique_ptr<HmlPipeline> createPipelineDebug(std::shared_ptr<HmlDevice> hmlDevice, VkExtent2D extent,
-    //         VkRenderPass renderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept;
+    inline void setModeDebug(bool debug) noexcept { modeDebug = debug; }
+
+    std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
+            std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlTerrainRenderer> create(
             const char* heightmapFilename,
             uint32_t granularity,
             const char* grassFilename,
             const Bounds& bounds,
-            std::shared_ptr<HmlWindow> hmlWindow,
-            std::shared_ptr<HmlDevice> hmlDevice,
-            std::shared_ptr<HmlCommands> hmlCommands,
-            // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-            std::shared_ptr<HmlResourceManager> hmlResourceManager,
-            std::shared_ptr<HmlDescriptors> hmlDescriptors,
+            std::shared_ptr<HmlContext> hmlContext,
             VkDescriptorSetLayout viewProjDescriptorSetLayout,
             uint32_t imageCount,
             uint32_t framesInFlight) noexcept;
@@ -107,7 +99,7 @@ struct HmlTerrainRenderer : HmlDrawer {
     void constructTree(SubTerrain& subTerrain, const glm::vec3& cameraPos) const noexcept;
     void update(const glm::vec3& cameraPos) noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
-    // void replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override;
+    void addRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept override;
 };
 
 #endif

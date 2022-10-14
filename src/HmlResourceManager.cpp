@@ -114,7 +114,7 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createStorageBuffer(VkDeviceSize 
 }
 
 
-std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const char* fileName, VkFilter filter) noexcept {
+std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const char* fileName, VkFormat format, VkFilter filter) noexcept {
     // ======== Load data and store it in a staging buffer
     int width, height, channels;
     // NOTE Will force alpha even if it is not present
@@ -134,7 +134,6 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const c
     // ======== Create the image resource
     const VkExtent2D            extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
     const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    const VkFormat              format = VK_FORMAT_R8G8B8A8_SRGB;
     const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     auto resource = newBlankImageResource(extent, format, usage, aspect);
 
@@ -230,7 +229,7 @@ std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* verti
     auto model = std::make_shared<HmlModelResource>();
     model->hmlDevice = hmlDevice;
     model->indicesCount = indices.size();
-    model->textureResource = newTextureResource(textureFileName, filter);
+    model->textureResource = newTextureResource(textureFileName, VK_FORMAT_R8G8B8A8_SRGB, filter);
 
     createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
     createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);

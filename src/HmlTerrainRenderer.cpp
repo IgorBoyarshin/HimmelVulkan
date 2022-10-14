@@ -93,8 +93,8 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
     hmlRenderer->hmlContext = hmlContext;
 
     hmlRenderer->bounds = bounds;
-    hmlRenderer->heightmapTexture = hmlContext->hmlResourceManager->newTextureResource(heightmapFilename, VK_FILTER_LINEAR);
-    hmlRenderer->grassTexture = hmlContext->hmlResourceManager->newTextureResource(grassFilename, VK_FILTER_LINEAR);
+    hmlRenderer->heightmapTexture = hmlContext->hmlResourceManager->newTextureResource(heightmapFilename, VK_FORMAT_R8G8B8A8_UNORM, VK_FILTER_LINEAR);
+    hmlRenderer->grassTexture = hmlContext->hmlResourceManager->newTextureResource(grassFilename, VK_FORMAT_R8G8B8A8_SRGB, VK_FILTER_LINEAR);
     hmlRenderer->granularity = granularity;
 
     {

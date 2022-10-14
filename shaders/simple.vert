@@ -18,7 +18,7 @@ struct PointLight {
 };
 
 // XXX Sync across all shaders
-const uint MAX_POINT_LIGHTS = 32;
+const uint MAX_POINT_LIGHTS = 64; // XXX sync with Himmel.h::LightUbo
 layout(set = 0, binding = 1) uniform LightsUbo {
     PointLight pointLights[MAX_POINT_LIGHTS];
     uint count;

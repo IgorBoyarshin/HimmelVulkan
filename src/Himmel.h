@@ -42,6 +42,7 @@ struct Himmel {
         using Coord = std::pair<size_t, size_t>;
 
         Coord heightmapSize;
+        // As per stbi: y rows, x pixels each
         std::vector<std::vector<float>> heightmap;
 
         inline World(const glm::vec2& start, const glm::vec2& finish, float height, const char* heightmapFilepath)
@@ -56,11 +57,13 @@ struct Himmel {
             heightmapSize = { mapWidth, mapHeight };
 
             size_t i = 0;
-            heightmap.reserve(mapWidth);
-            for (size_t x = 0; x < static_cast<size_t>(mapWidth); x++) {
-                std::vector<float> column(mapHeight);
-                for (size_t y = 0; y < static_cast<size_t>(mapHeight); y++) column[y] = static_cast<float>(pixels[i++]) / 255.0f * height;
-                heightmap.push_back(std::move(column));
+            heightmap.reserve(mapHeight);
+            for (size_t y = 0; y < static_cast<size_t>(mapHeight); y++) {
+                std::vector<float> row(mapWidth);
+                for (size_t x = 0; x < static_cast<size_t>(mapWidth); x++) {
+                    row[x] = static_cast<float>(pixels[i++]) / 255.0f * height;
+                }
+                heightmap.push_back(std::move(row));
             }
 
             stbi_image_free(pixels);
@@ -75,27 +78,11 @@ struct Himmel {
             const auto mapPosFloor = glm::vec2(std::floor(mapPos.x), std::floor(mapPos.y));
             const Coord mapCoordFloor{ static_cast<size_t>(mapPosFloor.x), static_cast<size_t>(mapPosFloor.y) };
             const auto t = mapPos - mapPosFloor;
-            return heightAtCoordWithT(mapCoordFloor, t);
-
-            // const glm::vec2 floorPos(std::floor(mapPos.x), std::floor(mapPos.y));
-            // const glm::vec2 ceilPos(std::ceil(mapPos.x), std::ceil(mapPos.y));
-            // const glm::vec2 ratio(
-            //     std::clamp(mapPos.x - static_cast<int>(mapPos.x), 0.0f, 1.0f),
-            //     std::clamp(mapPos.y - static_cast<int>(mapPos.y), 0.0f, 1.0f));
-            // const float floor = heightmap[floorPos.x][floorPos.y];
-            // const float ceil = heightmap[ceilPos.x][ceilPos.y];
-            // return glm::mix(floor, ceil, ratio);
+            const auto res = heightAtCoordWithT(mapCoordFloor, t);
+            return res;
         }
 
         private:
-        // inline Coord toCoord(const glm::vec2& pos) const noexcept {
-        //     return {
-        //         std::clamp(static_cast<size_t>(pos.x), 0, heightmapSize.first - 1),
-        //         std::clamp(static_cast<size_t>(pos.y), 0, heightmapSize.second - 1)
-        //     };
-        // }
-
-
         // Coord is [0..size-2]
         // t is [0..1)
         inline float heightAtCoordWithT(Coord coord, glm::vec2 t) const noexcept {
@@ -111,11 +98,10 @@ struct Himmel {
             const size_t y = std::clamp(coord.second, 0ul, heightmapSize.second - 2);
             t = glm::clamp(t, {0.0f, 0.0f}, {1.0f, 1.0f});
 
-            const auto bottomLeftHeight  = heightmap[x    ][y];
-            const auto bottomRightHeight = heightmap[x + 1][y];
-            const auto topLeftHeight     = heightmap[x    ][y + 1];
-            const auto topRightHeight    = heightmap[x + 1][y + 1];
-            std::cout << "BL;BR;TL;TR = " << bottomLeftHeight << ' ' << bottomRightHeight << ' ' << topLeftHeight << ' ' << topRightHeight << '\n';
+            const auto bottomLeftHeight  = heightmap[y    ][x];
+            const auto bottomRightHeight = heightmap[y    ][x + 1];
+            const auto topLeftHeight     = heightmap[y + 1][x    ];
+            const auto topRightHeight    = heightmap[y + 1][x + 1];
             if (t.x + t.y < 1.0f) { // bottom-left triangle
                 const auto diffX = bottomRightHeight - bottomLeftHeight;
                 const auto diffY = topLeftHeight - bottomLeftHeight;
@@ -168,7 +154,6 @@ struct Himmel {
         }
         void setHeight(float height) {
             cachedViewValid = false;
-            std::cout << "H = " << height << '\n';
             posCenter.y = height;
         }
 
@@ -177,10 +162,12 @@ struct Himmel {
                 cachedViewValid = true;
 
                 cachedView = glm::mat4(1.0f);
-                cachedView = glm::scale(cachedView, glm::vec3{sizeScaler, sizeScaler, sizeScaler});
                 cachedView = glm::translate(cachedView, posCenter);
-                // XXX fix model 90-degree rotation
+                cachedView = glm::scale(cachedView, glm::vec3{sizeScaler, sizeScaler, sizeScaler});
+                // NOTE fix model 90-degree rotation
                 cachedView = glm::rotate(cachedView, glm::radians(-90.0f), glm::vec3{0, 1, 0});
+                // NOTE fix move up
+                cachedView = glm::translate(cachedView, glm::vec3{0.0f, 1.0f, 0.0f});
             }
 
             return cachedView;
@@ -208,8 +195,9 @@ struct Himmel {
     std::vector<HmlLightRenderer::PointLight> pointLightsStatic;
     std::vector<HmlLightRenderer::PointLight> pointLightsDynamic;
 
+    static constexpr size_t MAX_POINT_LIGHTS = 64; // XXX sync with all shaders
     struct LightUbo {
-        std::array<HmlLightRenderer::PointLight, 32> pointLights;
+        std::array<HmlLightRenderer::PointLight, MAX_POINT_LIGHTS> pointLights;
         uint32_t count;
     };
 

@@ -79,12 +79,15 @@ bool Himmel::init() noexcept {
 
 
     weather = Weather{
-        // Night:
-        // .fogColor = glm::vec3(0.0, 0.0, 0.0),
-        // .fogDensity = -1.0f,
+#if 1
+        // Night (no fog):
+        .fogColor = glm::vec3(0.0, 0.0, 0.0),
+        .fogDensity = -1.0f,
+#else
         // Day:
         .fogColor = glm::vec3(0.8f, 0.8f, 0.8f),
         .fogDensity = 0.011,
+#endif
     };
 
 
@@ -145,11 +148,12 @@ bool Himmel::init() noexcept {
 
     // Add lights
     const float LIGHT_RADIUS = 2.0f;
-    for (size_t i = 0; i < 20; i++) {
+    const size_t lightsCount = 20;
+    for (size_t i = 0; i < lightsCount; i++) {
         const auto pos = glm::vec3(
             hml::getRandomUniformFloat(world->start.x, world->finish.x),
             hml::getRandomUniformFloat(world->height/2.0f, world->height),
-            hml::getRandomUniformFloat(world->finish.y, world->finish.y)
+            hml::getRandomUniformFloat(world->start.y, world->finish.y)
         );
         const auto color = glm::vec3(
             hml::getRandomUniformFloat(0.0f, 1.0f),
@@ -158,7 +162,7 @@ bool Himmel::init() noexcept {
         );
         pointLightsStatic.push_back(HmlLightRenderer::PointLight{
             .color = color,
-            .intensity = 4000.0f,
+            .intensity = 5000.0f,
             .position = pos,
             .radius = LIGHT_RADIUS,
         });
@@ -389,7 +393,8 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_UP)    == GLFW_PRESS) { car->moveForward(carDistance); }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_DOWN)  == GLFW_PRESS) { car->moveForward(-carDistance); }
         if (!car->cachedViewValid) {
-            const auto worldHeight = world->heightAt(glm::vec2{car->posCenter});
+            const auto carPos = glm::vec2{car->posCenter.x, car->posCenter.z};
+            const auto worldHeight = world->heightAt(carPos);
             car->setHeight(worldHeight);
 
             // XXX We rely on the Car to be the last Entity here XXX
@@ -409,7 +414,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     }
 
 
-    hmlSnowRenderer->updateForDt(dt, sinceStart);
+    // hmlSnowRenderer->updateForDt(dt, sinceStart);
     hmlTerrainRenderer->update(camera.getPos());
 }
 
@@ -426,21 +431,25 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
     };
     viewProjUniformBuffers[imageIndex]->update(&generalUbo);
 
-    LightUbo lightUbo;
-    size_t count = 0;
-    for (const auto& light : pointLightsStatic)  lightUbo.pointLights[count++] = light;
-    for (const auto& light : pointLightsDynamic) lightUbo.pointLights[count++] = light;
-    lightUbo.count = count;
-    // Sort to enable proper transparency
-    std::sort(lightUbo.pointLights.begin(), lightUbo.pointLights.begin() + count,
-            [cameraPos = camera.getPos()](const auto& l1, const auto& l2){
-        const auto v1 = cameraPos - l1.position;
-        const auto v2 = cameraPos - l2.position;
-        return glm::dot(v1, v1) > glm::dot(v2, v2);
-    });
-    lightUniformBuffers[imageIndex]->update(&lightUbo);
+    {
+        const auto lightsCount = pointLightsStatic.size() + pointLightsDynamic.size();
+        assert(lightsCount <= MAX_POINT_LIGHTS && "::> Reserved std::array size in LightUbo for lights count exceeded.\n");
+        LightUbo lightUbo;
+        lightUbo.count = lightsCount;
+        size_t i = 0;
+        for (const auto& light : pointLightsStatic)  lightUbo.pointLights[i++] = light;
+        for (const auto& light : pointLightsDynamic) lightUbo.pointLights[i++] = light;
+        // Sort to enable proper transparency
+        std::sort(lightUbo.pointLights.begin(), lightUbo.pointLights.begin() + lightsCount,
+                [cameraPos = camera.getPos()](const auto& l1, const auto& l2){
+                const auto v1 = cameraPos - l1.position;
+                const auto v2 = cameraPos - l2.position;
+                return glm::dot(v1, v1) > glm::dot(v2, v2);
+                });
+        lightUniformBuffers[imageIndex]->update(&lightUbo);
+    }
 
-    hmlSnowRenderer->updateForImage(imageIndex);
+    // hmlSnowRenderer->updateForImage(imageIndex);
 }
 
 
@@ -645,9 +654,10 @@ bool Himmel::prepareResources() noexcept {
         std::nullopt // post func
     );
     // Renders on top of the deferred texture using the depth info from the prep pass
-    hmlTerrainRenderer->setModeDebug(true);
+    // hmlTerrainRenderer->setModeDebug(true);
     allGood &= hmlPipe->addStage( // forward
-        { hmlSnowRenderer, hmlLightRenderer, hmlTerrainRenderer },
+        // { hmlSnowRenderer, hmlLightRenderer, hmlTerrainRenderer },
+        { hmlLightRenderer },
         { // output color attachments
             HmlRenderPass::ColorAttachment{
                 .imageFormat = mainTextures[0]->format,

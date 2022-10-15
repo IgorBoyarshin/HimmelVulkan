@@ -1,6 +1,10 @@
 #include "Himmel.h"
 
 
+#define SNOW_IS_ON    1
+#define DEBUG_TERRAIN 1
+
+
 bool Himmel::init() noexcept {
     const char* windowName = "Planes game";
 
@@ -120,18 +124,20 @@ bool Himmel::init() noexcept {
 
 
     {
-        const auto carPos = glm::vec3{0.0f, 25.0f, 0.0f};
+        const auto carPos = glm::vec3{0.0f, 35.0f, 0.0f};
         const auto carSizeScaler = 0.5f;
         car = std::make_unique<Car>(carPos, carSizeScaler);
     }
 
 
+#if SNOW_IS_ON
     const auto snowCount = 400000;
     const auto sizeSnow = world->height;
     const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ sizeSnow };
     hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlContext,
             generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
     if (!hmlSnowRenderer) return false;
+#endif
 
 
     const auto terrainBounds = HmlTerrainRenderer::Bounds{
@@ -193,7 +199,7 @@ bool Himmel::init() noexcept {
     hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
 
-    camera = HmlCamera{{ 25.0f, 30.0f, 35.0f }};
+    camera = HmlCamera{{ 25.0f, 40.0f, 35.0f }};
     camera.rotateDir(-15.0f, -40.0f);
     cursor = hmlContext->hmlWindow->getCursor();
     proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
@@ -274,18 +280,18 @@ bool Himmel::init() noexcept {
         entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, -50.0f, 0.0f});
 
         entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
-        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 25.0f, 30.0f});
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 30.0f});
 
         entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.8f, 0.2f, 0.5f }));
-        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 60.0f});
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 60.0f});
 
         entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.2f, 0.2f, 0.9f }));
-        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 25.0f, 90.0f});
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 90.0f});
 
         entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
         entities.back()->modelMatrix = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0, 10.0, 10.0)), glm::vec3{40.0f, 30.0f, 70.0f});
 
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(carModel, glm::vec3{ 0.2f, 0.7f, 0.0f }));
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(carModel, glm::vec3{ 0.2f, 0.7f, 0.4f }));
         entities.back()->modelMatrix = car->getView();
 
         hmlRenderer->specifyEntitiesToRender(entities);
@@ -414,7 +420,9 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     }
 
 
-    // hmlSnowRenderer->updateForDt(dt, sinceStart);
+#if SNOW_IS_ON
+    hmlSnowRenderer->updateForDt(dt, sinceStart);
+#endif
     hmlTerrainRenderer->update(camera.getPos());
 }
 
@@ -449,7 +457,9 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         lightUniformBuffers[imageIndex]->update(&lightUbo);
     }
 
-    // hmlSnowRenderer->updateForImage(imageIndex);
+#if SNOW_IS_ON
+    hmlSnowRenderer->updateForImage(imageIndex);
+#endif
 }
 
 
@@ -654,10 +664,19 @@ bool Himmel::prepareResources() noexcept {
         std::nullopt // post func
     );
     // Renders on top of the deferred texture using the depth info from the prep pass
-    // hmlTerrainRenderer->setModeDebug(true);
+#if DEBUG_TERRAIN
+    hmlTerrainRenderer->setModeDebug(true);
+#endif
     allGood &= hmlPipe->addStage( // forward
-        // { hmlSnowRenderer, hmlLightRenderer, hmlTerrainRenderer },
-        { hmlLightRenderer },
+        {
+#if SNOW_IS_ON
+            hmlSnowRenderer,
+#endif
+            hmlLightRenderer
+#if DEBUG_TERRAIN
+            , hmlTerrainRenderer
+#endif
+        },
         { // output color attachments
             HmlRenderPass::ColorAttachment{
                 .imageFormat = mainTextures[0]->format,

@@ -114,17 +114,17 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createStorageBuffer(VkDeviceSize 
 }
 
 
-std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const char* fileName, VkFormat format, VkFilter filter) noexcept {
+std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const char* fileName, uint32_t componentsCount, VkFormat format, VkFilter filter) noexcept {
     // ======== Load data and store it in a staging buffer
     int width, height, channels;
     // NOTE Will force alpha even if it is not present
-    stbi_uc* pixels = stbi_load(fileName, &width, &height, &channels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load(fileName, &width, &height, &channels, componentsCount);
     if (!pixels) {
         std::cerr << "::> Failed to load texture image using stb library: " << fileName << ".\n";
         return { nullptr };
     }
 
-    auto stagingBuffer = createStagingBuffer(width * height * 4);
+    auto stagingBuffer = createStagingBuffer(width * height * componentsCount);
     stagingBuffer->map();
     stagingBuffer->update(pixels);
     stagingBuffer->unmap();
@@ -229,7 +229,7 @@ std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* verti
     auto model = std::make_shared<HmlModelResource>();
     model->hmlDevice = hmlDevice;
     model->indicesCount = indices.size();
-    model->textureResource = newTextureResource(textureFileName, VK_FORMAT_R8G8B8A8_SRGB, filter);
+    model->textureResource = newTextureResource(textureFileName, 4, VK_FORMAT_R8G8B8A8_SRGB, filter);
 
     createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
     createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);

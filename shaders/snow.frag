@@ -11,7 +11,7 @@ layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outBloom;
 
 void main() {
-    outColor = texture(texSamplers[textureIndex], fragTexCoord);
+    outColor = texture(texSamplers[textureIndex], fragTexCoord).rrrr;
     outBloom = vec4(0.0);
     if (outColor.a < 0.1) discard;
     if (outColor.r < 0.1) discard;

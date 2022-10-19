@@ -10,6 +10,7 @@
 #include "HmlContext.h"
 #include "HmlRenderPass.h"
 #include "renderer.h"
+#include "settings.h"
 
 
 struct HmlPipe {

@@ -1,8 +1,8 @@
 #include "Himmel.h"
 
 
-#define SNOW_IS_ON    1
-#define DEBUG_TERRAIN 1
+#define SNOW_IS_ON    0
+#define DEBUG_TERRAIN 0
 
 
 bool Himmel::init() noexcept {
@@ -95,6 +95,7 @@ bool Himmel::init() noexcept {
     };
 
 
+    // TODO nocheckin redundant because they already have context with swapchain
     const uint32_t imagesCount = hmlContext->hmlSwapchain->imageCount();
 
     hmlRenderer = HmlRenderer::create(hmlContext, generalDescriptorSetLayout, maxFramesInFlight);
@@ -206,7 +207,7 @@ bool Himmel::init() noexcept {
 
 
     {
-        {
+        { // 2D plane of a girl picture
             std::vector<HmlSimpleModel::Vertex> vertices;
             vertices.push_back(HmlSimpleModel::Vertex{
                 .pos = {-0.5f, -0.5f, 0.0f},
@@ -236,7 +237,7 @@ bool Himmel::init() noexcept {
             models.push_back(model);
         }
 
-        {
+        { // A viking kitchen box
             std::vector<HmlSimpleModel::Vertex> vertices;
             std::vector<uint32_t> indices;
             if (!HmlSimpleModel::load("../models/viking_room.obj", vertices, indices)) return false;
@@ -247,7 +248,7 @@ bool Himmel::init() noexcept {
             models.push_back(model);
         }
 
-        {
+        { // Plane
             std::vector<HmlSimpleModel::Vertex> vertices;
             std::vector<uint32_t> indices;
             if (!HmlSimpleModel::load("../models/plane.obj", vertices, indices)) return false;
@@ -257,7 +258,7 @@ bool Himmel::init() noexcept {
             models.push_back(model);
         }
 
-        {
+        { // Car
             std::vector<HmlSimpleModel::Vertex> vertices;
             std::vector<uint32_t> indices;
             if (!HmlSimpleModel::load("../models/my_car.obj", vertices, indices)) return false;
@@ -324,7 +325,7 @@ bool Himmel::run() noexcept {
 
         if (!drawFrame()) return false;
 
-#if LOG_DELTA
+#if LOG_FPS
         const auto fps = 1.0 / deltaSeconds;
         std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]"
             // << " Update = " << updateMs << "ms"

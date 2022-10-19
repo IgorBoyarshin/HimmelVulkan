@@ -6,6 +6,7 @@
 #include <vector>
 #include <cassert>
 
+#include "settings.h"
 #include "HmlDevice.h"
 
 

@@ -2,7 +2,9 @@
 #define HML_SETTINGS
 
 
-#define LOG_FPS 0
+#define LOG_FPS 1
+
+#define DEBUG 1
 
 
 #endif

@@ -111,6 +111,10 @@ void HmlPipe::run(const HmlFrameData& frameData) noexcept {
             }
             if (vkQueueSubmit(hmlContext->hmlDevice->graphicsQueue, 1, &submitInfo, signalFence) != VK_SUCCESS) {
                 std::cerr << "::> Failed to submit draw command buffer.\n";
+#if DEBUG
+                // To quickly crash the application and not wait for it to un-hang
+                exit(-1);
+#endif
                 return;
             }
         }

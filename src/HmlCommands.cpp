@@ -259,6 +259,10 @@ void HmlCommands::endLongTermSingleTimeCommand(VkCommandBuffer commandBuffer) no
     vkResetFences(hmlDevice->device, 1, &singleTimeCommandFences[i]);
     if (vkQueueSubmit(queue, 1, &submitInfo, singleTimeCommandFences[i]) != VK_SUCCESS) {
         std::cerr << "::> Failed to submit a long-term one-time command buffer.\n";
+#if DEBUG
+            // To quickly crash the application and not wait for it to un-hang
+            exit(-1);
+#endif
         return;
     }
 }
@@ -275,6 +279,10 @@ void HmlCommands::freeFinishedLongTermSingleTimeCommands() noexcept {
         if (result == VK_TIMEOUT) continue; // not signaled yet
         if (result != VK_SUCCESS) {
             std::cerr << "::> Unexpected result from VkWaitForFences.\n";
+#if DEBUG
+            // To quickly crash the application and not wait for it to un-hang
+            exit(-1);
+#endif
             continue;
         }
 

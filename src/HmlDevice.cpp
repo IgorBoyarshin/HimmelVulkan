@@ -89,7 +89,7 @@ VkInstance HmlDevice::createInstance(const char* applicationName) noexcept {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.apiVersion = VK_API_VERSION_1_1;
 
     VkInstanceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -421,8 +421,14 @@ VkDevice HmlDevice::createLogicalDevice(VkPhysicalDevice physicalDevice,
     deviceFeatures.geometryShader = VK_TRUE;
     deviceFeatures.wideLines = VK_TRUE;
 
+    // Shader draw parameters
+    VkPhysicalDeviceShaderDrawParametersFeatures shaderDrawParameterFeatures = {};
+    shaderDrawParameterFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
+    shaderDrawParameterFeatures.shaderDrawParameters = VK_TRUE;
+
     // VkDevice itself
     VkDeviceCreateInfo createInfo = {};
+    createInfo.pNext = &shaderDrawParameterFeatures;
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();

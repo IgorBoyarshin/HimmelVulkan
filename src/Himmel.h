@@ -265,6 +265,9 @@ struct Himmel {
     std::vector<std::shared_ptr<HmlModelResource>> models;
 
     std::vector<std::shared_ptr<HmlRenderer::Entity>> entities;
+    // NOTE Since it's really a bad performance thing to have an array of pointers,
+    // here we try to see if a basic approach works architecturally-wise.
+    std::vector<HmlRenderer::Entity> staticEntities;
 
     bool successfulInit = false;
 

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <cassert>
+#include <span>
 
 #include "HmlDevice.h"
 #include "HmlModel.h"
@@ -39,8 +40,7 @@ struct HmlDescriptorSetUpdater {
     HmlDescriptorSetUpdater& storageBufferAt(uint32_t binding, VkBuffer buffer, VkDeviceSize sizeBytes) noexcept;
     HmlDescriptorSetUpdater& uniformBufferAt(uint32_t binding, VkBuffer buffer, VkDeviceSize sizeBytes) noexcept;
     HmlDescriptorSetUpdater& textureAt(uint32_t binding, VkSampler textureSampler, VkImageView textureImageView) noexcept;
-    HmlDescriptorSetUpdater& textureArrayAt(uint32_t binding, const std::vector<VkSampler>& textureSamplers,
-            const std::vector<VkImageView>& textureImageViews) noexcept;
+    HmlDescriptorSetUpdater& textureArrayAt(uint32_t binding, std::span<const VkSampler> textureSamplers, std::span<const VkImageView> textureImageViews) noexcept;
 
     void update(std::shared_ptr<HmlDevice> hmlDevice) noexcept;
 };

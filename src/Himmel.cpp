@@ -264,34 +264,95 @@ bool Himmel::init() noexcept {
             models.push_back(model);
         }
 
+        { // Tree
+            std::vector<HmlSimpleModel::Vertex> vertices;
+            std::vector<uint32_t> indices;
+            if (!HmlSimpleModel::load("../models/viking_room.obj", vertices, indices)) return false;
+
+            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
+            models.push_back(model);
+        }
+
         const auto& phonyModel = models[0];
         const auto& vikingModel = models[1];
         const auto& planeModel = models[2];
         const auto& carModel = models[3];
+        const auto& treeModel = models[4];
 
 
         // Add Entities
 
-        // PHONY with a texture
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
-        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, -50.0f, 0.0f});
+        { // Arbitrary Entities
+            // PHONY with a texture
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
+            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, -50.0f, 0.0f});
 
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
-        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 30.0f});
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 30.0f});
 
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.8f, 0.2f, 0.5f }));
-        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 60.0f});
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.8f, 0.2f, 0.5f }));
+            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 60.0f});
 
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.2f, 0.2f, 0.9f }));
-        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 90.0f});
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.2f, 0.2f, 0.9f }));
+            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 90.0f});
 
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
-        entities.back()->modelMatrix = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0, 10.0, 10.0)), glm::vec3{40.0f, 30.0f, 70.0f});
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
+            entities.back()->modelMatrix = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0, 10.0, 10.0)), glm::vec3{40.0f, 30.0f, 70.0f});
 
-        entities.push_back(std::make_shared<HmlRenderer::Entity>(carModel, glm::vec3{ 0.2f, 0.7f, 0.4f }));
-        entities.back()->modelMatrix = car->getView();
+#if 0
+            { // Test comparing to static Entities
+                // NOTE We don't need the Color component of Entity
+                const size_t amount = 500;
+                for (size_t i = 0; i < amount; i++) {
+                    // TODO utilize world height access
+                    const auto pos = glm::vec3{
+                        hml::getRandomUniformFloat(world->start.x, world->finish.x),
+                        60.0f,
+                        hml::getRandomUniformFloat(world->start.y, world->finish.y),
+                    };
+                    const float scale = 10.0f;
+                    auto modelMatrix = glm::mat4(1.0f);
+                    modelMatrix = glm::translate(modelMatrix, pos);
+                    modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
+                    modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
 
-        hmlRenderer->specifyEntitiesToRender(entities);
+                    entities.push_back(std::make_shared<HmlRenderer::Entity>(treeModel));
+                    entities.back()->modelMatrix = modelMatrix;
+                }
+            }
+#endif
+
+            // XXX We rely on it being last in update() XXX
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(carModel, glm::vec3{ 0.2f, 0.7f, 0.4f }));
+            entities.back()->modelMatrix = car->getView();
+
+
+            hmlRenderer->specifyEntitiesToRender(entities);
+        }
+
+        { // Static Entities
+            // NOTE We don't need the Color component of Entity
+            const size_t amount = 500;
+            staticEntities.reserve(amount);
+            for (size_t i = 0; i < amount; i++) {
+                // TODO utilize world height access
+                const auto pos = glm::vec3{
+                    hml::getRandomUniformFloat(world->start.x, world->finish.x),
+                    60.0f,
+                    hml::getRandomUniformFloat(world->start.y, world->finish.y),
+                };
+                const float scale = 7.0f;
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, pos);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+
+                staticEntities.emplace_back(treeModel, modelMatrix);
+            }
+
+            hmlRenderer->specifyStaticEntitiesToRender(staticEntities);
+        }
     }
 
     if (!createSyncObjects()) return false;

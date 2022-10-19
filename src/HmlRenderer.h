@@ -6,6 +6,8 @@
 #include <iostream>
 #include <unordered_map>
 #include <optional>
+#include <queue>
+#include <span>
 
 #include "HmlContext.h"
 #include "HmlPipeline.h"
@@ -19,10 +21,15 @@
 // swapchain recreation by recreating the whole Renderer object.
 // NOTE
 struct HmlRenderer : HmlDrawer {
-    struct PushConstant {
+    struct PushConstantRegular {
         alignas(16) glm::mat4 model;
         glm::vec4 color;
         int32_t textureIndex;
+    };
+
+    struct PushConstantInstanced {
+        int32_t textureIndex;
+        float time;
     };
 
 
@@ -46,25 +53,48 @@ struct HmlRenderer : HmlDrawer {
 
     VkDescriptorPool descriptorPool;
     VkDescriptorSet  descriptorSet_textures_1;
-    // std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    std::queue<VkDescriptorSet> descriptorSet_instances_2_queue; // FIFO
     VkDescriptorSetLayout descriptorSetLayoutTextures;
+    VkDescriptorSetLayout descriptorSetLayoutInstances;
+
+    // NOTE we don't really need to permanently store the array of them in RAM.
+    struct EntityInstanceData {
+        glm::mat4 model;
+        inline EntityInstanceData(glm::mat4&& model) : model(model) {}
+    };
+    std::vector<uint32_t> instancedCounts;
+
+    struct EntitiesData {
+        int32_t textureIndex;
+        std::shared_ptr<HmlModelResource> modelResource;
+        // uint32_t count;
+
+        inline EntitiesData() {}
+        inline EntitiesData(int32_t textureIndex, std::shared_ptr<HmlModelResource> modelResource)
+            : textureIndex(textureIndex), modelResource(modelResource) {}
+    };
+
+    std::unique_ptr<HmlBuffer> instancedEntitiesStorageBuffer;
+    std::unordered_map<HmlModelResource::Id, EntitiesData> staticEntitiesDataForModel;
 
 
     static constexpr uint32_t MAX_TEXTURES_COUNT = 32; // XXX must match the shader. NOTE can be increased (80+)
     static constexpr int32_t NO_TEXTURE_MARK = -1;
-    uint32_t nextFreeTextureIndex = 0;
 
-    std::shared_ptr<HmlModelResource> anyModelWithTexture;
     std::unordered_map<HmlModelResource::Id, int32_t> textureIndexFor;
     std::unordered_map<HmlModelResource::Id, std::vector<std::shared_ptr<Entity>>> entitiesToRenderForModel;
 
+    using TextureUpdateData = std::pair<std::array<VkSampler, MAX_TEXTURES_COUNT>, std::array<VkImageView, MAX_TEXTURES_COUNT>>;
+
+    TextureUpdateData prepareTextureUpdateData(std::span<const EntitiesData> entitiesData) noexcept;
 
     std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlRenderer> create(std::shared_ptr<HmlContext> hmlContext, VkDescriptorSetLayout generalDescriptorSetLayout) noexcept;
     ~HmlRenderer() noexcept;
-    void specifyEntitiesToRender(const std::vector<std::shared_ptr<Entity>>& entities) noexcept;
-    void updateDescriptorSetTextures() noexcept;
+    void specifyEntitiesToRender(std::span<const std::shared_ptr<Entity>> entities) noexcept;
+    void specifyStaticEntitiesToRender(std::span<const Entity> staticEntities) noexcept;
+    void updateDescriptorSetStaticTextures() noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
 };
 

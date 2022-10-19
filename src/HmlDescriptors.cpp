@@ -79,9 +79,9 @@ HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::textureAt(
 }
 
 
-HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::textureArrayAt(
-        uint32_t binding, const std::vector<VkSampler>& textureSamplers, const std::vector<VkImageView>& textureImageViews) noexcept {
-    assert((textureSamplers.size() == textureImageViews.size()) && "::> Passed vector size while updating textures array do not match.");
+HmlDescriptorSetUpdater& HmlDescriptorSetUpdater::textureArrayAt(uint32_t binding,
+        std::span<const VkSampler> textureSamplers, std::span<const VkImageView> textureImageViews) noexcept {
+    assert((textureSamplers.size() == textureImageViews.size()) && "::> Passed container size while updating textures array do not match.");
     const auto count = textureSamplers.size();
 
     imageInfosIndices.push_back(imageInfos.size());

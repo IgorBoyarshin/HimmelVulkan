@@ -4,6 +4,8 @@
 #include <memory>
 #include <vector>
 #include <iostream>
+#include <unordered_set>
+
 
 #include "HmlDevice.h"
 #include "HmlCommands.h"
@@ -88,8 +90,35 @@ struct HmlResourceManager {
     // NOTE We store the models ourselves as well (despite the fact that they
     // are shared_ptr) because there may be a time when there are no Entities
     // of this particular model at a given time, but there will be later.
+    // NOTE NOTE Actually, the above is false. If there are no other Entities of
+    // this particular Model left, then it cannot be accessed and therefore used
+    // again (so the only way is to recreate it). So the only reason to store
+    // the models is to eventually implement a system to access Models from here
+    // in the first place (not just store them here as well).
     std::vector<std::shared_ptr<HmlModelResource>> models;
+    // ========================================================================
+    uint32_t currentFrame = 0;
+    struct ReleaseData {
+        std::unique_ptr<HmlBuffer> hmlBuffer;
+        // After this frame the HmlBuffer can be safely deleted
+        uint32_t lastAliveFrame;
 
+        inline auto operator<=>(const ReleaseData&) const = default;
+    };
+
+    struct ReleaseDataHasher {
+        size_t operator()(const ReleaseData& releaseData) const;
+    };
+
+    std::unordered_set<ReleaseData, ReleaseDataHasher> releaseQueue;
+
+    void markForRelease(std::unique_ptr<HmlBuffer>&& hmlBuffer) noexcept;
+    // NOTE Must only be called by the main game loop to advance release logic by one frame
+    void tickFrame() noexcept;
+    // ========================================================================
+    std::unique_ptr<HmlImageResource> dummyTextureResource;
+
+    std::unique_ptr<HmlImageResource> newDummyTextureResource() noexcept;
 
     static std::unique_ptr<HmlResourceManager> create(
         std::shared_ptr<HmlDevice> hmlDevice,

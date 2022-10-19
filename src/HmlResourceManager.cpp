@@ -64,11 +64,39 @@ HmlBuffer::~HmlBuffer() noexcept {
 // ============================================================================
 // ============================================================================
 // ============================================================================
+size_t HmlResourceManager::ReleaseDataHasher::operator()(const ReleaseData& releaseData) const {
+    return std::hash<std::unique_ptr<HmlBuffer>>()(releaseData.hmlBuffer);
+}
+
+
+void HmlResourceManager::markForRelease(std::unique_ptr<HmlBuffer>&& hmlBuffer) noexcept {
+    static constexpr uint32_t FRAMES_WAIT_TILL_RELEASE = 3;
+    const auto lastAliveFrame = currentFrame + FRAMES_WAIT_TILL_RELEASE;
+    releaseQueue.emplace(std::move(hmlBuffer), lastAliveFrame);
+}
+
+
+void HmlResourceManager::tickFrame() noexcept {
+    currentFrame++;
+    const auto oldSize = releaseQueue.size();
+    std::erase_if(releaseQueue, [&](const auto& releaseData) {
+        return currentFrame > releaseData.lastAliveFrame;
+    });
+    const auto newSize = releaseQueue.size();
+    if (newSize != oldSize) {
+        std::cout << ":> HmlResourceManager::tickFrame() has just released " << (oldSize - newSize) << " HmlBuffers.\n";
+    }
+}
+
+
 std::unique_ptr<HmlResourceManager> HmlResourceManager::create(
         std::shared_ptr<HmlDevice> hmlDevice, std::shared_ptr<HmlCommands> hmlCommands) noexcept {
     auto hmlResourceManager = std::make_unique<HmlResourceManager>();
     hmlResourceManager->hmlDevice = hmlDevice;
     hmlResourceManager->hmlCommands = hmlCommands;
+
+    hmlResourceManager->dummyTextureResource = hmlResourceManager->newDummyTextureResource();
+
     return hmlResourceManager;
 }
 
@@ -111,6 +139,51 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createStorageBuffer(VkDeviceSize 
     const auto memoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
     return buffer;
+}
+
+
+std::unique_ptr<HmlImageResource> HmlResourceManager::newDummyTextureResource() noexcept {
+    // ======== Create data and store it in a staging buffer
+    const int width = 2;
+    const int height = 2;
+    const int componentsCount = 4;
+    unsigned char pixels[width * height * componentsCount] = {
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        0, 0, 255, 255,
+        255, 255, 255, 255
+    };
+
+    auto stagingBuffer = createStagingBuffer(width * height * componentsCount);
+    stagingBuffer->map();
+    stagingBuffer->update(pixels);
+    stagingBuffer->unmap();
+
+    // ======== Create the image resource
+    const VkExtent2D            extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+    const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    const VkFormat              format = VK_FORMAT_R8G8B8A8_UNORM;
+    auto resource = newBlankImageResource(extent, format, usage, aspect);
+
+    // ======== Copy data from the staging buffer to the image resource
+    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, hmlCommands)) {
+        std::cerr << "::> Failed to create HmlImageResource as a texture resource.\n";
+        return { nullptr };
+    }
+    copyBufferToImage(stagingBuffer->buffer, resource->image, extent);
+    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands)) {
+        std::cerr << "::> Failed to create HmlImageResource as a texture resource.\n";
+        return { nullptr };
+    }
+
+    // ======== Finish initializing resource members
+    resource->type = HmlImageResource::Type::TEXTURE;
+    resource->width = width;
+    resource->height = height;
+    resource->sampler = createTextureSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST);
+
+    return resource;
 }
 
 

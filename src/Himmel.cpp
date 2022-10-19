@@ -331,6 +331,8 @@ bool Himmel::run() noexcept {
             // << " Update = " << updateMs << "ms"
             << '\n';
 #endif
+
+        hmlContext->hmlResourceManager->tickFrame();
     }
     vkDeviceWaitIdle(hmlContext->hmlDevice->device);
     return true;

@@ -122,7 +122,9 @@ bool Himmel::init() noexcept {
 
 
     {
-        const auto carPos = glm::vec3{0.0f, 35.0f, 0.0f};
+        const float carX = 0.0f;
+        const float carZ = 0.0f;
+        const auto carPos = glm::vec3{carX, world->heightAt({ carX, carZ }), carZ};
         const auto carSizeScaler = 0.5f;
         car = std::make_unique<Car>(carPos, carSizeScaler);
     }
@@ -267,10 +269,10 @@ bool Himmel::init() noexcept {
         { // Tree
             std::vector<HmlSimpleModel::Vertex> vertices;
             std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/viking_room.obj", vertices, indices)) return false;
+            if (!HmlSimpleModel::load("../models/tree/basic_tree.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/tree/basic_tree.png", VK_FILTER_LINEAR);
             models.push_back(model);
         }
 
@@ -333,20 +335,18 @@ bool Himmel::init() noexcept {
 
         { // Static Entities
             // NOTE We don't need the Color component of Entity
-            const size_t amount = 500;
+            const size_t amount = 1000;
             staticEntities.reserve(amount);
             for (size_t i = 0; i < amount; i++) {
-                // TODO utilize world height access
-                const auto pos = glm::vec3{
-                    hml::getRandomUniformFloat(world->start.x, world->finish.x),
-                    60.0f,
-                    hml::getRandomUniformFloat(world->start.y, world->finish.y),
-                };
+                const auto x = hml::getRandomUniformFloat(world->start.x, world->finish.x);
+                const auto z = hml::getRandomUniformFloat(world->start.y, world->finish.y);
+                const auto y = world->heightAt({ x, z });
+                const auto pos = glm::vec3{ x, y, z };
                 const float scale = 7.0f;
                 auto modelMatrix = glm::mat4(1.0f);
                 modelMatrix = glm::translate(modelMatrix, pos);
                 modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
-                modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+                // modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
 
                 staticEntities.emplace_back(treeModel, modelMatrix);
             }

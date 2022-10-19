@@ -25,10 +25,7 @@ struct HmlBloomRenderer : HmlDrawer {
 
     std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
-    static std::unique_ptr<HmlBloomRenderer> create(
-        std::shared_ptr<HmlContext> hmlContext,
-        uint32_t imageCount,
-        uint32_t framesInFlight) noexcept;
+    static std::unique_ptr<HmlBloomRenderer> create(std::shared_ptr<HmlContext> hmlContext) noexcept;
     ~HmlBloomRenderer() noexcept;
     void specify(
         const std::vector<std::shared_ptr<HmlImageResource>>& firstTextures,

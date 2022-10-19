@@ -39,11 +39,12 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
         uint32_t snowCount,
         const SnowBounds& snowBounds,
         std::shared_ptr<HmlContext> hmlContext,
-        VkDescriptorSetLayout viewProjDescriptorSetLayout,
-        uint32_t imageCount,
-        uint32_t framesInFlight) noexcept {
+        VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept {
     auto hmlRenderer = std::make_unique<HmlSnowParticleRenderer>();
     hmlRenderer->hmlContext = hmlContext;
+
+    const auto imageCount = hmlContext->imageCount();
+
     // if (snowCount > MAX_SNOW_COUNT) {
     //     std::cout << "::> Exceeded MAX_SNOW_COUNT while creating HmlSnowParticleRenderer.\n";
     //     return { nullptr };

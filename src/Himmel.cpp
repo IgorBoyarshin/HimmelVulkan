@@ -95,22 +95,19 @@ bool Himmel::init() noexcept {
     };
 
 
-    // TODO nocheckin redundant because they already have context with swapchain
-    const uint32_t imagesCount = hmlContext->hmlSwapchain->imageCount();
-
-    hmlRenderer = HmlRenderer::create(hmlContext, generalDescriptorSetLayout, maxFramesInFlight);
+    hmlRenderer = HmlRenderer::create(hmlContext, generalDescriptorSetLayout);
     if (!hmlRenderer) return false;
 
-    hmlDeferredRenderer = HmlDeferredRenderer::create(hmlContext, generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
+    hmlDeferredRenderer = HmlDeferredRenderer::create(hmlContext, generalDescriptorSetLayout);
     if (!hmlDeferredRenderer) return false;
 
-    hmlUiRenderer = HmlUiRenderer::create(hmlContext, imagesCount, maxFramesInFlight);
+    hmlUiRenderer = HmlUiRenderer::create(hmlContext);
     if (!hmlUiRenderer) return false;
 
-    // hmlBlurRenderer = HmlBlurRenderer::create(hmlContext, imagesCount, maxFramesInFlight);
+    // hmlBlurRenderer = HmlBlurRenderer::create(hmlContext);
     // if (!hmlBlurRenderer) return false;
 
-    hmlBloomRenderer = HmlBloomRenderer::create(hmlContext, imagesCount, maxFramesInFlight);
+    hmlBloomRenderer = HmlBloomRenderer::create(hmlContext);
     if (!hmlBloomRenderer) return false;
 
 
@@ -135,8 +132,7 @@ bool Himmel::init() noexcept {
     const auto snowCount = 400000;
     const auto sizeSnow = world->height;
     const HmlSnowParticleRenderer::SnowBounds snowBounds = HmlSnowParticleRenderer::SnowCameraBounds{ sizeSnow };
-    hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlContext,
-            generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
+    hmlSnowRenderer = HmlSnowParticleRenderer::createSnowRenderer(snowCount, snowBounds, hmlContext, generalDescriptorSetLayout);
     if (!hmlSnowRenderer) return false;
 #endif
 
@@ -149,7 +145,7 @@ bool Himmel::init() noexcept {
     };
     const uint32_t granularity = 1;
     hmlTerrainRenderer = HmlTerrainRenderer::create(heightmapFile, granularity, "../models/grass-small.png",
-        terrainBounds, hmlContext, generalDescriptorSetLayout, imagesCount, maxFramesInFlight);
+        terrainBounds, hmlContext, generalDescriptorSetLayout);
     if (!hmlTerrainRenderer) return false;
 
 

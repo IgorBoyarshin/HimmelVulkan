@@ -35,13 +35,11 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlBloomRenderer::createPipelines(
 }
 
 
-std::unique_ptr<HmlBloomRenderer> HmlBloomRenderer::create(
-        std::shared_ptr<HmlContext> hmlContext,
-        uint32_t imageCount,
-        uint32_t framesInFlight) noexcept {
+std::unique_ptr<HmlBloomRenderer> HmlBloomRenderer::create(std::shared_ptr<HmlContext> hmlContext) noexcept {
     auto hmlRenderer = std::make_unique<HmlBloomRenderer>();
     hmlRenderer->hmlContext = hmlContext;
 
+    const auto imageCount = hmlContext->imageCount();
 
     hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(imageCount * 2)

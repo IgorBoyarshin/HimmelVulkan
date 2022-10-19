@@ -86,9 +86,7 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
         const char* grassFilename,
         const Bounds& bounds,
         std::shared_ptr<HmlContext> hmlContext,
-        VkDescriptorSetLayout viewProjDescriptorSetLayout,
-        uint32_t imageCount,
-        uint32_t framesInFlight) noexcept {
+        VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept {
     auto hmlRenderer = std::make_unique<HmlTerrainRenderer>();
     hmlRenderer->hmlContext = hmlContext;
 

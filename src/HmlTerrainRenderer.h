@@ -92,9 +92,7 @@ struct HmlTerrainRenderer : HmlDrawer {
             const char* grassFilename,
             const Bounds& bounds,
             std::shared_ptr<HmlContext> hmlContext,
-            VkDescriptorSetLayout viewProjDescriptorSetLayout,
-            uint32_t imageCount,
-            uint32_t framesInFlight) noexcept;
+            VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept;
     ~HmlTerrainRenderer() noexcept;
     void constructTree(SubTerrain& subTerrain, const glm::vec3& cameraPos) const noexcept;
     void update(const glm::vec3& cameraPos) noexcept;

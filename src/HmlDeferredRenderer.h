@@ -34,9 +34,7 @@ struct HmlDeferredRenderer : HmlDrawer {
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlDeferredRenderer> create(
         std::shared_ptr<HmlContext> hmlContext,
-        VkDescriptorSetLayout viewProjDescriptorSetLayout,
-        uint32_t imageCount,
-        uint32_t framesInFlight) noexcept;
+        VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept;
     ~HmlDeferredRenderer() noexcept;
     void specify(const std::array<std::vector<std::shared_ptr<HmlImageResource>>, G_COUNT>& resources) noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;

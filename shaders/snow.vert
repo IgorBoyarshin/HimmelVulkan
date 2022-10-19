@@ -9,8 +9,8 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     vec3 cameraPos;
 } ubo;
 
-layout(std140, set = 2, binding = 0) readonly buffer SnowInstancesUniformBuffers {
-    vec4 positions[]; // vec3 pos + float rotation
+layout(std430, set = 2, binding = 0) readonly buffer SnowInstancesUniformBuffers {
+    vec4 data[]; // (vec3 pos, float rotation)[instanceCount]
 } snowData;
 
 layout(push_constant) uniform PushConstants {
@@ -55,8 +55,8 @@ const vec2 texCoordFor[6] = vec2[](
 
 #define TEXTURES_COUNT 2
 void main() {
-    vec3 position  = snowData.positions[gl_InstanceIndex].xyz;
-    float rotation = snowData.positions[gl_InstanceIndex].w;
+    vec3 position  = snowData.data[gl_InstanceIndex].xyz;
+    float rotation = snowData.data[gl_InstanceIndex].w;
     if (push.snowMode > 0.0) { // SNOW_MODE_BOX
 
     } else { // SNOW_MODE_CAMERA

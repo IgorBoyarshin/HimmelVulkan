@@ -34,6 +34,7 @@ struct HmlSnowParticleRenderer : HmlDrawer {
 
     VkDescriptorPool descriptorPool;
     VkDescriptorSet              descriptorSet_textures_1;
+    // NOTE perImage because snowInstancesStorageBuffers are perImage
     std::vector<VkDescriptorSet> descriptorSet_instances_2_perImage;
     // std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
     std::vector<VkDescriptorSetLayout> descriptorSetLayoutsSelf;
@@ -68,9 +69,7 @@ struct HmlSnowParticleRenderer : HmlDrawer {
             uint32_t snowCount,
             const std::variant<SnowBoxBounds, SnowCameraBounds>& snowBounds,
             std::shared_ptr<HmlContext> hmlContext,
-            VkDescriptorSetLayout viewProjDescriptorSetLayout,
-            uint32_t imageCount,
-            uint32_t framesInFlight) noexcept;
+            VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept;
     ~HmlSnowParticleRenderer() noexcept;
     void createSnow(uint32_t count, const SnowBounds& bounds) noexcept;
     void updateForDt(float dt, float timeSinceStart) noexcept;

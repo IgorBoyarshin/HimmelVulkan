@@ -37,12 +37,11 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlDeferredRenderer::createPipelines(
 
 std::unique_ptr<HmlDeferredRenderer> HmlDeferredRenderer::create(
         std::shared_ptr<HmlContext> hmlContext,
-        VkDescriptorSetLayout viewProjDescriptorSetLayout,
-        uint32_t imageCount,
-        uint32_t framesInFlight) noexcept {
+        VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept {
     auto hmlRenderer = std::make_unique<HmlDeferredRenderer>();
     hmlRenderer->hmlContext = hmlContext;
 
+    const auto imageCount = hmlContext->imageCount();
 
     hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(imageCount * G_COUNT)

@@ -336,7 +336,6 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
             vkCmdBindIndexBuffer(commandBuffer, modelResource->indexBuffer, 0, VK_INDEX_TYPE_UINT32); // 0 is offset
 
-            // NOTE Yes, in theory having a textureIndex per Entity is redundant
             PushConstantInstanced pushConstant{
                 .textureIndex = textureIndex,
                 .time = 0.0f, // TODO
@@ -344,7 +343,8 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
             vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
                 hmlPipeline->pushConstantsStages, 0, sizeof(PushConstantInstanced), &pushConstant);
 
-            // NOTE could use firstInstance to supply a single integer to gl_BaseInstance
+            // XXX It appears that gl_BaseInstance is automatically added to
+            // gl_InstanceIndex, so gl_InstanceIndex does not restart at VkCmdDraw.
             const uint32_t instanceCount = *instancedCountsIt;
             const uint32_t firstInstance = dispatchedInstancesCount;
             const uint32_t firstIndex = 0;
@@ -353,7 +353,7 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
             // const uint32_t firstVertex = 0;
             // vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
             vkCmdDrawIndexed(commandBuffer, modelResource->indicesCount,
-            instanceCount, firstIndex, offsetToAddToIndices, firstInstance);
+                instanceCount, firstIndex, offsetToAddToIndices, firstInstance);
 
             dispatchedInstancesCount += *instancedCountsIt;
             std::advance(instancedCountsIt, 1);

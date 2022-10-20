@@ -11,8 +11,6 @@ layout(set = 0, binding = 0) uniform GeneralUbo {
 
 // XXX sync with Fragment shader
 layout(push_constant) uniform PushConstants {
-    /* mat4 model; */
-    /* vec4 color; */
     int textureIndex;
     float time;
 } push;
@@ -30,7 +28,10 @@ layout(location = 1) out vec3 outPosition;
 layout(location = 2) out vec3 outNormal;
 
 void main() {
-    mat4 model = instances.data[gl_BaseInstance + gl_InstanceIndex];
+    // XXX It appears that gl_BaseInstance is automatically added to
+    // gl_InstanceIndex, so gl_InstanceIndex does not restart at VkCmdDraw.
+    /* mat4 model = instances.data[gl_BaseInstance + gl_InstanceIndex]; */
+    mat4 model = instances.data[gl_InstanceIndex];
     vec4 posWorld = model * vec4(inPosition, 1.0);
     gl_Position = uboGeneral.proj * uboGeneral.view * posWorld;
     outFragTexCoord = inTexCoord;

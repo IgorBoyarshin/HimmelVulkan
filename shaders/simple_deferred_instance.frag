@@ -5,8 +5,6 @@ layout(set = 2, binding = 1) uniform sampler2D texSamplers[MAX_TEXTURES_COUNT];
 
 // XXX sync with Vertex shader
 layout(push_constant) uniform PushConstants {
-    /* mat4 model; */
-    /* vec4 color; */
     int textureIndex;
     float time;
 } push;

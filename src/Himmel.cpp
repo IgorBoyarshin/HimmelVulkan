@@ -268,7 +268,7 @@ bool Himmel::init() noexcept {
             models.push_back(model);
         }
 
-        { // Tree
+        { // Tree#1
             std::vector<HmlSimpleModel::Vertex> vertices;
             std::vector<uint32_t> indices;
             if (!HmlSimpleModel::load("../models/tree/basic_tree.obj", vertices, indices)) return false;
@@ -277,20 +277,36 @@ bool Himmel::init() noexcept {
             const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/tree/basic_tree.png", VK_FILTER_LINEAR);
             models.push_back(model);
         }
+        { // Tree#2
+            std::vector<HmlSimpleModel::Vertex> vertices;
+            std::vector<uint32_t> indices;
+            if (!HmlSimpleModel::load("../models/tree/basic_tree_2.obj", vertices, indices)) return false;
+
+            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/tree/basic_tree_2.png", VK_FILTER_LINEAR);
+            models.push_back(model);
+        }
 
         const auto& phonyModel = models[0];
         const auto& vikingModel = models[1];
         const auto& planeModel = models[2];
         const auto& carModel = models[3];
         const auto& treeModel = models[4];
+        const auto& treeModel2 = models[5];
 
 
         // Add Entities
 
         { // Arbitrary Entities
             // PHONY with a texture
-            entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
-            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, -50.0f, 0.0f});
+            {
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, { 0.0f, 50.0f, -200.0f });
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(150.0f));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 0.0, 1.0));
+                entities.back()->modelMatrix = modelMatrix;
+            }
 
             entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
             entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 30.0f});
@@ -350,7 +366,7 @@ bool Himmel::init() noexcept {
                 modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
                 // modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
 
-                staticEntities.emplace_back(treeModel, modelMatrix);
+                staticEntities.emplace_back((i % 2) ? treeModel : treeModel2, modelMatrix);
             }
 
             hmlRenderer->specifyStaticEntitiesToRender(staticEntities);
@@ -525,7 +541,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         .view = camera.view(),
         .proj = proj,
         .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
-        .ambientStrength = 0.0f,
+        .ambientStrength = 0.1f,
         .fogColor = weather.fogColor,
         .fogDensity = weather.fogDensity,
         .cameraPos = camera.getPos(),

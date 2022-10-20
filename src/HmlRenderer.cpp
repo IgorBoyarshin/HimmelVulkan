@@ -115,7 +115,9 @@ std::unique_ptr<HmlRenderer> HmlRenderer::create(
 
 
 HmlRenderer::~HmlRenderer() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlRenderer...\n";
+#endif
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.

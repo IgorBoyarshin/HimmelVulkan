@@ -156,7 +156,9 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
 
 
 HmlTerrainRenderer::~HmlTerrainRenderer() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlTerrainRenderer...\n";
+#endif
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.

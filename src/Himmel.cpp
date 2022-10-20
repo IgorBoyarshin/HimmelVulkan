@@ -961,7 +961,9 @@ bool Himmel::createSyncObjects() noexcept {
 
 
 Himmel::~Himmel() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying Himmel...\n";
+#endif
     // vkDeviceWaitIdle(hmlDevice->device);
 
     if (!successfulInit) {

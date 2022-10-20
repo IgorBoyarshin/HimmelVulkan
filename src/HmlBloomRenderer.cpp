@@ -71,7 +71,9 @@ std::unique_ptr<HmlBloomRenderer> HmlBloomRenderer::create(std::shared_ptr<HmlCo
 
 
 HmlBloomRenderer::~HmlBloomRenderer() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlBloomRenderer...\n";
+#endif
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.

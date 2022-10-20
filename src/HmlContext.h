@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "settings.h"
 #include "HmlWindow.h"
 #include "HmlDevice.h"
 #include "HmlDescriptors.h"

@@ -75,7 +75,9 @@ std::unique_ptr<HmlDeferredRenderer> HmlDeferredRenderer::create(
 
 
 HmlDeferredRenderer::~HmlDeferredRenderer() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlDeferredRenderer...\n";
+#endif
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.

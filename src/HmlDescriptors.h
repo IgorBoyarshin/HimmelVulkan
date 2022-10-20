@@ -7,6 +7,7 @@
 #include <cassert>
 #include <span>
 
+#include "settings.h"
 #include "HmlDevice.h"
 #include "HmlModel.h"
 

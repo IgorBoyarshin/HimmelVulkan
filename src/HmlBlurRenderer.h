@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <optional>
 
+#include "settings.h"
 #include "HmlWindow.h"
 #include "HmlPipeline.h"
 #include "HmlCommands.h"

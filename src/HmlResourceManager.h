@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 
+#include "settings.h"
 #include "HmlDevice.h"
 #include "HmlCommands.h"
 

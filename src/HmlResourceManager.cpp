@@ -2,12 +2,14 @@
 
 
 HmlImageResource::~HmlImageResource() noexcept {
+#if LOG_DESTROYS
     switch (type) {
         case Type::BLANK:         std::cout << ":> Destroying HmlImageResource (blank).\n"; break;
         case Type::TEXTURE:       std::cout << ":> Destroying HmlImageResource (texture).\n"; break;
         case Type::RENDER_TARGET: std::cout << ":> Destroying HmlImageResource (render target).\n"; break;
         case Type::DEPTH:         std::cout << ":> Destroying HmlImageResource (depth).\n"; break;
     }
+#endif
 
     if (sampler) vkDestroySampler(hmlDevice->device, sampler, nullptr);
     vkDestroyImageView(hmlDevice->device, view, nullptr);
@@ -18,7 +20,9 @@ HmlImageResource::~HmlImageResource() noexcept {
 // ============================================================================
 // ============================================================================
 HmlModelResource::~HmlModelResource() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlModelResource.\n";
+#endif
 
     vkDestroyBuffer(hmlDevice->device, indexBuffer, nullptr);
     vkFreeMemory(hmlDevice->device, indexBufferMemory, nullptr);
@@ -51,11 +55,13 @@ void HmlBuffer::update(const void* newData) noexcept {
 
 
 HmlBuffer::~HmlBuffer() noexcept {
+#if LOG_DESTROYS
     switch (type) {
         case Type::STAGING: std::cout << ":> Destroying HmlBuffer (staging).\n"; break;
         case Type::UNIFORM: std::cout << ":> Destroying HmlBuffer (uniform).\n"; break;
         case Type::STORAGE: std::cout << ":> Destroying HmlBuffer (storage).\n"; break;
     }
+#endif
 
     unmap();
     vkDestroyBuffer(hmlDevice->device, buffer, nullptr);
@@ -103,7 +109,9 @@ std::unique_ptr<HmlResourceManager> HmlResourceManager::create(
 
 
 HmlResourceManager::~HmlResourceManager() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlResourceManager.\n";
+#endif
 }
 
 

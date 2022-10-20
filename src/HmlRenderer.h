@@ -9,6 +9,7 @@
 #include <queue>
 #include <span>
 
+#include "settings.h"
 #include "HmlContext.h"
 #include "HmlPipeline.h"
 #include "HmlModel.h"

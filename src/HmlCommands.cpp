@@ -28,7 +28,9 @@ std::unique_ptr<HmlCommands> HmlCommands::create(std::shared_ptr<HmlDevice> hmlD
 
 
 HmlCommands::~HmlCommands() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlCommands...\n";
+#endif
     vkDestroyCommandPool(hmlDevice->device, commandPoolOnetime, nullptr);
     vkDestroyCommandPool(hmlDevice->device, commandPoolGeneral, nullptr);
     vkDestroyCommandPool(hmlDevice->device, commandPoolGeneralResettable, nullptr);

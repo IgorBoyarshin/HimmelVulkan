@@ -199,7 +199,9 @@ VkFramebuffer HmlRenderPass::createFramebuffer(const std::vector<VkImageView>& c
 
 
 HmlRenderPass::~HmlRenderPass() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlRenderPass.\n";
+#endif
 
     for (auto framebuffer : framebuffers) {
         vkDestroyFramebuffer(hmlDevice->device, framebuffer, nullptr);

@@ -36,7 +36,9 @@ std::unique_ptr<HmlDevice> HmlDevice::create(std::shared_ptr<HmlWindow> hmlWindo
 
 
 HmlDevice::~HmlDevice() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlDevice...\n";
+#endif
     vkDestroyDevice(device, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     if (enableValidationLayers) {

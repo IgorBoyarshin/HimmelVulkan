@@ -264,7 +264,9 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
 }
 
 HmlPipeline::~HmlPipeline() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlPipeline...\n";
+#endif
     vkDestroyPipelineLayout(hmlDevice->device, layout, nullptr);
     vkDestroyPipeline(hmlDevice->device, pipeline, nullptr);
 }

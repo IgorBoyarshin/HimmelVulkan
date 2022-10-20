@@ -29,7 +29,9 @@ std::unique_ptr<HmlQueries> HmlQueries::create(std::shared_ptr<HmlDevice> hmlDev
 
 
 HmlQueries::~HmlQueries() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlQueries...\n";
+#endif
 
     while (!pools.empty()) {
         vkDestroyQueryPool(hmlDevice->device, pools.front(), nullptr);

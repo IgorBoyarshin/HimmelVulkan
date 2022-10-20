@@ -8,6 +8,7 @@
 #include <optional>
 #include <variant>
 
+#include "settings.h"
 #include "HmlContext.h"
 #include "HmlPipeline.h"
 #include "HmlRenderPass.h"

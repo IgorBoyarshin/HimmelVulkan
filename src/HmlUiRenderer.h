@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <optional>
 
+#include "settings.h"
 #include "HmlContext.h"
 #include "HmlPipeline.h"
 #include "HmlModel.h"

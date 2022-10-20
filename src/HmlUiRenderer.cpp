@@ -70,7 +70,9 @@ std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(std::shared_ptr<HmlContext>
 
 
 HmlUiRenderer::~HmlUiRenderer() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlUiRenderer...\n";
+#endif
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.

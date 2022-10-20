@@ -50,7 +50,9 @@ struct HmlPipe {
 
 
     inline ~HmlPipe() noexcept {
+#if LOG_DESTROYS
         std::cout << ":> Destroying HmlPipe...\n";
+#endif
         for (const auto& semaphore : semaphoresForFrames) {
             vkDestroySemaphore(hmlContext->hmlDevice->device, semaphore, nullptr);
         }

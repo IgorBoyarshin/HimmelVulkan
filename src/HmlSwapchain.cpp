@@ -75,7 +75,9 @@ std::unique_ptr<HmlSwapchain> HmlSwapchain::create(
 
 
 HmlSwapchain::~HmlSwapchain() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlSwapchain...\n";
+#endif
 
     for (auto imageView : imageViews) {
         vkDestroyImageView(hmlDevice->device, imageView, nullptr);

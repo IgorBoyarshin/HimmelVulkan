@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "settings.h"
+
 
 struct HmlCamera {
     inline HmlCamera() {

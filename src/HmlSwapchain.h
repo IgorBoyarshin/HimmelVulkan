@@ -5,6 +5,7 @@
 #include <optional>
 #include <algorithm>
 
+#include "settings.h"
 #include "HmlWindow.h"
 #include "HmlDevice.h"
 #include "HmlResourceManager.h"

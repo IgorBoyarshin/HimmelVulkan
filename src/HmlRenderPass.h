@@ -9,6 +9,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
+#include "settings.h"
 #include "HmlDevice.h"
 #include "HmlCommands.h"
 #include "HmlResourceManager.h"

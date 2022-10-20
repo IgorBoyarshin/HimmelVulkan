@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <span>
 
+#include "settings.h"
 #include "HmlWindow.h"
 
 

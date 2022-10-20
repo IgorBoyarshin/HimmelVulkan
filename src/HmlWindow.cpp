@@ -44,7 +44,9 @@ void HmlWindow::resizeCallback(GLFWwindow* window, int width, int height) noexce
 
 
 HmlWindow::~HmlWindow() noexcept {
+#if LOG_DESTROYS
     std::cout << ":> Destroying HmlWindow...\n";
+#endif
     glfwDestroyWindow(window);
     glfwTerminate();
 }

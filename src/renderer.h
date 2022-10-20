@@ -1,6 +1,7 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
+#include "settings.h"
 #include "HmlRenderPass.h"
 #include "HmlPipeline.h"
 #include "HmlDevice.h"

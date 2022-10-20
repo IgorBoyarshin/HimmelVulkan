@@ -220,6 +220,7 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noe
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+    hmlContext->hmlQueries->registerEvent("HmlSnowParticleRenderer: begin", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
     assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlSnowParticleRenderer.\n");
     const auto& hmlPipeline = getCurrentPipelines()[0];
@@ -252,6 +253,7 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noe
     const uint32_t firstVertex = 0;
     vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
+    hmlContext->hmlQueries->registerEvent("HmlSnowParticleRenderer: end", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }

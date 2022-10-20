@@ -97,7 +97,6 @@ struct HmlResourceManager {
     // in the first place (not just store them here as well).
     std::vector<std::shared_ptr<HmlModelResource>> models;
     // ========================================================================
-    uint32_t currentFrame = 0;
     struct ReleaseData {
         std::unique_ptr<HmlBuffer> hmlBuffer;
         // After this frame the HmlBuffer can be safely deleted
@@ -112,9 +111,9 @@ struct HmlResourceManager {
 
     std::unordered_set<ReleaseData, ReleaseDataHasher> releaseQueue;
 
-    void markForRelease(std::unique_ptr<HmlBuffer>&& hmlBuffer) noexcept;
+    void markForRelease(std::unique_ptr<HmlBuffer>&& hmlBuffer, uint32_t currentFrame) noexcept;
     // NOTE Must only be called by the main game loop to advance release logic by one frame
-    void tickFrame() noexcept;
+    void tickFrame(uint32_t currentFrame) noexcept;
     // ========================================================================
     std::unique_ptr<HmlImageResource> dummyTextureResource;
 

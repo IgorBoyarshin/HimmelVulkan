@@ -1,5 +1,5 @@
-#ifndef HML_CONTEXT_H
-#define HML_CONTEXT_H
+#ifndef HML_CONTEXT
+#define HML_CONTEXT
 
 #include <memory>
 
@@ -9,6 +9,7 @@
 #include "HmlCommands.h"
 #include "HmlSwapchain.h"
 #include "HmlResourceManager.h"
+#include "HmlQueries.h"
 
 
 struct HmlContext {
@@ -18,8 +19,11 @@ struct HmlContext {
     std::shared_ptr<HmlCommands> hmlCommands;
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
+    std::shared_ptr<HmlQueries> hmlQueries;
 
-    uint32_t maxFramesInFlight;
+    uint32_t maxFramesInFlight = 0;
+
+    uint32_t currentFrame = 0;
 
 
     inline uint32_t imageCount() const noexcept {

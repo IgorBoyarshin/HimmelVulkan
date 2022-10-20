@@ -69,15 +69,16 @@ size_t HmlResourceManager::ReleaseDataHasher::operator()(const ReleaseData& rele
 }
 
 
-void HmlResourceManager::markForRelease(std::unique_ptr<HmlBuffer>&& hmlBuffer) noexcept {
+void HmlResourceManager::markForRelease(std::unique_ptr<HmlBuffer>&& hmlBuffer, uint32_t currentFrame) noexcept {
     static constexpr uint32_t FRAMES_WAIT_TILL_RELEASE = 3;
-    const auto lastAliveFrame = currentFrame + FRAMES_WAIT_TILL_RELEASE;
+    const auto framesWaitTillRelease = FRAMES_WAIT_TILL_RELEASE;
+    // const auto framesWaitTillRelease = hmlSwapchain->imageCount(); // TODO
+    const auto lastAliveFrame = currentFrame + framesWaitTillRelease;
     releaseQueue.emplace(std::move(hmlBuffer), lastAliveFrame);
 }
 
 
-void HmlResourceManager::tickFrame() noexcept {
-    currentFrame++;
+void HmlResourceManager::tickFrame(uint32_t currentFrame) noexcept {
     const auto oldSize = releaseQueue.size();
     std::erase_if(releaseQueue, [&](const auto& releaseData) {
         return currentFrame > releaseData.lastAliveFrame;

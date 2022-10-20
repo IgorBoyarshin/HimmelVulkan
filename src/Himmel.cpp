@@ -9,6 +9,7 @@ bool Himmel::init() noexcept {
     const char* windowName = "Planes game";
 
     hmlContext = std::make_shared<HmlContext>();
+    hmlContext->maxFramesInFlight = 2;
 
     hmlContext->hmlWindow = HmlWindow::create(1920, 1080, windowName);
     if (!hmlContext->hmlWindow) return false;
@@ -28,16 +29,17 @@ bool Himmel::init() noexcept {
     hmlContext->hmlSwapchain = HmlSwapchain::create(hmlContext->hmlWindow, hmlContext->hmlDevice, hmlContext->hmlResourceManager, std::nullopt);
     if (!hmlContext->hmlSwapchain) return false;
 
-    hmlContext->maxFramesInFlight = maxFramesInFlight;
+    hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, hmlContext->imageCount());
+    if (!hmlContext->hmlQueries) return false;
 
 
-    for (size_t i = 0; i < hmlContext->hmlSwapchain->imageCount(); i++) {
+    for (size_t i = 0; i < hmlContext->imageCount(); i++) {
         const auto size = sizeof(GeneralUbo);
         auto ubo = hmlContext->hmlResourceManager->createUniformBuffer(size);
         ubo->map();
         viewProjUniformBuffers.push_back(std::move(ubo));
     }
-    for (size_t i = 0; i < hmlContext->hmlSwapchain->imageCount(); i++) {
+    for (size_t i = 0; i < hmlContext->imageCount(); i++) {
         const auto size = sizeof(LightUbo);
         auto ubo = hmlContext->hmlResourceManager->createUniformBuffer(size);
         ubo->map();
@@ -46,8 +48,8 @@ bool Himmel::init() noexcept {
 
 
     generalDescriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
-        .withUniformBuffers(hmlContext->hmlSwapchain->imageCount() + hmlContext->hmlSwapchain->imageCount()) // GeneralUbo + LightUbo
-        .maxSets(hmlContext->hmlSwapchain->imageCount()) // they are in the same set
+        .withUniformBuffers(hmlContext->imageCount() + hmlContext->imageCount()) // GeneralUbo + LightUbo
+        .maxSets(hmlContext->imageCount()) // they are in the same set
         .build(hmlContext->hmlDevice);
     if (!generalDescriptorPool) return false;
 
@@ -68,9 +70,9 @@ bool Himmel::init() noexcept {
     if (!generalDescriptorSetLayout) return false;
 
     generalDescriptorSet_0_perImage = hmlContext->hmlDescriptors->createDescriptorSets(
-        hmlContext->hmlSwapchain->imageCount(), generalDescriptorSetLayout, generalDescriptorPool);
+        hmlContext->imageCount(), generalDescriptorSetLayout, generalDescriptorPool);
     if (generalDescriptorSet_0_perImage.empty()) return false;
-    for (size_t imageIndex = 0; imageIndex < hmlContext->hmlSwapchain->imageCount(); imageIndex++) {
+    for (size_t imageIndex = 0; imageIndex < hmlContext->imageCount(); imageIndex++) {
         HmlDescriptorSetUpdater(generalDescriptorSet_0_perImage[imageIndex])
             .uniformBufferAt(0,
                 viewProjUniformBuffers[imageIndex]->buffer,
@@ -367,6 +369,8 @@ bool Himmel::init() noexcept {
 bool Himmel::run() noexcept {
     static auto startTime = std::chrono::high_resolution_clock::now();
     while (!hmlContext->hmlWindow->shouldClose()) {
+        hmlContext->hmlQueries->beginFrame();
+
         glfwPollEvents();
 
         static auto mark = startTime;
@@ -382,6 +386,9 @@ bool Himmel::run() noexcept {
 
         if (!drawFrame()) return false;
 
+        hmlContext->hmlResourceManager->tickFrame(hmlContext->currentFrame);
+        hmlContext->hmlQueries->endFrame(hmlContext->currentFrame);
+
 #if LOG_FPS
         const auto fps = 1.0 / deltaSeconds;
         std::cout << "Delta = " << deltaSeconds * 1000.0f << "ms [FPS = " << fps << "]"
@@ -389,7 +396,33 @@ bool Himmel::run() noexcept {
             << '\n';
 #endif
 
-        hmlContext->hmlResourceManager->tickFrame();
+#if LOG_STATS
+        if (const auto frameStatOpt = hmlContext->hmlQueries->popOldestFrameStat(); frameStatOpt) {
+            static uint64_t lastFrameStart = 0;
+
+            // for (const auto& eventName : *(frameStatOpt->layout)) std::cout << eventName << "===";
+            // std::cout << '\n';
+
+            uint64_t last = 0;
+            char c = 'A';
+            for (const auto& dataOpt : frameStatOpt->data) {
+                if (dataOpt) {
+                    if (!last) {
+                        last = *dataOpt; // to make the first one display as zero
+                        std::cout << "Since d=" << (*dataOpt - lastFrameStart)/1000 << "mks     ";
+                        lastFrameStart = *dataOpt;
+                    }
+                    std::cout << c++ << "=" << ((*dataOpt) - last) / 1000 << "mks";
+                    last = *dataOpt;
+                } else         std::cout << "---";
+
+                std::cout << "  ";
+            }
+            std::cout << '\n';
+        }
+#endif
+
+        hmlContext->currentFrame++;
     }
     vkDeviceWaitIdle(hmlContext->hmlDevice->device);
     return true;
@@ -609,7 +642,7 @@ bool Himmel::drawFrame() noexcept {
         }
     }
 
-    currentFrame = (currentFrame + 1) % maxFramesInFlight;
+    currentFrame = (currentFrame + 1) % hmlContext->maxFramesInFlight;
     return true;
 }
 
@@ -622,7 +655,7 @@ bool Himmel::prepareResources() noexcept {
     };
 
     const auto extent = hmlContext->hmlSwapchain->extent;
-    const size_t count = hmlContext->hmlSwapchain->imageCount();
+    const size_t count = hmlContext->imageCount();
     gBufferPositions.resize(count);
     gBufferNormals.resize(count);
     gBufferColors.resize(count);
@@ -882,10 +915,10 @@ void Himmel::recreateSwapchain() noexcept {
 
 
 bool Himmel::createSyncObjects() noexcept {
-    imageAvailableSemaphores.resize(maxFramesInFlight);
-    renderFinishedSemaphores.resize(maxFramesInFlight);
-    inFlightFences.resize(maxFramesInFlight);
-    imagesInFlight.resize(hmlContext->hmlSwapchain->imageCount(), VK_NULL_HANDLE); // initially not a single frame is using an image
+    imageAvailableSemaphores.resize(hmlContext->maxFramesInFlight);
+    renderFinishedSemaphores.resize(hmlContext->maxFramesInFlight);
+    inFlightFences.resize(hmlContext->maxFramesInFlight);
+    imagesInFlight.resize(hmlContext->imageCount(), VK_NULL_HANDLE); // initially not a single frame is using an image
 
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -897,7 +930,7 @@ bool Himmel::createSyncObjects() noexcept {
     // Vulkan upon command buffer execution finish.
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    for (size_t i = 0; i < maxFramesInFlight; i++) {
+    for (size_t i = 0; i < hmlContext->maxFramesInFlight; i++) {
         if (vkCreateSemaphore(hmlContext->hmlDevice->device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
             vkCreateSemaphore(hmlContext->hmlDevice->device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
             vkCreateFence    (hmlContext->hmlDevice->device, &fenceInfo,     nullptr, &inFlightFences[i])           != VK_SUCCESS) {
@@ -920,7 +953,7 @@ Himmel::~Himmel() noexcept {
         return;
     }
 
-    for (size_t i = 0; i < maxFramesInFlight; i++) {
+    for (size_t i = 0; i < hmlContext->maxFramesInFlight; i++) {
         vkDestroySemaphore(hmlContext->hmlDevice->device, renderFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(hmlContext->hmlDevice->device, imageAvailableSemaphores[i], nullptr);
         vkDestroyFence(hmlContext->hmlDevice->device, inFlightFences[i], nullptr);

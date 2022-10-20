@@ -29,7 +29,7 @@ bool HmlPipe::addStage(
         drawer->addRenderPass(hmlRenderPass);
     }
 
-    const auto count = hmlContext->hmlSwapchain->imageCount();
+    const auto count = hmlContext->imageCount();
     const auto pool = hmlContext->hmlCommands->commandPoolOnetimeFrames;
     stages.push_back(HmlStage{
         .drawers = std::move(drawers),
@@ -120,11 +120,13 @@ void HmlPipe::run(const HmlFrameData& frameData) noexcept {
         }
         // ============== Post-stage transitions
         {
-            const auto commandBuffer = hmlContext->hmlCommands->beginLongTermSingleTimeCommand();
-            for (const auto& transition : stage.postTransitions) {
-                transition.resourcePerImage[frameData.imageIndex]->transitionLayoutTo(transition.dstLayout, commandBuffer);
+            if (!stage.postTransitions.empty()) {
+                const auto commandBuffer = hmlContext->hmlCommands->beginLongTermSingleTimeCommand();
+                for (const auto& transition : stage.postTransitions) {
+                    transition.resourcePerImage[frameData.imageIndex]->transitionLayoutTo(transition.dstLayout, commandBuffer);
+                }
+                hmlContext->hmlCommands->endLongTermSingleTimeCommand(commandBuffer);
             }
-            hmlContext->hmlCommands->endLongTermSingleTimeCommand(commandBuffer);
         }
         // ============== Post-stage funcs
         if (stage.postFunc) (*stage.postFunc)(frameData.imageIndex);

@@ -8,7 +8,6 @@
 #include <iostream>
 #include <algorithm>
 
-#include "HmlContext.h"
 #include "HmlWindow.h"
 #include "HmlDevice.h"
 #include "HmlDescriptors.h"
@@ -28,6 +27,8 @@
 #include "util.h"
 #include "HmlRenderPass.h"
 #include "HmlPipe.h"
+#include "HmlQueries.h"
+#include "HmlContext.h"
 
 #include "../libs/stb_image.h"
 
@@ -242,7 +243,6 @@ struct Himmel {
 
 
     // Sync objects
-    const uint32_t maxFramesInFlight = 2;
     std::vector<VkSemaphore> imageAvailableSemaphores; // for each frame in flight
     std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
     std::vector<VkFence> inFlightFences;               // for each frame in flight

@@ -111,6 +111,7 @@ VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+    hmlContext->hmlQueries->registerEvent("HmlUiRenderer: begin", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
     assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlUiRenderer.\n");
     const auto& hmlPipeline = getCurrentPipelines()[0];
@@ -137,6 +138,7 @@ VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
         vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
     }
 
+    hmlContext->hmlQueries->registerEvent("HmlUiRenderer: end", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }

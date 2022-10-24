@@ -13,8 +13,14 @@
 
 
 struct HmlQueries {
+    struct LayoutItem {
+        std::string name;
+        std::string shortName;
+        inline LayoutItem(std::string&& name, std::string&& shortName) : name(std::move(name)), shortName(std::move(shortName)) {}
+    };
+
     struct FrameStat {
-        std::shared_ptr<std::vector<std::string>> layout;
+        std::shared_ptr<std::vector<LayoutItem>> layout;
         std::vector<std::optional<uint64_t>> data;
     };
 
@@ -22,7 +28,7 @@ struct HmlQueries {
     ~HmlQueries() noexcept;
     std::optional<VkQueryPool> createPool(uint32_t count) noexcept;
     std::vector<std::optional<uint64_t>> query(VkQueryPool pool) noexcept;
-    void registerEvent(std::string_view name, VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage) noexcept;
+    void registerEvent(std::string_view name, std::string_view shortName, VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage) noexcept;
     std::optional<FrameStat> popOldestFrameStat() noexcept;
     void beginFrame() noexcept;
     void endFrame(uint32_t currentFrame) noexcept;
@@ -39,7 +45,7 @@ struct HmlQueries {
     bool hasBegun = false;
 
     uint32_t currentEventIndex;
-    std::shared_ptr<std::vector<std::string>> layout;
+    std::shared_ptr<std::vector<LayoutItem>> layout;
     std::queue<FrameStat> frameStats;
     std::queue<VkQueryPool> pools;
     std::unordered_map<VkQueryPool, uint32_t> usedQueriesInPool;

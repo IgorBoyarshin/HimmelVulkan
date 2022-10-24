@@ -16,7 +16,7 @@ std::unique_ptr<HmlQueries> HmlQueries::create(std::shared_ptr<HmlDevice> hmlDev
     }
     hmlCommands->endLongTermSingleTimeCommand(commandBuffer);
 
-    hmlQueries->layout = std::make_shared<std::vector<std::string>>();
+    hmlQueries->layout = std::make_shared<std::vector<LayoutItem>>();
 
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(hmlDevice->physicalDevice, &properties);
@@ -80,12 +80,16 @@ std::vector<std::optional<uint64_t>> HmlQueries::query(VkQueryPool pool) noexcep
 
 
 // TODO add support for static registrations
-void HmlQueries::registerEvent(std::string_view name, VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage) noexcept {
+void HmlQueries::registerEvent(std::string_view name, std::string_view shortName, VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage) noexcept {
 #if USE_TIMESTAMP_QUERIES
-    if (!hasBegun) return;
-    if ((layout->size() <= currentEventIndex) || (name != (*layout)[currentEventIndex])) {
+    if (!hasBegun) {
+        std::cout << ":> HmlQueries: not registering " << name << " because the frame has not begun yet.\n";
+        return;
+    }
+
+    if ((layout->size() <= currentEventIndex) || (name != (*layout)[currentEventIndex].name)) {
         replaceLayout();
-        layout->push_back(std::string(name));
+        layout->emplace_back(std::string(name), std::string(shortName));
     }
 
     vkCmdWriteTimestamp(commandBuffer, pipelineStage, pools.front(), currentEventIndex);
@@ -146,7 +150,7 @@ void HmlQueries::endFrame(uint32_t currentFrame) noexcept {
 
 
 void HmlQueries::replaceLayout() noexcept {
-    auto copy = std::make_shared<std::vector<std::string>>(*layout);
+    auto copy = std::make_shared<std::vector<LayoutItem>>(*layout);
     layout.swap(copy);
     // Invalidate the rest of the layout, thus making it valid again
     layout->erase(layout->begin() + currentEventIndex, layout->end());

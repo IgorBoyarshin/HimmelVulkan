@@ -238,7 +238,7 @@ struct Himmel {
     std::unique_ptr<Car> car;
 
 
-    HmlCamera camera;
+    HmlCamera hmlCamera;
     glm::mat4 proj;
     std::pair<int32_t, int32_t> cursor;
 

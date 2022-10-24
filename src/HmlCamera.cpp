@@ -16,33 +16,34 @@ void HmlCamera::rotateDir(float dPitch, float dYaw) noexcept {
 
     // std::cout << "Pitch = " << pitch << "; Yaw = " << yaw << '\n';
 
-    recacheView();
+    rotationChanged = true;
+    cachedView = std::nullopt;
 }
 
 
 void HmlCamera::forward(float length) noexcept {
     pos += length * calcDirForward();
-    recacheView();
+    positionChanged = true;
+    cachedView = std::nullopt;
 }
 
 
 void HmlCamera::right(float length) noexcept {
     pos += length * calcDirRight();
-    recacheView();
+    positionChanged = true;
+    cachedView = std::nullopt;
 }
 
 
 void HmlCamera::lift(float length) noexcept {
     pos += length * dirUp;
-    recacheView();
+    positionChanged = true;
+    cachedView = std::nullopt;
 }
 
 
 void HmlCamera::recacheView() noexcept {
-    cachedView = glm::lookAt(pos, pos + calcDirForward(), dirUp);
-    // const auto f = calcDirForward();
-    // std::cout << "Pos = " << pos.x << "," << pos.y << "," << pos.z
-    //     << "; For = " << f.x << "," << f.y << "," << f.z << '\n';
+    cachedView = { glm::lookAt(pos, pos + calcDirForward(), dirUp) };
 }
 
 

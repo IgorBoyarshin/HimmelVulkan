@@ -200,8 +200,8 @@ bool Himmel::init() noexcept {
     hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
 
-    camera = HmlCamera{{ 25.0f, 40.0f, 35.0f }};
-    camera.rotateDir(-15.0f, -40.0f);
+    hmlCamera = HmlCamera{{ 25.0f, 40.0f, 35.0f }};
+    hmlCamera.rotateDir(-15.0f, -40.0f);
     cursor = hmlContext->hmlWindow->getCursor();
     proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
 
@@ -386,6 +386,8 @@ bool Himmel::run() noexcept {
     static auto startTime = std::chrono::high_resolution_clock::now();
     while (!hmlContext->hmlWindow->shouldClose()) {
         hmlContext->hmlQueries->beginFrame();
+        // To force initial update of stuff
+        if (hmlContext->currentFrame) hmlCamera.resetChanged();
 
         glfwPollEvents();
 
@@ -420,7 +422,7 @@ bool Himmel::run() noexcept {
             // std::cout << '\n';
 
             uint64_t last = 0;
-            char c = 'A';
+            auto it = frameStatOpt->layout->cbegin();
             for (const auto& dataOpt : frameStatOpt->data) {
                 if (dataOpt) {
                     if (!last) {
@@ -428,9 +430,10 @@ bool Himmel::run() noexcept {
                         std::cout << "Since d=" << (*dataOpt - lastFrameStart)/1000 << "mks     ";
                         lastFrameStart = *dataOpt;
                     }
-                    std::cout << c++ << "=" << ((*dataOpt) - last) / 1000 << "mks";
+                    const auto value = ((*dataOpt) - last) / 1000;
+                    std::cout << (it++)->shortName << "=" << value << "mks";
                     last = *dataOpt;
-                } else         std::cout << "---";
+                } else std::cout << "---";
 
                 std::cout << "  ";
             }
@@ -467,7 +470,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         const int32_t dy = newCursor.second - cursor.second;
         cursor = newCursor;
         const float rotateSpeed = 0.05f;
-        if (dx || dy) camera.rotateDir(-dy * rotateSpeed, dx * rotateSpeed);
+        if (dx || dy) hmlCamera.rotateDir(-dy * rotateSpeed, dx * rotateSpeed);
     }
     {
         constexpr float movementSpeed = 16.0f;
@@ -481,28 +484,28 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
 
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_W) == GLFW_PRESS) {
-            camera.forward(length);
+            hmlCamera.forward(length);
         }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_S) == GLFW_PRESS) {
-            camera.forward(-length);
+            hmlCamera.forward(-length);
         }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_D) == GLFW_PRESS) {
-            camera.right(length);
+            hmlCamera.right(length);
         }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_A) == GLFW_PRESS) {
-            camera.right(-length);
+            hmlCamera.right(-length);
         }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            camera.lift(length);
+            hmlCamera.lift(length);
         }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_C) == GLFW_PRESS) {
-            camera.lift(-length);
+            hmlCamera.lift(-length);
         }
 
         const float carSpeed = 10.0f;
         float carDistance = carSpeed * dt;
         if      (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) { carDistance *= 0.4f * boostUp; }
-        else if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)   { carDistance *= boostDown; }
+        else if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_ALT)   == GLFW_PRESS) { carDistance *= boostDown; }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_RIGHT) == GLFW_PRESS) { car->moveRight(carDistance); }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT)  == GLFW_PRESS) { car->moveRight(-carDistance); }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_UP)    == GLFW_PRESS) { car->moveForward(carDistance); }
@@ -522,7 +525,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         static bool pPressed = false;
         if (!pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_PRESS) {
             pPressed = true;
-            camera.printStats();
+            hmlCamera.printStats();
         } else if (pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_RELEASE) {
             pPressed = false;
         }
@@ -532,19 +535,28 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 #if SNOW_IS_ON
     hmlSnowRenderer->updateForDt(dt, sinceStart);
 #endif
-    hmlTerrainRenderer->update(camera.getPos());
+    {
+        // NOTE Takes up to 60mks with (current) CPU-patch implementation
+        // const auto startTime = std::chrono::high_resolution_clock::now();
+        if (hmlCamera.positionHasChanged()) hmlTerrainRenderer->update(hmlCamera.getPos());
+        // const auto newMark = std::chrono::high_resolution_clock::now();
+        // const auto sinceStart = std::chrono::duration_cast<std::chrono::microseconds>(newMark - startTime).count();
+        // const float sinceStartMksSeconds = static_cast<float>(sinceStart);
+        // std::cout << "UPD = " << sinceStartMksSeconds << '\n';
+    }
 }
 
 
 void Himmel::updateForImage(uint32_t imageIndex) noexcept {
+    // NOTE cannot use hmlCamera.somethingHasChanged because we have multiple UBOs (per image)
     GeneralUbo generalUbo{
-        .view = camera.view(),
+        .view = hmlCamera.view(),
         .proj = proj,
         .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
         .ambientStrength = 0.1f,
         .fogColor = weather.fogColor,
         .fogDensity = weather.fogDensity,
-        .cameraPos = camera.getPos(),
+        .cameraPos = hmlCamera.getPos(),
     };
     viewProjUniformBuffers[imageIndex]->update(&generalUbo);
 
@@ -558,7 +570,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         for (const auto& light : pointLightsDynamic) lightUbo.pointLights[i++] = light;
         // Sort to enable proper transparency
         std::sort(lightUbo.pointLights.begin(), lightUbo.pointLights.begin() + lightsCount,
-                [cameraPos = camera.getPos()](const auto& l1, const auto& l2){
+                [cameraPos = hmlCamera.getPos()](const auto& l1, const auto& l2){
                 const auto v1 = cameraPos - l1.position;
                 const auto v2 = cameraPos - l2.position;
                 return glm::dot(v1, v1) > glm::dot(v2, v2);

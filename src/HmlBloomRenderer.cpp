@@ -110,7 +110,7 @@ VkCommandBuffer HmlBloomRenderer::draw(const HmlFrameData& frameData) noexcept {
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
-    hmlContext->hmlQueries->registerEvent("HmlBloomRenderer: begin", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    hmlContext->hmlQueries->registerEvent("HmlBloomRenderer: begin", "BLw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
     assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlBloomRenderer.\n");
     const auto& hmlPipeline = getCurrentPipelines()[0];
@@ -128,7 +128,7 @@ VkCommandBuffer HmlBloomRenderer::draw(const HmlFrameData& frameData) noexcept {
     const uint32_t firstVertex = 0;
     vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
-    hmlContext->hmlQueries->registerEvent("HmlBloomRenderer: end", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+    hmlContext->hmlQueries->registerEvent("HmlBloomRenderer: end", "BL", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }

@@ -249,7 +249,7 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
-    hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
     // const auto pipelineIndex = modeDebug ? PIPELINE_DEBUG_INDEX : PIPELINE_REGULAR_INDEX;
     // const auto& hmlPipeline = getCurrentPipelines()[pipelineIndex];
@@ -286,7 +286,7 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
         }
     }
 
-    hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+    hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", "T", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }

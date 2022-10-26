@@ -35,7 +35,7 @@ struct HmlUiRenderer : HmlDrawer {
     std::vector<std::shared_ptr<HmlImageResource>> imageResources;
 
 
-    static constexpr uint32_t MAX_TEXTURES_COUNT = 3; // XXX must match the shader
+    static constexpr uint32_t MAX_TEXTURES_COUNT = 4; // XXX must match the shader
     // static constexpr int32_t NO_TEXTURE_MARK = -1;
     uint32_t texturesCount = 0;
 

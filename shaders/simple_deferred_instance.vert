@@ -26,6 +26,7 @@ layout(location = 2) in vec3 inNormal;
 layout(location = 0) out vec2 outFragTexCoord;
 layout(location = 1) out vec3 outPosition;
 layout(location = 2) out vec3 outNormal;
+layout(location = 3) out vec3 outLightSpacePosition;
 
 void main() {
     // XXX It appears that gl_BaseInstance is automatically added to
@@ -37,4 +38,5 @@ void main() {
     outFragTexCoord = inTexCoord;
     outNormal = normalize((model * vec4(inNormal, 0.0)).xyz);
     outPosition = posWorld.xyz;
+    outLightSpacePosition = posWorld.xyz;
 }

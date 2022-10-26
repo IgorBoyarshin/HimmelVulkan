@@ -32,6 +32,7 @@ layout(location = 1) in float inSegments[];
 layout(location = 0) out vec2 outTexCoord;
 layout(location = 1) out vec3 outPosition;
 layout(location = 2) out vec3 outNormal;
+layout(location = 3) out vec3 outLightSpacePosition;
 
 void main() {
     vec2 t = mix(
@@ -60,4 +61,5 @@ void main() {
     outTexCoord = t;
     outNormal = normal;
     outPosition = v0.xyz;
+    outLightSpacePosition = v0.xyz; // TODO XXX
 }

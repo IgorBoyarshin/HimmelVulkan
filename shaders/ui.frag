@@ -1,7 +1,7 @@
 #version 450
 
 // XXX sync with Vertex shader
-#define MAX_TEXTURES_COUNT 3
+#define MAX_TEXTURES_COUNT 4
 layout(push_constant) uniform PushConstants {
     int textureIndex;
     float shift;

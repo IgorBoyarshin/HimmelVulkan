@@ -26,10 +26,11 @@ layout(set = 0, binding = 1) uniform LightsUbo {
     uint count;
 } uboLights;
 
-#define G_POSITION 0
-#define G_NORMAL   1
-#define G_COLOR    2
-#define G_COUNT    3
+#define G_POSITION        0
+#define G_NORMAL          1
+#define G_COLOR           2
+#define G_LIGHT_SPACE_POS 3
+#define G_COUNT           4
 layout(set = 1, binding = 0) uniform sampler2D texSamplers[G_COUNT];
 
 layout(location = 0) in vec2 inTexCoord;

@@ -687,29 +687,33 @@ bool Himmel::prepareResources() noexcept {
     gBufferPositions.resize(count);
     gBufferNormals.resize(count);
     gBufferColors.resize(count);
+    gBufferLightSpacePositions.resize(count);
     brightness1Textures.resize(count);
     // brightness2Textures.resize(count);
     mainTextures.resize(count);
     for (size_t i = 0; i < count; i++) {
-        gBufferPositions[i]    = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
-        gBufferNormals[i]      = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
-        gBufferColors[i]       = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        brightness1Textures[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        // brightness2Textures[i] = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        mainTextures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        if (!gBufferPositions[i])    return false;
-        if (!gBufferNormals[i])      return false;
-        if (!gBufferColors[i])       return false;
-        if (!brightness1Textures[i]) return false;
-        // if (!brightness2Textures[i]) return false;
-        if (!mainTextures[i])        return false;
+        // XXX TODO use modified findDepthFormat()
+        gBufferPositions[i]           = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        gBufferNormals[i]             = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        gBufferColors[i]              = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        // brightness2Textures[i]        = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        mainTextures[i]               = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        if (!gBufferPositions[i])           return false;
+        if (!gBufferNormals[i])             return false;
+        if (!gBufferColors[i])              return false;
+        if (!gBufferLightSpacePositions[i]) return false;
+        if (!brightness1Textures[i])        return false;
+        // if (!brightness2Textures[i])        return false;
+        if (!mainTextures[i])               return false;
     }
     hmlDepthResource = hmlContext->hmlResourceManager->newDepthResource(extent);
     if (!hmlDepthResource) return false;
 
 
-    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
-    hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
+    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
+    hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
     // hmlBlurRenderer->specify(brightness1Textures, brightness2Textures);
     hmlBloomRenderer->specify(mainTextures, brightness1Textures);
     // hmlBloomRenderer->specify(mainTextures);
@@ -742,6 +746,14 @@ bool Himmel::prepareResources() noexcept {
             HmlRenderPass::ColorAttachment{
                 .imageFormat = gBufferColors[0]->format,
                 .imageViews = viewsFrom(gBufferColors),
+                .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
+                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+            HmlRenderPass::ColorAttachment{
+                .imageFormat = gBufferLightSpacePositions[0]->format,
+                .imageViews = viewsFrom(gBufferLightSpacePositions),
                 .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
                 .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                 // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,

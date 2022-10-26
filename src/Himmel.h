@@ -187,6 +187,8 @@ struct Himmel {
     struct GeneralUbo {
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
+        alignas(16) glm::mat4 globalLightView;
+        alignas(16) glm::mat4 globalLightProj;
         glm::vec3 globalLightDir;
         float ambientStrength;
         glm::vec3 fogColor;

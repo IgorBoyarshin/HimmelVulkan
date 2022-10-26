@@ -12,6 +12,10 @@
 
 // XXX Sync across all shaders
 layout(set = 0, binding = 0) uniform GeneralUbo {
+    // TODO update
+    // TODO update
+    // TODO update
+    // TODO update
     mat4 view;
     mat4 proj;
     vec4 globalLightDir_ambientStrength;

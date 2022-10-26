@@ -4,6 +4,8 @@
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
+    mat4 globalLightView;
+    mat4 globalLightProj;
     vec4 globalLightDir_ambientStrength;
     vec4 fogColor_density;
     vec3 cameraPos;

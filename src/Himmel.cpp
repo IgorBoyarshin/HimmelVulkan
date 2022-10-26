@@ -549,10 +549,34 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 void Himmel::updateForImage(uint32_t imageIndex) noexcept {
     // NOTE cannot use hmlCamera.somethingHasChanged because we have multiple UBOs (per image)
+    const auto globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f));
+    // const auto DST = 4.0f;
+    // const auto globalLightPos = glm::vec3(DST * world->start.x, DST * world->height, DST * world->finish.y);
+    // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + globalLightDir, glm::vec3{0, 1, 0});
+    const auto calcDirForward = [](float pitch, float yaw){
+        const auto p = glm::radians(pitch);
+        const auto y = glm::radians(yaw);
+        const auto cosp = glm::cos(p);
+        const auto sinp = glm::sin(p);
+        const auto cosy = glm::cos(y);
+        const auto siny = glm::sin(y);
+        return glm::normalize(glm::vec3(siny * cosp, sinp, -cosy * cosp));
+    };
+    const auto globalLightPos = glm::vec3(-330, 150, 400);
+    const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + calcDirForward(-18.15f, 42.4f), glm::vec3{0, 1, 0});
+    const auto globalLightProj = [&](){
+        const float near = 0.1f;
+        const float far = 1000.0f;
+        glm::mat4 proj = glm::perspective(glm::radians(45.0f), hmlContext->hmlSwapchain->extentAspect(), near, far);
+        proj[1][1] *= -1; // fix the inverted Y axis of GLM
+        return proj;
+    }();
     GeneralUbo generalUbo{
         .view = hmlCamera.view(),
         .proj = proj,
-        .globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)),
+        .globalLightView = globalLightView,
+        .globalLightProj = globalLightProj,
+        .globalLightDir = globalLightDir,
         .ambientStrength = 0.1f,
         .fogColor = weather.fogColor,
         .fogDensity = weather.fogDensity,

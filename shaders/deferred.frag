@@ -4,6 +4,8 @@
 layout(set = 0, binding = 0) uniform GeneralUbo {
     mat4 view;
     mat4 proj;
+    mat4 globalLightView;
+    mat4 globalLightProj;
     vec3 globalLightDir;
     float ambientStrength;
     vec3 fogColor;

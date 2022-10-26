@@ -5,56 +5,117 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
     std::vector<std::unique_ptr<HmlPipeline>> pipelines;
 
-    { // Regular Entities
-        HmlGraphicsPipelineConfig config{
-            .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
-            .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
-            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-            .hmlShaders = HmlShaders()
-                .addVertex("../shaders/out/simple_deferred.vert.spv")
-                .addFragment("../shaders/out/simple_deferred.frag.spv"),
-            .renderPass = hmlRenderPass->renderPass,
-            .extent = hmlRenderPass->extent,
-            .polygoneMode = VK_POLYGON_MODE_FILL,
-            // .cullMode = VK_CULL_MODE_BACK_BIT,
-            .cullMode = VK_CULL_MODE_NONE,
-            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            .descriptorSetLayouts = descriptorSetLayouts,
-            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pushConstantsSizeBytes = sizeof(PushConstantRegular),
-            .tessellationPatchPoints = 0,
-            .lineWidth = 1.0f,
-            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-            .withBlending = true,
-        };
+    switch (mode) {
+        case Mode::Regular: {
+            { // Regular Entities
+                HmlGraphicsPipelineConfig config{
+                    .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
+                    .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
+                    .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                    .hmlShaders = HmlShaders()
+                        .addVertex("../shaders/out/simple_deferred.vert.spv")
+                        .addFragment("../shaders/out/simple_deferred.frag.spv"),
+                    .renderPass = hmlRenderPass->renderPass,
+                    .extent = hmlRenderPass->extent,
+                    .polygoneMode = VK_POLYGON_MODE_FILL,
+                    // .cullMode = VK_CULL_MODE_BACK_BIT,
+                    .cullMode = VK_CULL_MODE_NONE,
+                    .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                    .descriptorSetLayouts = descriptorSetLayouts,
+                    .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pushConstantsSizeBytes = sizeof(PushConstantRegular),
+                    .tessellationPatchPoints = 0,
+                    .lineWidth = 1.0f,
+                    .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+                    .withBlending = true,
+                };
 
-        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
-    }
+                pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+            }
 
-    { // Instanced (static Entities)
-        HmlGraphicsPipelineConfig config{
-            .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
-            .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
-            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-            .hmlShaders = HmlShaders()
-                .addVertex("../shaders/out/simple_deferred_instance.vert.spv")
-                .addFragment("../shaders/out/simple_deferred_instance.frag.spv"),
-            .renderPass = hmlRenderPass->renderPass,
-            .extent = hmlRenderPass->extent,
-            .polygoneMode = VK_POLYGON_MODE_FILL,
-            // .cullMode = VK_CULL_MODE_BACK_BIT,
-            .cullMode = VK_CULL_MODE_NONE,
-            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            .descriptorSetLayouts = descriptorSetLayouts,
-            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pushConstantsSizeBytes = sizeof(PushConstantInstanced),
-            .tessellationPatchPoints = 0,
-            .lineWidth = 1.0f,
-            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-            .withBlending = true,
-        };
+            { // Instanced (static Entities)
+                HmlGraphicsPipelineConfig config{
+                    .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
+                    .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
+                    .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                    .hmlShaders = HmlShaders()
+                        .addVertex("../shaders/out/simple_deferred_instance.vert.spv")
+                        .addFragment("../shaders/out/simple_deferred_instance.frag.spv"),
+                    .renderPass = hmlRenderPass->renderPass,
+                    .extent = hmlRenderPass->extent,
+                    .polygoneMode = VK_POLYGON_MODE_FILL,
+                    // .cullMode = VK_CULL_MODE_BACK_BIT,
+                    .cullMode = VK_CULL_MODE_NONE,
+                    .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                    .descriptorSetLayouts = descriptorSetLayouts,
+                    .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pushConstantsSizeBytes = sizeof(PushConstantInstanced),
+                    .tessellationPatchPoints = 0,
+                    .lineWidth = 1.0f,
+                    .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+                    .withBlending = true,
+                };
 
-        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+                pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+            }
+        } break;
+
+        case Mode::Shadowmap: {
+            { // Regular Entities
+                HmlGraphicsPipelineConfig config{
+                    .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
+                    .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
+                    .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                    .hmlShaders = HmlShaders()
+                        .addVertex("../shaders/out/simple_deferred.vert.spv")
+                        .addFragment("../shaders/out/simple_deferred.frag.spv"),
+                    .renderPass = hmlRenderPass->renderPass,
+                    .extent = hmlRenderPass->extent,
+                    .polygoneMode = VK_POLYGON_MODE_FILL,
+                    // .cullMode = VK_CULL_MODE_BACK_BIT,
+                    .cullMode = VK_CULL_MODE_NONE,
+                    .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                    .descriptorSetLayouts = descriptorSetLayouts,
+                    .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pushConstantsSizeBytes = sizeof(PushConstantRegular),
+                    .tessellationPatchPoints = 0,
+                    .lineWidth = 1.0f,
+                    .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+                    .withBlending = true,
+                };
+
+                pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+            }
+
+            { // Instanced (static Entities)
+                HmlGraphicsPipelineConfig config{
+                    .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
+                    .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
+                    .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                    .hmlShaders = HmlShaders()
+                        .addVertex("../shaders/out/simple_deferred_instance.vert.spv")
+                        .addFragment("../shaders/out/simple_deferred_instance.frag.spv"),
+                    .renderPass = hmlRenderPass->renderPass,
+                    .extent = hmlRenderPass->extent,
+                    .polygoneMode = VK_POLYGON_MODE_FILL,
+                    // .cullMode = VK_CULL_MODE_BACK_BIT,
+                    .cullMode = VK_CULL_MODE_NONE,
+                    .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                    .descriptorSetLayouts = descriptorSetLayouts,
+                    .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pushConstantsSizeBytes = sizeof(PushConstantInstanced),
+                    .tessellationPatchPoints = 0,
+                    .lineWidth = 1.0f,
+                    .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+                    .withBlending = true,
+                };
+
+                pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+            }
+        } break;
+
+        default:
+            assert(false && "::> HmlRenderer: Unhandled Mode in createPipelines.\n");
     }
 
     return pipelines;

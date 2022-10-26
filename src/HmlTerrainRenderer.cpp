@@ -15,65 +15,100 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
     // std::vector<std::unique_ptr<HmlPipeline>> pipelines(PIPELINE_COUNT);
     std::vector<std::unique_ptr<HmlPipeline>> pipelines;
 
-    if (!modeDebug) { // Regular
-        HmlGraphicsPipelineConfig config{
-            .bindingDescriptions   = {},
-            .attributeDescriptions = {},
-            .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
-            .hmlShaders = HmlShaders()
-                .addVertex("../shaders/out/terrain.vert.spv")
-                .addTessellationControl("../shaders/out/terrain.tesc.spv")
-                .addTessellationEvaluation("../shaders/out/terrain_deferred.tese.spv")
-                .addFragment("../shaders/out/terrain_deferred.frag.spv"),
-            .renderPass = hmlRenderPass->renderPass,
-            .extent = hmlRenderPass->extent,
-            // .polygoneMode = VK_POLYGON_MODE_LINE,
-            .polygoneMode = VK_POLYGON_MODE_FILL,
-            // .cullMode = VK_CULL_MODE_BACK_BIT,
-            .cullMode = VK_CULL_MODE_NONE,
-            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            .descriptorSetLayouts = descriptorSetLayouts,
-            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
-            .pushConstantsSizeBytes = sizeof(PushConstant),
-            .tessellationPatchPoints = 4,
-            .lineWidth = 1.0f,
-            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-            .withBlending = true,
-        };
+    switch (mode) {
+        case Mode::Regular: {
+            HmlGraphicsPipelineConfig config{
+                .bindingDescriptions   = {},
+                .attributeDescriptions = {},
+                .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
+                .hmlShaders = HmlShaders()
+                    .addVertex("../shaders/out/terrain.vert.spv")
+                    .addTessellationControl("../shaders/out/terrain.tesc.spv")
+                    .addTessellationEvaluation("../shaders/out/terrain_deferred.tese.spv")
+                    .addFragment("../shaders/out/terrain_deferred.frag.spv"),
+                .renderPass = hmlRenderPass->renderPass,
+                .extent = hmlRenderPass->extent,
+                // .polygoneMode = VK_POLYGON_MODE_LINE,
+                .polygoneMode = VK_POLYGON_MODE_FILL,
+                // .cullMode = VK_CULL_MODE_BACK_BIT,
+                .cullMode = VK_CULL_MODE_NONE,
+                .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                .descriptorSetLayouts = descriptorSetLayouts,
+                .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+                .pushConstantsSizeBytes = sizeof(PushConstant),
+                .tessellationPatchPoints = 4,
+                .lineWidth = 1.0f,
+                .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+                .withBlending = true,
+            };
 
-        // pipelines[PIPELINE_REGULAR_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
-        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
-    }
+            // pipelines[PIPELINE_REGULAR_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
+            pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+        } break;
 
-    if (modeDebug) { // Debug
-        HmlGraphicsPipelineConfig config{
-            .bindingDescriptions   = {},
-            .attributeDescriptions = {},
-            .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
-            .hmlShaders = HmlShaders()
-                .addVertex("../shaders/out/terrain.vert.spv")
-                .addTessellationControl("../shaders/out/terrain.tesc.spv")
-                .addTessellationEvaluation("../shaders/out/terrain_debug.tese.spv")
-                .addGeometry("../shaders/out/terrain_debug.geom.spv")
-                .addFragment("../shaders/out/terrain_debug.frag.spv"),
-            .renderPass = hmlRenderPass->renderPass,
-            .extent = hmlRenderPass->extent,
-            // .polygoneMode = VK_POLYGON_MODE_LINE,
-            .polygoneMode = VK_POLYGON_MODE_FILL, // NOTE does not matter, we output a line strip
-            // .cullMode = VK_CULL_MODE_BACK_BIT,
-            .cullMode = VK_CULL_MODE_NONE,
-            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            .descriptorSetLayouts = descriptorSetLayouts,
-            .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
-            .pushConstantsSizeBytes = sizeof(PushConstant),
-            .tessellationPatchPoints = 4,
-            .lineWidth = 2.0f,
-            .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-            .withBlending = true,
-        };
+        case Mode::Debug: {
+            HmlGraphicsPipelineConfig config{
+                .bindingDescriptions   = {},
+                .attributeDescriptions = {},
+                .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
+                .hmlShaders = HmlShaders()
+                    .addVertex("../shaders/out/terrain.vert.spv")
+                    .addTessellationControl("../shaders/out/terrain.tesc.spv")
+                    .addTessellationEvaluation("../shaders/out/terrain_debug.tese.spv")
+                    .addGeometry("../shaders/out/terrain_debug.geom.spv")
+                    .addFragment("../shaders/out/terrain_debug.frag.spv"),
+                .renderPass = hmlRenderPass->renderPass,
+                .extent = hmlRenderPass->extent,
+                // .polygoneMode = VK_POLYGON_MODE_LINE,
+                .polygoneMode = VK_POLYGON_MODE_FILL, // NOTE does not matter, we output a line strip
+                // .cullMode = VK_CULL_MODE_BACK_BIT,
+                .cullMode = VK_CULL_MODE_NONE,
+                .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                .descriptorSetLayouts = descriptorSetLayouts,
+                .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+                .pushConstantsSizeBytes = sizeof(PushConstant),
+                .tessellationPatchPoints = 4,
+                .lineWidth = 2.0f,
+                .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+                .withBlending = true,
+            };
 
-        // pipelines[PIPELINE_DEBUG_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
-        pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+            // pipelines[PIPELINE_DEBUG_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
+            pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+        } break;
+
+        case Mode::Shadowmap: {
+            HmlGraphicsPipelineConfig config{
+                .bindingDescriptions   = {},
+                .attributeDescriptions = {},
+                .topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
+                .hmlShaders = HmlShaders()
+                    .addVertex("../shaders/out/terrain.vert.spv")
+                    .addTessellationControl("../shaders/out/terrain.tesc.spv")
+                    .addTessellationEvaluation("../shaders/out/terrain_deferred.tese.spv")
+                    .addFragment("../shaders/out/terrain_deferred.frag.spv"),
+                .renderPass = hmlRenderPass->renderPass,
+                .extent = hmlRenderPass->extent,
+                // .polygoneMode = VK_POLYGON_MODE_LINE,
+                .polygoneMode = VK_POLYGON_MODE_FILL,
+                // .cullMode = VK_CULL_MODE_BACK_BIT,
+                .cullMode = VK_CULL_MODE_NONE,
+                .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                .descriptorSetLayouts = descriptorSetLayouts,
+                .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+                .pushConstantsSizeBytes = sizeof(PushConstant),
+                .tessellationPatchPoints = 4,
+                .lineWidth = 1.0f,
+                .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
+                .withBlending = true,
+            };
+
+            // pipelines[PIPELINE_REGULAR_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
+            pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+        } break;
+
+        default:
+            assert(false && "::> HmlTerrainRenderer: Unhandled Mode in createPipelines.\n");
     }
 
     return pipelines;
@@ -251,8 +286,6 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
     hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
-    // const auto pipelineIndex = modeDebug ? PIPELINE_DEBUG_INDEX : PIPELINE_REGULAR_INDEX;
-    // const auto& hmlPipeline = getCurrentPipelines()[pipelineIndex];
     assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlTerrainRenderer.\n");
     const auto& hmlPipeline = getCurrentPipelines()[0];
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);

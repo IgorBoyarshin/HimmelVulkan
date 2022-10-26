@@ -722,8 +722,35 @@ bool Himmel::prepareResources() noexcept {
     hmlPipe = std::make_unique<HmlPipe>(hmlContext, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences);
     const float VERY_FAR = 10000.0f;
     bool allGood = true;
-    // Renders main geometry into the GBuffer
-    hmlTerrainRenderer->setModeDebug(false);
+
+    // ================================= PASS =================================
+    // ======== Render shadow-casting geometry into shadow map ========
+    // hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
+    // hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
+    // allGood &= hmlPipe->addStage(
+    //     { hmlTerrainRenderer, hmlRenderer }, // drawers
+    //     {}, // output color attachments
+    //     { // optional depth attachment
+    //         HmlRenderPass::DepthStencilAttachment{
+    //             .imageFormat = hmlDepthResource->format,
+    //             .imageView = hmlDepthResource->view,
+    //             .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
+    //             .saveDepth = true,
+    //             .hasPrevious = false,
+    //         }
+    //     },
+    //     {}, // post transitions
+    //     std::nullopt // post func
+    //     // [&](uint32_t imageIndex){ // post func
+    //     //     gBufferPositions[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //     //     gBufferNormals[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //     //     gBufferColors[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //     // }
+    // );
+    // ================================= PASS =================================
+    // ======== Renders main geometry into the GBuffer ========
+    hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
+    hmlRenderer->setMode(HmlRenderer::Mode::Regular);
     allGood &= hmlPipe->addStage( // deferred prep
         { hmlTerrainRenderer, hmlRenderer }, // drawers
         { // output color attachments
@@ -777,7 +804,8 @@ bool Himmel::prepareResources() noexcept {
         //     gBufferColors[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         // }
     );
-    // Renders a 2D texture using the GBuffer
+    // ================================= PASS =================================
+    // ======== Renders a 2D texture using the GBuffer ========
     allGood &= hmlPipe->addStage( // deferred
         { hmlDeferredRenderer }, // drawers
         { // output color attachments
@@ -798,7 +826,7 @@ bool Himmel::prepareResources() noexcept {
     );
     // Renders on top of the deferred texture using the depth info from the prep pass
 #if DEBUG_TERRAIN
-    hmlTerrainRenderer->setModeDebug(true);
+    hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
 #endif
     allGood &= hmlPipe->addStage( // forward
         {
@@ -850,6 +878,7 @@ bool Himmel::prepareResources() noexcept {
         std::nullopt // post func
     );
 
+    // ================================= PASS =================================
     // hmlBlurRenderer->modeVertical();
     // hmlBlurRenderer->modeHorizontal();
     // for (auto i = 0; i < 1; i++) {
@@ -885,6 +914,7 @@ bool Himmel::prepareResources() noexcept {
     //         [hmlBlurRenderer=hmlBlurRenderer](uint32_t){ hmlBlurRenderer->modeHorizontal(); } // post func
     //     );
     // }
+    // ================================= PASS =================================
     allGood &= hmlPipe->addStage( // bloom
         { hmlBloomRenderer }, // drawers
         { // output color attachments
@@ -900,7 +930,8 @@ bool Himmel::prepareResources() noexcept {
         {}, // post transitions
         std::nullopt // post func
     );
-    // Renders multiple 2D textures on top of everything
+    // ================================= PASS =================================
+    // ======== Renders multiple 2D textures on top of everything ========
     allGood &= hmlPipe->addStage( // ui
         { hmlUiRenderer }, // drawers
         { // output color attachments

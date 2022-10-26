@@ -52,6 +52,13 @@ struct HmlRenderer : HmlDrawer {
     };
 
 
+    enum class Mode {
+        Regular, Shadowmap
+    } mode;
+
+    inline void setMode(Mode newMode) noexcept { mode = newMode; }
+
+
     VkDescriptorPool descriptorPool;
     VkDescriptorSet  descriptorSet_textures_1;
     std::queue<VkDescriptorSet> descriptorSet_instances_2_queue; // FIFO

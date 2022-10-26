@@ -81,9 +81,11 @@ struct HmlTerrainRenderer : HmlDrawer {
     // static constexpr size_t PIPELINE_REGULAR_INDEX = 0;
     // static constexpr size_t PIPELINE_DEBUG_INDEX   = 1;
     // static constexpr size_t PIPELINE_COUNT         = 2;
-    bool modeDebug = false;
+    enum class Mode {
+        Regular, Debug, Shadowmap
+    } mode;
 
-    inline void setModeDebug(bool debug) noexcept { modeDebug = debug; }
+    inline void setMode(Mode newMode) noexcept { mode = newMode; }
 
     std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
             std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;

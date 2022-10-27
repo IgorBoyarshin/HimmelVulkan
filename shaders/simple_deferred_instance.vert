@@ -26,8 +26,9 @@ layout(location = 1) in vec2 inTexCoord;
 layout(location = 2) in vec3 inNormal;
 
 layout(location = 0) out vec2 outFragTexCoord;
-layout(location = 1) out vec4 outPosition_DepthFromLight;
+layout(location = 1) out vec3 outPosition;
 layout(location = 2) out vec3 outNormal;
+layout(location = 3) out vec3 outLightSpacePosition;
 
 void main() {
     // XXX It appears that gl_BaseInstance is automatically added to
@@ -38,6 +39,7 @@ void main() {
     gl_Position = uboGeneral.proj * uboGeneral.view * posWorld;
     outFragTexCoord = inTexCoord;
     outNormal = normalize((model * vec4(inNormal, 0.0)).xyz);
-    float depthFromLight = 1.0;
-    outPosition_DepthFromLight = vec4(posWorld.xyz, depthFromLight);
+    outPosition = posWorld.xyz;
+    vec4 posInLightSpace = uboGeneral.globalLightProj * uboGeneral.globalLightView * posWorld;
+    outLightSpacePosition = posInLightSpace.xyz / posInLightSpace.w;
 }

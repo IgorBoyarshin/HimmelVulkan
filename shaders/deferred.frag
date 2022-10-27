@@ -28,10 +28,12 @@ layout(set = 0, binding = 1) uniform LightsUbo {
     uint count;
 } uboLights;
 
-#define G_POSITION        0
-#define G_NORMAL          1
-#define G_COLOR           2
-#define G_COUNT           3
+#define G_POSITION              0
+#define G_NORMAL                1
+#define G_COLOR                 2
+#define G_LIGHT_SPACE_POSITIONS 3
+#define G_SHADOWMAP             4
+#define G_COUNT                 5
 layout(set = 1, binding = 0) uniform sampler2D texSamplers[G_COUNT];
 
 layout(location = 0) in vec2 inTexCoord;
@@ -45,6 +47,7 @@ float distToLine(vec3 v0, vec3 v1, vec3 p) {
 
 void main() {
     vec3 pos       = texture(texSamplers[G_POSITION], inTexCoord).rgb;
+    vec3 lightSpacePos = texture(texSamplers[G_LIGHT_SPACE_POSITIONS], inTexCoord).rgb;
     vec3 normal    = texture(texSamplers[G_NORMAL], inTexCoord).rgb;
     vec3 albedo    = texture(texSamplers[G_COLOR], inTexCoord).rgb;
     float specular = texture(texSamplers[G_COLOR], inTexCoord).a;
@@ -57,10 +60,10 @@ void main() {
     vec3 light = ambientStrength * albedo * GLOBAL_COLOR;
 
     // Global diffuse
-    const float DIRECT_INTENSITY = 0.0;
-    vec3 globalLightDir = -uboGeneral.globalLightDir;
-    float diffuseStrength = max(dot(normal, globalLightDir), 0.0);
-    light += DIRECT_INTENSITY * diffuseStrength * albedo * GLOBAL_COLOR;
+    /* const float DIRECT_INTENSITY = 0.0; */
+    /* vec3 globalLightDir = -uboGeneral.globalLightDir; */
+    /* float diffuseStrength = max(dot(normal, globalLightDir), 0.0); */
+    /* light += DIRECT_INTENSITY * diffuseStrength * albedo * GLOBAL_COLOR; */
 
     // Diffuse from point lights; fog color
     vec3 fogColor = vec3(0.0);
@@ -79,6 +82,15 @@ void main() {
         // Fog
         /* float h = distToLine(uboGeneral.cameraPos, pos, position); */
         /* fogColor += sqrt(intensity) * color * atan(distToCamera / h) / h; */
+    }
+
+    // Global diffuse from shadowmap
+    vec2 shadowmapCoord = lightSpacePos.xy * 0.5 + 0.5;
+    float shadowDepth = texture(texSamplers[G_SHADOWMAP], shadowmapCoord).r;
+    if (lightSpacePos.z > shadowDepth) {
+        light *= 0.2;
+        /* outColor = vec4(light, 1.0); */
+        /* return; */
     }
 
     // Apply simple fog

@@ -111,10 +111,13 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
     rasterizer.lineWidth = hmlPipelineConfig.lineWidth;
     rasterizer.cullMode = hmlPipelineConfig.cullMode;
     rasterizer.frontFace = hmlPipelineConfig.frontFace;
-    rasterizer.depthBiasEnable = VK_FALSE;
-    rasterizer.depthBiasConstantFactor = 0.0f; // Optional
+    // rasterizer.depthBiasEnable = VK_FALSE;
+    // rasterizer.depthBiasConstantFactor = 0.0f; // Optional
+    // rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+    rasterizer.depthBiasEnable = VK_TRUE;
+    rasterizer.depthBiasConstantFactor = 4.0f;
+    rasterizer.depthBiasSlopeFactor = 1.5f;
     rasterizer.depthBiasClamp = 0.0f; // Optional
-    rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
 
     // ----------- Multisampling -----------
     // (disable for now)

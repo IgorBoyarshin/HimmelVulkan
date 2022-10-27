@@ -1,7 +1,7 @@
 #version 450
 
 // XXX sync with Vertex shader
-#define MAX_TEXTURES_COUNT 4
+#define MAX_TEXTURES_COUNT 5
 layout(push_constant) uniform PushConstants {
     int textureIndex;
     float shift;
@@ -15,5 +15,9 @@ layout(location = 0) out vec4 outColor;
 void main() {
     outColor = texture(texSamplers[push.textureIndex], inTexCoord);
     // NOTE can use to linearize Depth:
-    outColor = vec4(1.0 - (1.0 - outColor.r) * 1000.0);
+    if (push.textureIndex == 3) {
+        outColor = vec4(1.0 - (1.0 - outColor.r) * 1000.0);
+    } else if (push.textureIndex == 0) {
+        outColor = vec4(1.0 - (1.0 - outColor.w) * 1000.0);
+    }
 }

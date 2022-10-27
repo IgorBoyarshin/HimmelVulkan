@@ -719,15 +719,17 @@ bool Himmel::prepareResources() noexcept {
     gBufferPositions.resize(count);
     gBufferNormals.resize(count);
     gBufferColors.resize(count);
-    // gBufferLightSpacePositions.resize(count);
+    gBufferLightSpacePositions.resize(count);
     brightness1Textures.resize(count);
     // brightness2Textures.resize(count);
     mainTextures.resize(count);
     for (size_t i = 0; i < count; i++) {
         // XXX TODO use modified findDepthFormat()
         gBufferPositions[i]           = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        // gBufferPositions[i]           = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
         gBufferNormals[i]             = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         gBufferColors[i]              = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
         // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         // brightness2Textures[i]        = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
@@ -735,7 +737,7 @@ bool Himmel::prepareResources() noexcept {
         if (!gBufferPositions[i])           return false;
         if (!gBufferNormals[i])             return false;
         if (!gBufferColors[i])              return false;
-        // if (!gBufferLightSpacePositions[i]) return false;
+        if (!gBufferLightSpacePositions[i]) return false;
         if (!brightness1Textures[i])        return false;
         // if (!brightness2Textures[i])        return false;
         if (!mainTextures[i])               return false;
@@ -747,8 +749,8 @@ bool Himmel::prepareResources() noexcept {
     if (!hmlShadow) return false;
 
 
-    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
-    hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, {hmlShadow,hmlShadow,hmlShadow} });
+    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, {hmlShadow,hmlShadow,hmlShadow} });
+    hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, {hmlShadow,hmlShadow,hmlShadow} });
     // hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
     // hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
     // hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
@@ -818,14 +820,13 @@ bool Himmel::prepareResources() noexcept {
                 // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
-            // HmlRenderPass::ColorAttachment{
-            //     .imageFormat = gBufferLightSpacePositions[0]->format,
-            //     .imageViews = viewsFrom(gBufferLightSpacePositions),
-            //     .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
-            //     .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            //     // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            //     .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            // },
+            HmlRenderPass::ColorAttachment{
+                .imageFormat = gBufferLightSpacePositions[0]->format,
+                .imageViews = viewsFrom(gBufferLightSpacePositions),
+                .clearColor = {{ 2.0f, 2.0f, 2.0f, 2.0f }}, // TODO i dunno!!!
+                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
         },
         { // optional depth attachment
             HmlRenderPass::DepthStencilAttachment{

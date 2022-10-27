@@ -16,7 +16,7 @@
 
 struct HmlImageResource {
     enum class Type {
-        BLANK, TEXTURE, RENDER_TARGET, DEPTH
+        BLANK, TEXTURE, RENDER_TARGET, DEPTH, SHADOW_MAP
     } type;
 
     std::shared_ptr<HmlDevice> hmlDevice;
@@ -128,6 +128,7 @@ struct HmlResourceManager {
     std::unique_ptr<HmlBuffer> createStagingBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createUniformBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createStorageBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlImageResource> newShadowResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newRenderTargetImageResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newTextureResource(const char* fileName, uint32_t componentsCount, VkFormat format, VkFilter filter) noexcept;
     std::unique_ptr<HmlImageResource> newImageResource(VkExtent2D extent) noexcept;

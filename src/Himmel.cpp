@@ -565,6 +565,10 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
     const auto globalLightPos = glm::vec3(-330, 150, 400);
     const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + calcDirForward(-18.15f, 42.4f), glm::vec3{0, 1, 0});
     const auto globalLightProj = [&](){
+        // glm::mat4 clip = glm::mat4(1.0f, 0.0f, 0.0f, 0.0f,
+        //                            0.0f,-1.0f, 0.0f, 0.0f,
+        //                            0.0f, 0.0f, 0.5f, 0.0f,
+        //                            0.0f, 0.0f, 0.5f, 1.0f);
         const float near = 0.1f;
         const float far = 1000.0f;
         glm::mat4 proj = glm::perspective(glm::radians(45.0f), hmlContext->hmlSwapchain->extentAspect(), near, far);
@@ -574,8 +578,12 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
     GeneralUbo generalUbo{
         .view = hmlCamera.view(),
         .proj = proj,
+        // XXX
+        // XXX
         .globalLightView = globalLightView,
         .globalLightProj = globalLightProj,
+        // .globalLightView = hmlCamera.view(),
+        // .globalLightProj = proj,
         .globalLightDir = globalLightDir,
         .ambientStrength = 0.1f,
         .fogColor = weather.fogColor,
@@ -711,7 +719,7 @@ bool Himmel::prepareResources() noexcept {
     gBufferPositions.resize(count);
     gBufferNormals.resize(count);
     gBufferColors.resize(count);
-    gBufferLightSpacePositions.resize(count);
+    // gBufferLightSpacePositions.resize(count);
     brightness1Textures.resize(count);
     // brightness2Textures.resize(count);
     mainTextures.resize(count);
@@ -720,14 +728,14 @@ bool Himmel::prepareResources() noexcept {
         gBufferPositions[i]           = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         gBufferNormals[i]             = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         gBufferColors[i]              = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         // brightness2Textures[i]        = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         mainTextures[i]               = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         if (!gBufferPositions[i])           return false;
         if (!gBufferNormals[i])             return false;
         if (!gBufferColors[i])              return false;
-        if (!gBufferLightSpacePositions[i]) return false;
+        // if (!gBufferLightSpacePositions[i]) return false;
         if (!brightness1Textures[i])        return false;
         // if (!brightness2Textures[i])        return false;
         if (!mainTextures[i])               return false;
@@ -735,42 +743,47 @@ bool Himmel::prepareResources() noexcept {
     hmlDepthResource = hmlContext->hmlResourceManager->newDepthResource(extent);
     if (!hmlDepthResource) return false;
 
+    hmlShadow = hmlContext->hmlResourceManager->newShadowResource(extent, VK_FORMAT_D32_SFLOAT);
+    if (!hmlShadow) return false;
 
-    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
-    hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
+
+    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
+    hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, {hmlShadow,hmlShadow,hmlShadow} });
     // hmlBlurRenderer->specify(brightness1Textures, brightness2Textures);
     hmlBloomRenderer->specify(mainTextures, brightness1Textures);
-    // hmlBloomRenderer->specify(mainTextures);
 
 
     hmlPipe = std::make_unique<HmlPipe>(hmlContext, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences);
     const float VERY_FAR = 10000.0f;
     bool allGood = true;
 
+    // TODO
+    // TODO Maybe create pre-func???
+    // TODO for terrain!!!!!!
+    // TODO
     // ================================= PASS =================================
     // ======== Render shadow-casting geometry into shadow map ========
-    // hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
-    // hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
-    // allGood &= hmlPipe->addStage(
-    //     { hmlTerrainRenderer, hmlRenderer }, // drawers
-    //     {}, // output color attachments
-    //     { // optional depth attachment
-    //         HmlRenderPass::DepthStencilAttachment{
-    //             .imageFormat = hmlDepthResource->format,
-    //             .imageView = hmlDepthResource->view,
-    //             .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
-    //             .saveDepth = true,
-    //             .hasPrevious = false,
-    //         }
-    //     },
-    //     {}, // post transitions
-    //     std::nullopt // post func
-    //     // [&](uint32_t imageIndex){ // post func
-    //     //     gBufferPositions[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    //     //     gBufferNormals[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    //     //     gBufferColors[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    //     // }
-    // );
+    hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
+    hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
+    allGood &= hmlPipe->addStage(
+        { hmlTerrainRenderer, hmlRenderer }, // drawers
+        {}, // output color attachments
+        { // optional depth attachment
+            HmlRenderPass::DepthStencilAttachment{
+                .imageFormat = hmlShadow->format,
+                .imageView = hmlShadow->view,
+                .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
+                .store = true,
+                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            }
+        },
+        {}, // post transitions
+        // std::nullopt // post func
+        [&](uint32_t imageIndex){ // post func
+            hmlRenderer->setMode(HmlRenderer::Mode::Regular);
+        }
+    );
     // ================================= PASS =================================
     // ======== Renders main geometry into the GBuffer ========
     hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
@@ -802,32 +815,37 @@ bool Himmel::prepareResources() noexcept {
                 // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
-            HmlRenderPass::ColorAttachment{
-                .imageFormat = gBufferLightSpacePositions[0]->format,
-                .imageViews = viewsFrom(gBufferLightSpacePositions),
-                .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            },
+            // HmlRenderPass::ColorAttachment{
+            //     .imageFormat = gBufferLightSpacePositions[0]->format,
+            //     .imageViews = viewsFrom(gBufferLightSpacePositions),
+            //     .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
+            //     .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            //     // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            //     .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            // },
         },
         { // optional depth attachment
             HmlRenderPass::DepthStencilAttachment{
                 .imageFormat = hmlDepthResource->format,
                 .imageView = hmlDepthResource->view,
                 .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
-                .saveDepth = true,
-                .hasPrevious = false,
+                .store = true,
+                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .postLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             }
         },
         {}, // post transitions
-        std::nullopt // post func
+        // std::nullopt // post func
+        [&](uint32_t imageIndex){ // post func
+            hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
+        }
         // [&](uint32_t imageIndex){ // post func
         //     gBufferPositions[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         //     gBufferNormals[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         //     gBufferColors[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         // }
     );
+    hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap); // TODO XXX
     // ================================= PASS =================================
     // ======== Renders a 2D texture using the GBuffer ========
     allGood &= hmlPipe->addStage( // deferred
@@ -885,8 +903,9 @@ bool Himmel::prepareResources() noexcept {
                 .imageFormat = hmlDepthResource->format,
                 .imageView = hmlDepthResource->view,
                 .clearColor = std::nullopt,
-                .saveDepth = false,
-                .hasPrevious = true,
+                .store = false,
+                .preLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                .postLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             }
         },
         { // post transitions
@@ -1004,8 +1023,6 @@ void Himmel::recreateSwapchain() noexcept {
     }
 
     proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
-
-    std::cout << '\n';
 }
 
 

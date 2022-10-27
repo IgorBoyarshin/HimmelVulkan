@@ -85,8 +85,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
                 .hmlShaders = HmlShaders()
                     .addVertex("../shaders/out/terrain.vert.spv")
                     .addTessellationControl("../shaders/out/terrain.tesc.spv")
-                    .addTessellationEvaluation("../shaders/out/terrain_deferred.tese.spv")
-                    .addFragment("../shaders/out/terrain_deferred.frag.spv"),
+                    .addTessellationEvaluation("../shaders/out/terrain_shadow_deferred.tese.spv"),
                 .renderPass = hmlRenderPass->renderPass,
                 .extent = hmlRenderPass->extent,
                 // .polygoneMode = VK_POLYGON_MODE_LINE,

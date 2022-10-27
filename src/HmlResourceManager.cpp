@@ -8,6 +8,7 @@ HmlImageResource::~HmlImageResource() noexcept {
         case Type::TEXTURE:       std::cout << ":> Destroying HmlImageResource (texture).\n"; break;
         case Type::RENDER_TARGET: std::cout << ":> Destroying HmlImageResource (render target).\n"; break;
         case Type::DEPTH:         std::cout << ":> Destroying HmlImageResource (depth).\n"; break;
+        case Type::SHADOW_MAP:    std::cout << ":> Destroying HmlImageResource (shadow map).\n"; break;
     }
 #endif
 
@@ -254,6 +255,23 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newBlankImageResource(
     resource->format = format;
     if (!createImage(extent.width, extent.height, format, tiling, usage, memoryType, resource->image, resource->memory)) return { nullptr };
     resource->view = createImageView(resource->image, format, aspect);
+    return resource;
+}
+
+
+std::unique_ptr<HmlImageResource> HmlResourceManager::newShadowResource(VkExtent2D extent, VkFormat format) noexcept {
+    const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    // const VkFormat              format = VK_FORMAT_R8G8B8A8_SRGB;
+    const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+    auto resource = newBlankImageResource(extent, format, usage, aspect);
+    resource->sampler = createTextureSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST); // TODO XXX does not belong with this function name
+    resource->type = HmlImageResource::Type::SHADOW_MAP;
+
+    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, hmlCommands)) {
+        std::cerr << "::> Failed to create HmlImageResource as a shadow map.\n";
+        return { nullptr };
+    }
+
     return resource;
 }
 

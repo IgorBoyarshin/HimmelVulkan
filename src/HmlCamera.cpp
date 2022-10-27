@@ -43,6 +43,7 @@ void HmlCamera::lift(float length) noexcept {
 
 
 void HmlCamera::recacheView() noexcept {
+    // From where, to where, up
     cachedView = { glm::lookAt(pos, pos + calcDirForward(), dirUp) };
 }
 

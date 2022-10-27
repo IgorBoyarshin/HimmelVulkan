@@ -61,14 +61,30 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
         } break;
 
         case Mode::Shadowmap: {
+            std::vector<VkVertexInputBindingDescription> bindingDescriptions = {
+                VkVertexInputBindingDescription{
+                    .binding = 0, // index of current Binding in the array of Bindings
+                    .stride = sizeof(HmlSimpleModel::Vertex),
+                    .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+                }
+            };
+
+            std::vector<VkVertexInputAttributeDescription> attributeDescriptions = {
+                VkVertexInputAttributeDescription{
+                    .location = 0, // as in shader
+                    .binding = 0,
+                    .format = VK_FORMAT_R32G32B32_SFLOAT,
+                    .offset = 0
+                }
+            };
+
             { // Regular Entities
                 HmlGraphicsPipelineConfig config{
-                    .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
-                    .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
+                    .bindingDescriptions   = bindingDescriptions,
+                    .attributeDescriptions = attributeDescriptions,
                     .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
                     .hmlShaders = HmlShaders()
-                        .addVertex("../shaders/out/simple_deferred.vert.spv")
-                        .addFragment("../shaders/out/simple_deferred.frag.spv"),
+                        .addVertex("../shaders/out/simple_shadow.vert.spv"),
                     .renderPass = hmlRenderPass->renderPass,
                     .extent = hmlRenderPass->extent,
                     .polygoneMode = VK_POLYGON_MODE_FILL,
@@ -76,7 +92,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .cullMode = VK_CULL_MODE_NONE,
                     .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
                     .descriptorSetLayouts = descriptorSetLayouts,
-                    .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT,
                     .pushConstantsSizeBytes = sizeof(PushConstantRegular),
                     .tessellationPatchPoints = 0,
                     .lineWidth = 1.0f,
@@ -89,12 +105,11 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
 
             { // Instanced (static Entities)
                 HmlGraphicsPipelineConfig config{
-                    .bindingDescriptions   = HmlSimpleModel::Vertex::getBindingDescriptions(),
-                    .attributeDescriptions = HmlSimpleModel::Vertex::getAttributeDescriptions(),
+                    .bindingDescriptions   = bindingDescriptions,
+                    .attributeDescriptions = attributeDescriptions,
                     .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
                     .hmlShaders = HmlShaders()
-                        .addVertex("../shaders/out/simple_deferred_instance.vert.spv")
-                        .addFragment("../shaders/out/simple_deferred_instance.frag.spv"),
+                        .addVertex("../shaders/out/simple_shadow_instance.vert.spv"),
                     .renderPass = hmlRenderPass->renderPass,
                     .extent = hmlRenderPass->extent,
                     .polygoneMode = VK_POLYGON_MODE_FILL,
@@ -102,8 +117,8 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .cullMode = VK_CULL_MODE_NONE,
                     .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
                     .descriptorSetLayouts = descriptorSetLayouts,
-                    .pushConstantsStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                    .pushConstantsSizeBytes = sizeof(PushConstantInstanced),
+                    .pushConstantsStages = 0,
+                    .pushConstantsSizeBytes = 0,
                     .tessellationPatchPoints = 0,
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
@@ -325,7 +340,11 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
     assert(getCurrentPipelines().size() == 2 && "::> Expected two pipelines in HmlRenderer.\n");
 
     { // Regular Entities
-        hmlContext->hmlQueries->registerEvent("HmlRenderer: begin regular entities", "Ew", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+        if (mode == Mode::Regular) {
+            hmlContext->hmlQueries->registerEvent("HmlRenderer: begin regular entities", "Ew", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+        } else {
+            hmlContext->hmlQueries->registerEvent("HmlRenderer: begin regular entities", "Ew(s)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+        }
         const auto& hmlPipeline = getCurrentPipelines()[0];
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
@@ -356,7 +375,7 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
                     .textureIndex = model->textureResource ? textureIndexFor[modelId] : NO_TEXTURE_MARK,
                 };
                 vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
-                        hmlPipeline->pushConstantsStages, 0, sizeof(PushConstantRegular), &pushConstant);
+                    hmlPipeline->pushConstantsStages, 0, sizeof(PushConstantRegular), &pushConstant);
 
                 // NOTE could use firstInstance to supply a single integer to gl_BaseInstance
                 const uint32_t instanceCount = 1;
@@ -367,14 +386,22 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
                 // const uint32_t firstVertex = 0;
                 // vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
                 vkCmdDrawIndexed(commandBuffer, model->indicesCount,
-                        instanceCount, firstIndex, offsetToAddToIndices, firstInstance);
+                    instanceCount, firstIndex, offsetToAddToIndices, firstInstance);
             }
         }
-        hmlContext->hmlQueries->registerEvent("HmlRenderer: end regular entities", "E", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+        if (mode == Mode::Regular) {
+            hmlContext->hmlQueries->registerEvent("HmlRenderer: end regular entities", "E", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+        } else {
+            hmlContext->hmlQueries->registerEvent("HmlRenderer: end regular entities", "E(s)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+        }
     }
 
     if (!instancedCounts.empty()) { // Instanced (static Entities)
-        hmlContext->hmlQueries->registerEvent("HmlRenderer: begin instanced entities", "EIw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+        if (mode == Mode::Regular) {
+            hmlContext->hmlQueries->registerEvent("HmlRenderer: begin instanced entities", "EIw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+        } else {
+            hmlContext->hmlQueries->registerEvent("HmlRenderer: begin instanced entities", "EIw(s)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+        }
         const auto& hmlPipeline = getCurrentPipelines()[1];
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
@@ -399,12 +426,14 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
             vkCmdBindIndexBuffer(commandBuffer, modelResource->indexBuffer, 0, VK_INDEX_TYPE_UINT32); // 0 is offset
 
-            PushConstantInstanced pushConstant{
-                .textureIndex = textureIndex,
-                .time = 0.0f, // TODO
-            };
-            vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
-                hmlPipeline->pushConstantsStages, 0, sizeof(PushConstantInstanced), &pushConstant);
+            if (mode == Mode::Regular) {
+                PushConstantInstanced pushConstant{
+                    .textureIndex = textureIndex,
+                    .time = 0.0f, // TODO
+                };
+                vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
+                    hmlPipeline->pushConstantsStages, 0, sizeof(PushConstantInstanced), &pushConstant);
+            }
 
             // XXX It appears that gl_BaseInstance is automatically added to
             // gl_InstanceIndex, so gl_InstanceIndex does not restart at VkCmdDraw.
@@ -421,7 +450,11 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
             dispatchedInstancesCount += *instancedCountsIt;
             std::advance(instancedCountsIt, 1);
         }
-        hmlContext->hmlQueries->registerEvent("HmlRenderer: end instanced entities", "EI", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+        if (mode == Mode::Regular) {
+            hmlContext->hmlQueries->registerEvent("HmlRenderer: end instanced entities", "EI", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+        } else {
+            hmlContext->hmlQueries->registerEvent("HmlRenderer: end instanced entities", "EI(s)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+        }
     }
 
     hmlContext->hmlCommands->endRecording(commandBuffer);

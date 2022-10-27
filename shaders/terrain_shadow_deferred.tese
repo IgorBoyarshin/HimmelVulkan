@@ -31,11 +31,6 @@ layout(set = 1, binding = 0) uniform sampler2D heightmap;
 layout(location = 0) in vec2  inTexCoord[];
 layout(location = 1) in float inSegments[];
 
-layout(location = 0) out vec2 outTexCoord;
-layout(location = 1) out vec4 outPosition_DepthFromLight;
-layout(location = 2) out vec3 outNormal;
-//layout(location = 3) out vec3 outLightSpacePosition; nocheckin
-
 void main() {
     vec2 t = mix(
         mix(inTexCoord[0], inTexCoord[1], gl_TessCoord.x),
@@ -49,20 +44,5 @@ void main() {
     );
     v0.y = push.offsetY + push.maxHeight * texture(heightmap, t).r;
 
-    // The other texCoords are generally the same, so 2 suffice
-    float unit = length(inTexCoord[0] - inTexCoord[1]) / inSegments[0] / 2.0; // NOTE last division is imperical
-    vec2 d = vec2(unit, 0.0); // just need the numbers, the vector has no real meaning
-    float hL = texture(heightmap, t - d.xy).r;
-    float hR = texture(heightmap, t + d.xy).r;
-    float hD = texture(heightmap, t - d.yx).r;
-    float hU = texture(heightmap, t + d.yx).r;
-    // NOTE will be normalized in FragmentShader
-    vec3 normal = vec3(hL - hR, 16.0 * unit, hD - hU);
-
-    gl_Position = uboGeneral.proj * uboGeneral.view * v0;
-    outTexCoord = t;
-    outNormal = normal;
-    float depthFromLight = 1.0;
-    outPosition_DepthFromLight = vec4(v0.xyz, depthFromLight);
-    /* outLightSpacePosition = v0.xyz; */
+    gl_Position = uboGeneral.globalLightProj * uboGeneral.globalLightView * v0;
 }

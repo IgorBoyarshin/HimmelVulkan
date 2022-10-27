@@ -27,8 +27,9 @@ struct HmlRenderPass {
         VkFormat imageFormat;
         VkImageView imageView;
         std::optional<VkClearDepthStencilValue> clearColor;
-        bool saveDepth;
-        bool hasPrevious;
+        bool store;
+        VkImageLayout preLayout;
+        VkImageLayout postLayout;
     };
 
 

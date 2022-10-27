@@ -80,11 +80,11 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
             .format = attachment.imageFormat,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = attachment.clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
-            .storeOp = (config.depthStencilAttachment->saveDepth) ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .storeOp = (config.depthStencilAttachment->store) ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = (attachment.hasPrevious) ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .initialLayout = attachment.preLayout,
+            .finalLayout = attachment.postLayout,
         });
     }
 
@@ -141,13 +141,15 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
     }
 
     // Create and store framebuffers
-    assert(!config.colorAttachments.empty() && "::> No color attachments specified for HmlRenderPass.");
-    const auto images = config.colorAttachments[0].imageViews.size();
+    // assert(!config.colorAttachments.empty() && "::> No color attachments specified for HmlRenderPass.");
+    // const auto images = config.colorAttachments[0].imageViews.size();
+    const auto images = 3; // NOTE XXX terrible hack!!!
     for (size_t i = 0; i < images; i++) {
         std::vector<VkImageView> imageViews;
         for (const auto& colorAttachment : config.colorAttachments) {
             imageViews.push_back(colorAttachment.imageViews[i]);
         }
+        // NOTE It might actually be true!
         // TODO XXX Why is this true?
         // The same depth image can be shared because only a single subpass
         // is running at the same time due to our semaphores.
@@ -156,7 +158,7 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
         }
         const auto framebuffer = hmlRenderPass->createFramebuffer(imageViews);
         if (!framebuffer) {
-            std::cerr << "::> Failed to create HmlRenderPass.\n";
+            std::cerr << "::> Failed to create framebuffer.\n";
             return { nullptr };
         }
         hmlRenderPass->framebuffers.push_back(framebuffer);

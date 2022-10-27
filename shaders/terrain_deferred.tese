@@ -34,7 +34,6 @@ layout(location = 1) in float inSegments[];
 layout(location = 0) out vec2 outTexCoord;
 layout(location = 1) out vec4 outPosition_DepthFromLight;
 layout(location = 2) out vec3 outNormal;
-//layout(location = 3) out vec3 outLightSpacePosition; nocheckin
 
 void main() {
     vec2 t = mix(
@@ -64,5 +63,4 @@ void main() {
     outNormal = normal;
     float depthFromLight = 1.0;
     outPosition_DepthFromLight = vec4(v0.xyz, depthFromLight);
-    /* outLightSpacePosition = v0.xyz; */
 }

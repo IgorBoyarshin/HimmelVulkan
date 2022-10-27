@@ -27,7 +27,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .tessellationPatchPoints = 0,
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-                    .withBlending = true,
+                    .withBlending = false,
                 };
 
                 pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -53,7 +53,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .tessellationPatchPoints = 0,
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-                    .withBlending = true,
+                    .withBlending = false,
                 };
 
                 pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -97,7 +97,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .tessellationPatchPoints = 0,
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-                    .withBlending = true,
+                    .withBlending = false,
                 };
 
                 pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -122,7 +122,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .tessellationPatchPoints = 0,
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-                    .withBlending = true,
+                    .withBlending = false,
                 };
 
                 pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));

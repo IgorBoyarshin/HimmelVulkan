@@ -749,6 +749,9 @@ bool Himmel::prepareResources() noexcept {
 
     hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
     hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, {hmlShadow,hmlShadow,hmlShadow} });
+    // hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
+    // hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
+    // hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
     // hmlBlurRenderer->specify(brightness1Textures, brightness2Textures);
     hmlBloomRenderer->specify(mainTextures, brightness1Textures);
 

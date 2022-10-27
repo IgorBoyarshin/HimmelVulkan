@@ -39,7 +39,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
                 .tessellationPatchPoints = 4,
                 .lineWidth = 1.0f,
                 .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-                .withBlending = true,
+                .withBlending = false,
             };
 
             // pipelines[PIPELINE_REGULAR_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -70,7 +70,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
                 .tessellationPatchPoints = 4,
                 .lineWidth = 2.0f,
                 .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-                .withBlending = true,
+                .withBlending = false,
             };
 
             // pipelines[PIPELINE_DEBUG_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -99,7 +99,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
                 .tessellationPatchPoints = 4,
                 .lineWidth = 1.0f,
                 .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
-                .withBlending = true,
+                .withBlending = false,
             };
 
             // pipelines[PIPELINE_REGULAR_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));

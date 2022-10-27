@@ -13,12 +13,10 @@ layout(push_constant) uniform PushConstants {
 layout(location = 0) in vec2 inFragTexCoord;
 layout(location = 1) in vec4 inPosition_DepthFromLight;
 layout(location = 2) in vec3 inNormal;
-/* layout(location = 3) in vec3 inLightSpacePosition; */
 
 layout(location = 0) out vec4 gPosition_DepthFromLight;
 layout(location = 1) out vec4 gNormal;
 layout(location = 2) out vec4 gColor;
-// layout(location = 3) out vec4 gLightSpacePosition;
 
 void main() {
     if (0 <= push.textureIndex) {
@@ -27,6 +25,5 @@ void main() {
         gColor = vec4(push.color.rgb, 1.0);
     }
     gPosition_DepthFromLight = inPosition_DepthFromLight;
-    /* gLightSpacePosition = vec4(inLightSpacePosition, 1.0); */
     gNormal = vec4(inNormal, 1.0);
 }

@@ -25,7 +25,6 @@ layout(location = 2) in vec3 inNormal;
 layout(location = 0) out vec2 outFragTexCoord;
 layout(location = 1) out vec4 outPosition_DepthFromLight;
 layout(location = 2) out vec3 outNormal;
-/* layout(location = 3) out vec3 outLightSpacePosition; */
 
 void main() {
     vec4 posWorld = push.model * vec4(inPosition, 1.0);
@@ -34,5 +33,4 @@ void main() {
     outNormal = normalize((push.model * vec4(inNormal, 0.0)).xyz);
     float depthFromLight = 1.0;
     outPosition_DepthFromLight = vec4(posWorld.xyz, depthFromLight);
-    /* outLightSpacePosition = posWorld.xyz; */
 }

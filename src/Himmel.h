@@ -96,8 +96,8 @@ struct Himmel {
             // We account for that while interpolation between the coordinates to
             // create this edge.
 
-            const size_t x = std::clamp(coord.first,  0ul, heightmapSize.first  - 2);
-            const size_t y = std::clamp(coord.second, 0ul, heightmapSize.second - 2);
+            const size_t x = std::clamp(coord.first,  0ull, heightmapSize.first  - 2);
+            const size_t y = std::clamp(coord.second, 0ull, heightmapSize.second - 2);
             t = glm::clamp(t, {0.0f, 0.0f}, {1.0f, 1.0f});
 
             const auto bottomLeftHeight  = heightmap[y    ][x];

@@ -1,0 +1,7 @@
+==== WINDOWS ====
+1) Download GLM into a folder; point .env.cmake into it
+2) Download GLFW into a folder; point .env.cmake into it
+3) Download LLVM (official website -> github -> LLWM-15-win64.exe); Add to PATH "..\LLVM\bin"
+4) Download Mingw (official website -> w64devkit -> github releases -> .zip); Add to PATH "..\w64devkit\bin"
+5) Get Models from somewhere and place into "models"
+6) Create the "../shaders/out" folder manually so that Windows can create files there

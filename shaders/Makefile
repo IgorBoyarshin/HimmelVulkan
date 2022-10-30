@@ -1,9 +1,9 @@
 shaderSrcs = $(wildcard *.frag) $(wildcard *.vert) $(wildcard *.geom) $(wildcard *.tesc) $(wildcard *.tese)
 
-shaderSpvs = $(addsuffix .spv, $(shaderSrcs))
+shaderSpvs = $(addprefix out/, $(addsuffix .spv, $(shaderSrcs)))
 
-%.spv: %
-	glslc $^ -o out/$@
+out/%.spv: %
+	glslc $^ -o $@
 
 compileShaders: $(shaderSpvs)
 

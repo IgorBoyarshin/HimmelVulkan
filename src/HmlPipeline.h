@@ -76,6 +76,7 @@ struct HmlGraphicsPipelineConfig {
     uint32_t colorAttachmentCount;
 
     bool withBlending;
+    bool withDepthTest;
 };
 
 

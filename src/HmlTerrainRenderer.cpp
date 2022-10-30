@@ -40,6 +40,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
                 .lineWidth = 1.0f,
                 .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
                 .withBlending = false,
+                .withDepthTest = true,
             };
 
             // pipelines[PIPELINE_REGULAR_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -71,6 +72,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
                 .lineWidth = 2.0f,
                 .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
                 .withBlending = false,
+                .withDepthTest = true,
             };
 
             // pipelines[PIPELINE_DEBUG_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -100,6 +102,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlTerrainRenderer::createPipelines(
                 .lineWidth = 1.0f,
                 .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
                 .withBlending = false,
+                .withDepthTest = true,
             };
 
             // pipelines[PIPELINE_REGULAR_INDEX] = HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -147,7 +150,7 @@ std::unique_ptr<HmlTerrainRenderer> HmlTerrainRenderer::create(
 
     hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(2)
-        .maxSets(1)
+        .maxDescriptorSets(1)
         .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
@@ -283,7 +286,13 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
-    hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    if (mode == Mode::Regular) {
+        hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw(r)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    } else if (mode == Mode::Debug) {
+        hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw(d)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    } else if (mode == Mode::Shadowmap) {
+        hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw(s)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    }
 
     assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlTerrainRenderer.\n");
     const auto& hmlPipeline = getCurrentPipelines()[0];
@@ -318,7 +327,13 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
         }
     }
 
-    hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", "T", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+    if (mode == Mode::Regular) {
+        hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", "T(r)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+    } else if (mode == Mode::Debug) {
+        hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", "T(d)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+    } else if (mode == Mode::Shadowmap) {
+        hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", "T(s)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+    }
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }

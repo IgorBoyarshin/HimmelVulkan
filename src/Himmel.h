@@ -7,6 +7,7 @@
 #include <optional>
 #include <iostream>
 #include <algorithm>
+#include <type_traits>
 
 #include "settings.h"
 #include "HmlWindow.h"
@@ -29,6 +30,8 @@
 #include "HmlRenderPass.h"
 #include "HmlPipe.h"
 #include "HmlQueries.h"
+#include "HmlImguiRenderer.h"
+#include "HmlImgui.h"
 #include "HmlContext.h"
 
 #include "../libs/stb_image.h"
@@ -96,8 +99,8 @@ struct Himmel {
             // We account for that while interpolation between the coordinates to
             // create this edge.
 
-            const size_t x = std::clamp(coord.first,  0ull, heightmapSize.first  - 2);
-            const size_t y = std::clamp(coord.second, 0ull, heightmapSize.second - 2);
+            const size_t x = std::clamp(coord.first,  static_cast<size_t>(0), heightmapSize.first  - 2);
+            const size_t y = std::clamp(coord.second, static_cast<size_t>(0), heightmapSize.second - 2);
             t = glm::clamp(t, {0.0f, 0.0f}, {1.0f, 1.0f});
 
             const auto bottomLeftHeight  = heightmap[y    ][x];
@@ -226,6 +229,7 @@ struct Himmel {
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
     std::shared_ptr<HmlSnowParticleRenderer> hmlSnowRenderer;
     std::shared_ptr<HmlLightRenderer> hmlLightRenderer;
+    std::shared_ptr<HmlImguiRenderer> hmlImguiRenderer;
 
     std::vector<std::shared_ptr<HmlImageResource>> gBufferPositions;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferNormals;

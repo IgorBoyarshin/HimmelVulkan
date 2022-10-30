@@ -40,6 +40,35 @@ struct HmlImageResource {
 };
 
 
+struct HmlBuffer {
+    enum class Type {
+        STAGING, UNIFORM, STORAGE, VERTEX, INDEX
+    } type;
+
+    struct Pack {
+        void* vertices;
+        VkDeviceSize sizeBytes;
+        inline Pack(void* vertices, VkDeviceSize sizeBytes) : vertices(vertices), sizeBytes(sizeBytes) {}
+    };
+
+    std::shared_ptr<HmlDevice> hmlDevice;
+
+    VkDeviceSize   sizeBytes;
+    VkBuffer       buffer;
+    VkDeviceMemory memory;
+    void* mappedPtr = nullptr;
+
+    bool map() noexcept;
+    bool unmap() noexcept;
+    bool update(const void* newData) noexcept;
+    HmlBuffer(bool mappable) noexcept;
+    ~HmlBuffer() noexcept;
+
+    private:
+    bool mappable = false;
+};
+
+
 struct HmlModelResource {
     using Id = uint32_t;
     Id id;
@@ -48,10 +77,8 @@ struct HmlModelResource {
 
     uint32_t indicesCount;
 
-    VkBuffer       vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer       indexBuffer;
-    VkDeviceMemory indexBufferMemory;
+    std::unique_ptr<HmlBuffer> vertexBuffer;
+    std::unique_ptr<HmlBuffer> indexBuffer;
 
 
     std::unique_ptr<HmlImageResource> textureResource;
@@ -62,25 +89,6 @@ struct HmlModelResource {
 
     private:
     static Id newId() noexcept;
-};
-
-
-struct HmlBuffer {
-    enum class Type {
-        STAGING, UNIFORM, STORAGE
-    } type;
-
-    std::shared_ptr<HmlDevice> hmlDevice;
-
-    VkDeviceSize   sizeBytes;
-    VkBuffer       buffer;
-    VkDeviceMemory memory;
-    void* mappedPtr = nullptr;
-
-    void map() noexcept;
-    void unmap() noexcept;
-    void update(const void* newData) noexcept;
-    ~HmlBuffer() noexcept;
 };
 
 
@@ -128,8 +136,13 @@ struct HmlResourceManager {
     std::unique_ptr<HmlBuffer> createStagingBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createUniformBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createStorageBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createVertexBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createIndexBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createVertexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createIndexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlImageResource> newShadowResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newRenderTargetImageResource(VkExtent2D extent, VkFormat format) noexcept;
+    std::unique_ptr<HmlImageResource> newTextureResourceFromData(uint32_t width, uint32_t height, uint32_t componentsCount, unsigned char* data, VkFormat format, std::optional<VkFilter> filter) noexcept;
     std::unique_ptr<HmlImageResource> newTextureResource(const char* fileName, uint32_t componentsCount, VkFormat format, VkFilter filter) noexcept;
     std::unique_ptr<HmlImageResource> newImageResource(VkExtent2D extent) noexcept;
     std::unique_ptr<HmlImageResource> newDepthResource(VkExtent2D extent) noexcept;
@@ -144,12 +157,8 @@ struct HmlResourceManager {
     // TODO remove
     void createVertexBufferHost(VkBuffer& vertexBuffer,
             VkDeviceMemory& vertexBufferMemory, const void* vertices, VkDeviceSize sizeBytes) noexcept;
-
-    void createVertexBufferThroughStaging(VkBuffer& vertexBuffer,
-            VkDeviceMemory& vertexBufferMemory, const void* vertices, VkDeviceSize sizeBytes) noexcept;
-    void createIndexBufferThroughStaging(VkBuffer& indexBuffer,
-            VkDeviceMemory& indexBufferMemory, const std::vector<uint32_t>& indices) noexcept;
     // ========================================================================
+    VkSampler createTextureSamplerForFonts() noexcept;
     VkSampler createTextureSampler(VkFilter magFilter, VkFilter minFilter) noexcept;
     // ========================================================================
     bool createImage(uint32_t width, uint32_t height, VkFormat format,
@@ -213,8 +222,8 @@ struct HmlResourceManager {
     // ========================================================================
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const noexcept;
     // ========================================================================
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) noexcept;
-    void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D extent) noexcept;
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) const noexcept;
+    void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D extent) const noexcept;
 };
 
 #endif

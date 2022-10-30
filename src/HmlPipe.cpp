@@ -2,6 +2,7 @@
 
 
 bool HmlPipe::addStage(
+        std::optional<std::function<void()>> preFunc,
         std::vector<std::shared_ptr<HmlDrawer>>&& drawers,
         std::vector<HmlRenderPass::ColorAttachment>&& colorAttachments,
         std::optional<HmlRenderPass::DepthStencilAttachment> depthAttachment,
@@ -36,6 +37,7 @@ bool HmlPipe::addStage(
         .commandBuffers = hmlContext->hmlCommands->allocatePrimary(count, pool),
         .renderPass = hmlRenderPass,
         .postTransitions = std::move(postTransitions),
+        .preFunc = preFunc,
         .postFunc = postFunc,
     });
 
@@ -69,6 +71,8 @@ void HmlPipe::run(const HmlFrameData& frameData) noexcept {
         const bool firstStage = stageIndex == 0;
         const bool lastStage  = stageIndex == stages.size() - 1;
 
+        // ============== Pre-stage funcs
+        if (stage.preFunc) (*stage.preFunc)();
         // ============== Submit
         {
             const auto commandBuffer = stage.commandBuffers[frameData.imageIndex];

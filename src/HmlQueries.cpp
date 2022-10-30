@@ -87,6 +87,7 @@ void HmlQueries::registerEvent(std::string_view name, std::string_view shortName
         return;
     }
 
+    assert((layout->size() < QUERIES_IN_POOL) && "::> HmlQueries: while registering a new query: exceeding max allocated pool size for queries.\n");
     if ((layout->size() <= currentEventIndex) || (name != (*layout)[currentEventIndex].name)) {
         replaceLayout();
         layout->emplace_back(std::string(name), std::string(shortName));

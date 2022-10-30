@@ -32,6 +32,9 @@ bool Himmel::init() noexcept {
     hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, hmlContext->imageCount());
     if (!hmlContext->hmlQueries) return false;
 
+    hmlContext->hmlImgui = HmlImgui::create(hmlContext->hmlWindow, hmlContext->hmlResourceManager);
+    if (!hmlContext->hmlImgui) return false;
+
 
     for (size_t i = 0; i < hmlContext->imageCount(); i++) {
         const auto size = sizeof(GeneralUbo);
@@ -49,7 +52,7 @@ bool Himmel::init() noexcept {
 
     generalDescriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withUniformBuffers(hmlContext->imageCount() + hmlContext->imageCount()) // GeneralUbo + LightUbo
-        .maxSets(hmlContext->imageCount()) // they are in the same set
+        .maxDescriptorSets(hmlContext->imageCount()) // they are in the same set
         .build(hmlContext->hmlDevice);
     if (!generalDescriptorPool) return false;
 
@@ -111,6 +114,10 @@ bool Himmel::init() noexcept {
 
     hmlBloomRenderer = HmlBloomRenderer::create(hmlContext);
     if (!hmlBloomRenderer) return false;
+
+    // NOTE specify buffers explicitly, even though we have context already, to highlight this dependency
+    hmlImguiRenderer = HmlImguiRenderer::create(hmlContext->hmlImgui->vertexBuffer, hmlContext->hmlImgui->indexBuffer, hmlContext);
+    if (!hmlImguiRenderer) return false;
 
 
     const char* heightmapFile = "../models/heightmap.png";
@@ -178,19 +185,19 @@ bool Himmel::init() noexcept {
         pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(1.0, 0.0, 0.0),
             .intensity = 5000.0f,
-            .position = {}, // will be set in updateForDt
+            .position = {},
             .radius = LIGHT_RADIUS,
         });
         pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(0.0, 1.0, 0.0),
             .intensity = 3000.0f,
-            .position = {}, // will be set in updateForDt
+            .position = {},
             .radius = LIGHT_RADIUS,
         });
         pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(0.0, 0.0, 1.0),
             .intensity = 3800.0f,
-            .position = {}, // will be set in updateForDt
+            .position = {},
             .radius = LIGHT_RADIUS,
         });
     }
@@ -390,6 +397,7 @@ bool Himmel::run() noexcept {
         if (hmlContext->currentFrame) hmlCamera.resetChanged();
 
         glfwPollEvents();
+        hmlContext->hmlImgui->beginFrame();
 
         static auto mark = startTime;
         const auto newMark = std::chrono::high_resolution_clock::now();
@@ -464,15 +472,39 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     }
 
 
-    {
+    static bool uiInFocus = false;
+    { // Imgui stuff
+        static bool f1Pressed = false;
+        if (!f1Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F1) == GLFW_PRESS) {
+            f1Pressed = true;
+            uiInFocus = !uiInFocus;
+            if (uiInFocus) {
+                glfwSetInputMode(hmlContext->hmlWindow->window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            } else {
+                glfwSetInputMode(hmlContext->hmlWindow->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                // Unfocus Imgui windows to not accidentally capture game input (e.g. spacebar to minimize window)
+                ImGui::SetWindowFocus(nullptr);
+            }
+        } else if (f1Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F1) == GLFW_RELEASE) {
+            f1Pressed = false;
+        }
+    }
+
+    // NOTE allow cursor position update and only disable camera rotation reaction
+    // in order not to have the camera jump on re-acquiring control from the ui
+    // due to the cursor (pointer) position change that will have happened.
+    { // Camera rotation from mouse
         const auto newCursor = hmlContext->hmlWindow->getCursor();
         const int32_t dx = newCursor.first - cursor.first;
         const int32_t dy = newCursor.second - cursor.second;
         cursor = newCursor;
         const float rotateSpeed = 0.05f;
-        if (dx || dy) hmlCamera.rotateDir(-dy * rotateSpeed, dx * rotateSpeed);
+        if (!uiInFocus) {
+            if (dx || dy) hmlCamera.rotateDir(-dy * rotateSpeed, dx * rotateSpeed);
+        }
     }
-    {
+
+    if (!uiInFocus) { // Camera movement from keyboard
         constexpr float movementSpeed = 16.0f;
         constexpr float boostUp = 10.0f;
         constexpr float boostDown = 0.2f;
@@ -501,8 +533,22 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_C) == GLFW_PRESS) {
             hmlCamera.lift(-length);
         }
+    }
 
-        const float carSpeed = 10.0f;
+    if (!uiInFocus) { // Camera print position
+        static bool pPressed = false;
+        if (!pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_PRESS) {
+            pPressed = true;
+            hmlCamera.printStats();
+        } else if (pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_RELEASE) {
+            pPressed = false;
+        }
+    }
+
+    if (!uiInFocus) { // Car movement
+        constexpr float carSpeed = 10.0f;
+        constexpr float boostUp = 10.0f;
+        constexpr float boostDown = 0.2f;
         float carDistance = carSpeed * dt;
         if      (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) { carDistance *= 0.4f * boostUp; }
         else if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_ALT)   == GLFW_PRESS) { carDistance *= boostDown; }
@@ -521,15 +567,10 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
             // because the Entities are stored as shared_ptr there, which we have
             // just updated.
         }
-
-        static bool pPressed = false;
-        if (!pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_PRESS) {
-            pPressed = true;
-            hmlCamera.printStats();
-        } else if (pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_RELEASE) {
-            pPressed = false;
-        }
     }
+
+
+    hmlContext->hmlImgui->updateForDt(dt);
 
 
 #if SNOW_IS_ON
@@ -771,6 +812,10 @@ bool Himmel::prepareResources() noexcept {
     hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
     hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
     allGood &= hmlPipe->addStage(
+        [&](){ // pre func
+            hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
+            hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
+        },
         { hmlTerrainRenderer, hmlRenderer }, // drawers
         {}, // output color attachments
         { // optional depth attachment
@@ -784,16 +829,20 @@ bool Himmel::prepareResources() noexcept {
             }
         },
         {}, // post transitions
-        // std::nullopt // post func
-        [&](uint32_t imageIndex){ // post func
-            hmlRenderer->setMode(HmlRenderer::Mode::Regular);
-        }
+        std::nullopt // post func
+        // [&](uint32_t imageIndex){ // post func
+        //     hmlRenderer->setMode(HmlRenderer::Mode::Regular);
+        // }
     );
     // ================================= PASS =================================
     // ======== Renders main geometry into the GBuffer ========
     hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
     hmlRenderer->setMode(HmlRenderer::Mode::Regular);
     allGood &= hmlPipe->addStage( // deferred prep
+        [&](){ // pre func
+            hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
+            hmlRenderer->setMode(HmlRenderer::Mode::Regular);
+        },
         { hmlTerrainRenderer, hmlRenderer }, // drawers
         { // output color attachments
             HmlRenderPass::ColorAttachment{
@@ -839,20 +888,17 @@ bool Himmel::prepareResources() noexcept {
             }
         },
         {}, // post transitions
-        // std::nullopt // post func
-        [&](uint32_t imageIndex){ // post func
-            hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
-        }
+        std::nullopt // post func
         // [&](uint32_t imageIndex){ // post func
         //     gBufferPositions[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         //     gBufferNormals[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         //     gBufferColors[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         // }
     );
-    hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap); // TODO XXX
     // ================================= PASS =================================
     // ======== Renders a 2D texture using the GBuffer ========
     allGood &= hmlPipe->addStage( // deferred
+        std::nullopt, // pre func
         { hmlDeferredRenderer }, // drawers
         { // output color attachments
             HmlRenderPass::ColorAttachment{
@@ -875,6 +921,11 @@ bool Himmel::prepareResources() noexcept {
     hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
 #endif
     allGood &= hmlPipe->addStage( // forward
+        [&](){ // pre func
+#if DEBUG_TERRAIN
+            hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
+#endif
+        },
         {
 #if SNOW_IS_ON
             hmlSnowRenderer,
@@ -963,6 +1014,7 @@ bool Himmel::prepareResources() noexcept {
     // }
     // ================================= PASS =================================
     allGood &= hmlPipe->addStage( // bloom
+        std::nullopt, // pre func
         { hmlBloomRenderer }, // drawers
         { // output color attachments
             HmlRenderPass::ColorAttachment{
@@ -980,7 +1032,10 @@ bool Himmel::prepareResources() noexcept {
     // ================================= PASS =================================
     // ======== Renders multiple 2D textures on top of everything ========
     allGood &= hmlPipe->addStage( // ui
-        { hmlUiRenderer }, // drawers
+        [&](){ // pre func
+            hmlContext->hmlImgui->finilize();
+        },
+        { hmlUiRenderer, hmlImguiRenderer }, // drawers
         { // output color attachments
             HmlRenderPass::ColorAttachment{
                 .imageFormat = hmlContext->hmlSwapchain->imageFormat,
@@ -993,6 +1048,9 @@ bool Himmel::prepareResources() noexcept {
         std::nullopt, // optional depth attachment
         {}, // post transitions
         std::nullopt // post func
+        // [&](uint32_t imageIndex){ // post func
+        //     hmlContext->hmlImgui->beginFrame();
+        // }
     );
 
     if (!allGood) {

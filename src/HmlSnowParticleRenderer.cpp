@@ -26,6 +26,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlSnowParticleRenderer::createPipelin
             .lineWidth = 1.0f,
             .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
             .withBlending = true,
+            .withDepthTest = true,
         };
 
         pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -69,7 +70,7 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
     hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(hmlRenderer->snowTextureResources.size())
         .withStorageBuffers(imageCount)
-        .maxSets(imageCount + 1)
+        .maxDescriptorSets(imageCount + 1)
         .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 

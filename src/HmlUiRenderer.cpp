@@ -26,6 +26,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlUiRenderer::createPipelines(
             .lineWidth = 1.0f,
             .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
             .withBlending = false,
+            .withDepthTest = false,
         };
 
         pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -43,7 +44,7 @@ std::unique_ptr<HmlUiRenderer> HmlUiRenderer::create(std::shared_ptr<HmlContext>
 
     hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(imageCount * MAX_TEXTURES_COUNT)
-        .maxSets(imageCount)
+        .maxDescriptorSets(imageCount)
         .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 

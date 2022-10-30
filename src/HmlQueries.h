@@ -35,7 +35,7 @@ struct HmlQueries {
     void replaceLayout() noexcept;
 
 
-    static constexpr uint32_t QUERIES_IN_POOL = 20;
+    static constexpr uint32_t QUERIES_IN_POOL = 32;
     static constexpr uint32_t MAX_STORED_FRAME_STAT_COUNT = 32;
 
     std::shared_ptr<HmlDevice> hmlDevice;

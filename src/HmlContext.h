@@ -11,6 +11,7 @@
 #include "HmlSwapchain.h"
 #include "HmlResourceManager.h"
 #include "HmlQueries.h"
+#include "HmlImgui.h"
 
 
 struct HmlContext {
@@ -21,6 +22,7 @@ struct HmlContext {
     std::shared_ptr<HmlSwapchain> hmlSwapchain;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
     std::shared_ptr<HmlQueries> hmlQueries;
+    std::shared_ptr<HmlImgui> hmlImgui;
 
     uint32_t maxFramesInFlight = 0;
 

@@ -24,11 +24,6 @@ HmlModelResource::~HmlModelResource() noexcept {
 #if LOG_DESTROYS
     std::cout << ":> Destroying HmlModelResource.\n";
 #endif
-
-    vkDestroyBuffer(hmlDevice->device, indexBuffer, nullptr);
-    vkFreeMemory(hmlDevice->device, indexBufferMemory, nullptr);
-    vkDestroyBuffer(hmlDevice->device, vertexBuffer, nullptr);
-    vkFreeMemory(hmlDevice->device, vertexBufferMemory, nullptr);
 }
 
 
@@ -39,20 +34,36 @@ HmlModelResource::Id HmlModelResource::newId() noexcept {
 // ============================================================================
 // ============================================================================
 // ============================================================================
-void HmlBuffer::map() noexcept {
+bool HmlBuffer::map() noexcept {
+    if (!mappable) {
+        std::cerr << "::> HmlBuffer: trying to map an unmappable buffer.\n";
+        return false;
+    }
     if (!mappedPtr) vkMapMemory(hmlDevice->device, memory, 0, sizeBytes, 0, &mappedPtr);
+    return true;
 }
 
 
-void HmlBuffer::unmap() noexcept {
+bool HmlBuffer::unmap() noexcept {
+    // NOTE we silently ignore if the buffer is unmappable to make calling unmap always safe
+    if (!mappable) return false;
     if (mappedPtr) vkUnmapMemory(hmlDevice->device, memory);
     mappedPtr = nullptr;
+    return true;
 }
 
 
-void HmlBuffer::update(const void* newData) noexcept {
+bool HmlBuffer::update(const void* newData) noexcept {
+    if (!mappable) {
+        std::cerr << "::> HmlBuffer: trying to unmap an unmappable buffer.\n";
+        return false;
+    }
     if (mappedPtr) memcpy(mappedPtr, newData, sizeBytes);
+    return true;
 }
+
+
+HmlBuffer::HmlBuffer(bool mappable) noexcept : mappable(mappable) {}
 
 
 HmlBuffer::~HmlBuffer() noexcept {
@@ -61,6 +72,8 @@ HmlBuffer::~HmlBuffer() noexcept {
         case Type::STAGING: std::cout << ":> Destroying HmlBuffer (staging).\n"; break;
         case Type::UNIFORM: std::cout << ":> Destroying HmlBuffer (uniform).\n"; break;
         case Type::STORAGE: std::cout << ":> Destroying HmlBuffer (storage).\n"; break;
+        case Type::VERTEX: std::cout << ":> Destroying HmlBuffer (vertex).\n"; break;
+        case Type::INDEX: std::cout << ":> Destroying HmlBuffer (index).\n"; break;
     }
 #endif
 
@@ -117,7 +130,7 @@ HmlResourceManager::~HmlResourceManager() noexcept {
 
 
 std::unique_ptr<HmlBuffer> HmlResourceManager::createStagingBuffer(VkDeviceSize sizeBytes) const noexcept {
-    auto buffer = std::make_unique<HmlBuffer>();
+    auto buffer = std::make_unique<HmlBuffer>(true);
     buffer->hmlDevice = hmlDevice;
     buffer->type = HmlBuffer::Type::STAGING;
     buffer->sizeBytes = sizeBytes;
@@ -129,7 +142,7 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createStagingBuffer(VkDeviceSize 
 
 
 std::unique_ptr<HmlBuffer> HmlResourceManager::createUniformBuffer(VkDeviceSize sizeBytes) const noexcept {
-    auto buffer = std::make_unique<HmlBuffer>();
+    auto buffer = std::make_unique<HmlBuffer>(true);
     buffer->hmlDevice = hmlDevice;
     buffer->type = HmlBuffer::Type::UNIFORM;
     buffer->sizeBytes = sizeBytes;
@@ -141,7 +154,7 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createUniformBuffer(VkDeviceSize 
 
 
 std::unique_ptr<HmlBuffer> HmlResourceManager::createStorageBuffer(VkDeviceSize sizeBytes) const noexcept {
-    auto buffer = std::make_unique<HmlBuffer>();
+    auto buffer = std::make_unique<HmlBuffer>(true);
     buffer->hmlDevice = hmlDevice;
     buffer->type = HmlBuffer::Type::STORAGE;
     buffer->sizeBytes = sizeBytes;
@@ -152,28 +165,83 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createStorageBuffer(VkDeviceSize 
 }
 
 
-std::unique_ptr<HmlImageResource> HmlResourceManager::newDummyTextureResource() noexcept {
-    // ======== Create data and store it in a staging buffer
-    const int width = 2;
-    const int height = 2;
-    const int componentsCount = 4;
-    unsigned char pixels[width * height * componentsCount] = {
-        255, 0, 0, 255,
-        0, 255, 0, 255,
-        0, 0, 255, 255,
-        255, 255, 255, 255
-    };
+std::unique_ptr<HmlBuffer> HmlResourceManager::createVertexBuffer(VkDeviceSize sizeBytes) const noexcept {
+    auto buffer = std::make_unique<HmlBuffer>(true);
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::VERTEX;
+    buffer->sizeBytes = sizeBytes;
+    const auto usage      = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+    return buffer;
+}
 
+
+std::unique_ptr<HmlBuffer> HmlResourceManager::createIndexBuffer(VkDeviceSize sizeBytes) const noexcept {
+    auto buffer = std::make_unique<HmlBuffer>(true);
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::INDEX;
+    buffer->sizeBytes = sizeBytes;
+    const auto usage      = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+    return buffer;
+}
+
+
+std::unique_ptr<HmlBuffer> HmlResourceManager::createVertexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept {
+    auto stagingBuffer = createStagingBuffer(sizeBytes);
+    stagingBuffer->map();
+    stagingBuffer->update(data);
+    stagingBuffer->unmap();
+
+    auto buffer = std::make_unique<HmlBuffer>(false);
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::VERTEX;
+    buffer->sizeBytes = sizeBytes;
+
+    const auto usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+
+    copyBuffer(stagingBuffer->buffer, buffer->buffer, sizeBytes);
+
+    return buffer;
+}
+
+
+std::unique_ptr<HmlBuffer> HmlResourceManager::createIndexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept {
+    auto stagingBuffer = createStagingBuffer(sizeBytes);
+    stagingBuffer->map();
+    stagingBuffer->update(data);
+    stagingBuffer->unmap();
+
+    auto buffer = std::make_unique<HmlBuffer>(false);
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::INDEX;
+    buffer->sizeBytes = sizeBytes;
+
+    const auto usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+
+    copyBuffer(stagingBuffer->buffer, buffer->buffer, sizeBytes);
+
+    return buffer;
+}
+
+
+std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResourceFromData(uint32_t width, uint32_t height, uint32_t componentsCount, unsigned char* data, VkFormat format, std::optional<VkFilter> filter) noexcept {
+    // ======== Load data to a staging buffer
     auto stagingBuffer = createStagingBuffer(width * height * componentsCount);
     stagingBuffer->map();
-    stagingBuffer->update(pixels);
+    stagingBuffer->update(data);
     stagingBuffer->unmap();
 
     // ======== Create the image resource
     const VkExtent2D            extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
     const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-    const VkFormat              format = VK_FORMAT_R8G8B8A8_UNORM;
     auto resource = newBlankImageResource(extent, format, usage, aspect);
 
     // ======== Copy data from the staging buffer to the image resource
@@ -191,14 +259,32 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newDummyTextureResource() 
     resource->type = HmlImageResource::Type::TEXTURE;
     resource->width = width;
     resource->height = height;
-    resource->sampler = createTextureSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST);
+    if (filter) resource->sampler = createTextureSampler(*filter, *filter);
 
     return resource;
 }
 
 
+std::unique_ptr<HmlImageResource> HmlResourceManager::newDummyTextureResource() noexcept {
+    const uint32_t width = 2;
+    const uint32_t height = 2;
+    const uint32_t componentsCount = 4;
+    unsigned char pixels[width * height * componentsCount] = {
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        0, 0, 255, 255,
+        255, 255, 255, 255
+    };
+
+    const VkFilter filter = VK_FILTER_NEAREST;
+    const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    auto textureResource = newTextureResourceFromData(width, height, componentsCount, pixels, format, { filter });
+
+    return textureResource;
+}
+
+
 std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const char* fileName, uint32_t componentsCount, VkFormat format, VkFilter filter) noexcept {
-    // ======== Load data and store it in a staging buffer
     int width, height, channels;
     // NOTE Will force alpha even if it is not present
     stbi_uc* pixels = stbi_load(fileName, &width, &height, &channels, componentsCount);
@@ -207,37 +293,12 @@ std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResource(const c
         return { nullptr };
     }
 
-    auto stagingBuffer = createStagingBuffer(width * height * componentsCount);
-    stagingBuffer->map();
-    stagingBuffer->update(pixels);
-    stagingBuffer->unmap();
+    auto textureResource = newTextureResourceFromData(
+        static_cast<uint32_t>(width), static_cast<uint32_t>(height), componentsCount, pixels, format, { filter });
 
     stbi_image_free(pixels);
 
-    // ======== Create the image resource
-    const VkExtent2D            extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
-    const VkImageUsageFlags     usage  = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-    auto resource = newBlankImageResource(extent, format, usage, aspect);
-
-    // ======== Copy data from the staging buffer to the image resource
-    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, hmlCommands)) {
-        std::cerr << "::> Failed to create HmlImageResource as a texture resource.\n";
-        return { nullptr };
-    }
-    copyBufferToImage(stagingBuffer->buffer, resource->image, extent);
-    if (!resource->blockingTransitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, hmlCommands)) {
-        std::cerr << "::> Failed to create HmlImageResource as a texture resource.\n";
-        return { nullptr };
-    }
-
-    // ======== Finish initializing resource members
-    resource->type = HmlImageResource::Type::TEXTURE;
-    resource->width = width;
-    resource->height = height;
-    resource->sampler = createTextureSampler(filter, filter); // TODO
-
-    return resource;
+    return textureResource;
 }
 
 
@@ -315,9 +376,8 @@ std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* verti
     model->hmlDevice = hmlDevice;
     model->indicesCount = indices.size();
     model->textureResource = { nullptr };
-
-    createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
-    createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);
+    model->vertexBuffer = createVertexBufferWithData(vertices, verticesSizeBytes);
+    model->indexBuffer = createIndexBufferWithData(indices.data(), indices.size() * sizeof(indices[0]));
 
     models.push_back(model);
     return model;
@@ -330,9 +390,8 @@ std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* verti
     model->hmlDevice = hmlDevice;
     model->indicesCount = indices.size();
     model->textureResource = newTextureResource(textureFileName, 4, VK_FORMAT_R8G8B8A8_SRGB, filter);
-
-    createVertexBufferThroughStaging(model->vertexBuffer, model->vertexBufferMemory, vertices, verticesSizeBytes);
-    createIndexBufferThroughStaging(model->indexBuffer, model->indexBufferMemory, indices);
+    model->vertexBuffer = createVertexBufferWithData(vertices, verticesSizeBytes);
+    model->indexBuffer = createIndexBufferWithData(indices.data(), indices.size() * sizeof(indices[0]));
 
     models.push_back(model);
     return model;
@@ -370,41 +429,52 @@ void HmlResourceManager::createVertexBufferHost(VkBuffer& vertexBuffer,
         memcpy(data, vertices, sizeBytes);
     vkUnmapMemory(hmlDevice->device, vertexBufferMemory);
 }
+// ========================================================================
+// ========================================================================
+// ========================================================================
+VkSampler HmlResourceManager::createTextureSamplerForFonts() noexcept {
+    const VkFilter magFilter = VK_FILTER_LINEAR;
+    const VkFilter minFilter = VK_FILTER_LINEAR;
+    const VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    const VkBorderColor borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
+    // For anisotropic filtering
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(hmlDevice->physicalDevice, &properties);
 
-void HmlResourceManager::createVertexBufferThroughStaging(VkBuffer& vertexBuffer,
-        VkDeviceMemory& vertexBufferMemory, const void* vertices, VkDeviceSize sizeBytes) noexcept {
-    auto stagingBuffer = createStagingBuffer(sizeBytes);
-    stagingBuffer->map();
-    stagingBuffer->update(vertices);
-    stagingBuffer->unmap();
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    // VK_FILTER_LINEAR
+    samplerInfo.magFilter = magFilter;
+    samplerInfo.minFilter = minFilter;
+    // VK_SAMPLER_ADDRESS_MODE_REPEAT
+    // VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT
+    // VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+    // VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE
+    // VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER
+    samplerInfo.addressModeU = addressMode;
+    samplerInfo.addressModeV = addressMode;
+    samplerInfo.addressModeW = addressMode;
+    samplerInfo.anisotropyEnable = VK_TRUE; // FALSE to turn off, set max = 1.0f
+    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy; // use the best available
+    samplerInfo.borderColor = borderColor;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE; // if TRUE => [0; width) instead of [0;1)
+    samplerInfo.compareEnable = VK_FALSE; // used for percentage-closer filtering (shadow maps)
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
 
-    const auto usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    const auto memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    createBuffer(sizeBytes, usage, memoryType, vertexBuffer, vertexBufferMemory);
-
-    copyBuffer(stagingBuffer->buffer, vertexBuffer, sizeBytes);
+    VkSampler textureSampler;
+    if (vkCreateSampler(hmlDevice->device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+        std::cerr << "::> Failed to create TextureSampler.\n";
+        return VK_NULL_HANDLE;
+    }
+    return textureSampler;
 }
 
 
-void HmlResourceManager::createIndexBufferThroughStaging(VkBuffer& indexBuffer,
-        VkDeviceMemory& indexBufferMemory, const std::vector<uint32_t>& indices) noexcept {
-    const VkDeviceSize sizeBytes = sizeof(indices[0]) * indices.size();
-
-    auto stagingBuffer = createStagingBuffer(sizeBytes);
-    stagingBuffer->map();
-    stagingBuffer->update(indices.data());
-    stagingBuffer->unmap();
-
-    const auto usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    const auto memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    createBuffer(sizeBytes, usage, memoryType, indexBuffer, indexBufferMemory);
-
-    copyBuffer(stagingBuffer->buffer, indexBuffer, sizeBytes);
-}
-// ========================================================================
-// ========================================================================
-// ========================================================================
 VkSampler HmlResourceManager::createTextureSampler(VkFilter magFilter, VkFilter minFilter) noexcept {
     // For anisotropic filtering
     VkPhysicalDeviceProperties properties{};
@@ -822,7 +892,7 @@ uint32_t HmlResourceManager::findMemoryType(uint32_t typeFilter, VkMemoryPropert
 // ========================================================================
 // ========================================================================
 // ========================================================================
-void HmlResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) noexcept {
+void HmlResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) const noexcept {
     VkCommandBuffer commandBuffer = hmlCommands->beginSingleTimeCommands();
 
     VkBufferCopy copyRegion{};
@@ -835,7 +905,7 @@ void HmlResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDe
 }
 
 
-void HmlResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D extent) noexcept {
+void HmlResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D extent) const noexcept {
     VkCommandBuffer commandBuffer = hmlCommands->beginSingleTimeCommands();
 
     VkBufferImageCopy region{};

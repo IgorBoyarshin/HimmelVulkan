@@ -133,12 +133,13 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
     // -------------- Depth and stencil testing ----------
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthTestEnable = hmlPipelineConfig.withDepthTest;
+    depthStencil.depthWriteEnable = hmlPipelineConfig.withDepthTest;
+    // depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
-    depthStencil.minDepthBounds = 0.0f; // Optional
-    depthStencil.maxDepthBounds = 1.0f; // Optional
+    depthStencil.minDepthBounds = 0.0f; // skip fragment if out-of-bounds
+    depthStencil.maxDepthBounds = 1.0f; // skip fragment if out-of-bounds
     depthStencil.stencilTestEnable = VK_FALSE;
     depthStencil.front = {}; // Optional
     depthStencil.back = {}; // Optional
@@ -158,6 +159,8 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
         colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
         colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
         colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        // colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        // colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
         colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     } else {
         colorBlendAttachment.blendEnable = VK_FALSE;

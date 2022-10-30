@@ -251,7 +251,7 @@ HmlDescriptors::HmlDescriptorPoolBuilder& HmlDescriptors::HmlDescriptorPoolBuild
 }
 
 
-HmlDescriptors::HmlDescriptorPoolBuilder& HmlDescriptors::HmlDescriptorPoolBuilder::maxSets(uint32_t count) noexcept {
+HmlDescriptors::HmlDescriptorPoolBuilder& HmlDescriptors::HmlDescriptorPoolBuilder::maxDescriptorSets(uint32_t count) noexcept {
     descriptorSetCount = count;
     return *this;
 }

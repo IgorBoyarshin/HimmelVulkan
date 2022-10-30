@@ -26,6 +26,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlLightRenderer::createPipelines(
             .lineWidth = 1.0f,
             .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
             .withBlending = true,
+            .withDepthTest = true,
         };
 
         pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));

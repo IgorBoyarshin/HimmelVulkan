@@ -28,6 +28,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
                     .withBlending = false,
+                    .withDepthTest = true,
                 };
 
                 pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -54,6 +55,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
                     .withBlending = false,
+                    .withDepthTest = true,
                 };
 
                 pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -98,6 +100,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
                     .withBlending = false,
+                    .withDepthTest = true,
                 };
 
                 pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -123,6 +126,7 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
                     .lineWidth = 1.0f,
                     .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
                     .withBlending = false,
+                    .withDepthTest = true,
                 };
 
                 pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
@@ -148,7 +152,7 @@ std::unique_ptr<HmlRenderer> HmlRenderer::create(
     hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(MAX_TEXTURES_COUNT + imageCount * MAX_TEXTURES_COUNT)
         .withStorageBuffers(imageCount)
-        .maxSets(1 + imageCount)
+        .maxDescriptorSets(1 + imageCount)
         .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
@@ -358,14 +362,14 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
             // NOTE We know there is at least 1 such entity (ensured by logic of specifyEntitiesToRender)
             const auto& model = entities[0]->modelResource;
 
-            VkBuffer vertexBuffers[] = { model->vertexBuffer };
+            VkBuffer vertexBuffers[] = { model->vertexBuffer->buffer };
             VkDeviceSize offsets[] = { 0 };
             // NOTE advanced usage would be to have a single VkBuffer for both
             // VertexBuffer and IndexBuffer and specify different offsets into it.
             // Second and third arguments specify the offset and number of bindings
             // we're going to specify VertexBuffers for.
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(commandBuffer, model->indexBuffer, 0, VK_INDEX_TYPE_UINT32); // 0 is offset
+            vkCmdBindIndexBuffer(commandBuffer, model->indexBuffer->buffer, 0, VK_INDEX_TYPE_UINT32); // 0 is offset
 
             for (const auto& entity : entities) {
                 // NOTE Yes, in theory having a textureIndex per Entity is redundant
@@ -417,14 +421,14 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
             // NOTE We know there is at least 1 such entity (ensured by logic of specifyStaticEntitiesToRender)
             const auto& [textureIndex, modelResource] = entitiesData;
 
-            VkBuffer vertexBuffers[] = { modelResource->vertexBuffer };
+            VkBuffer vertexBuffers[] = { modelResource->vertexBuffer->buffer };
             VkDeviceSize offsets[] = { 0 };
             // NOTE advanced usage would be to have a single VkBuffer for both
             // VertexBuffer and IndexBuffer and specify different offsets into it.
             // Second and third arguments specify the offset and number of bindings
             // we're going to specify VertexBuffers for.
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(commandBuffer, modelResource->indexBuffer, 0, VK_INDEX_TYPE_UINT32); // 0 is offset
+            vkCmdBindIndexBuffer(commandBuffer, modelResource->indexBuffer->buffer, 0, VK_INDEX_TYPE_UINT32); // 0 is offset
 
             if (mode == Mode::Regular) {
                 PushConstantInstanced pushConstant{

@@ -91,7 +91,7 @@ struct HmlDescriptors {
         HmlDescriptorPoolBuilder& withTextures(uint32_t count) noexcept;
         HmlDescriptorPoolBuilder& withUniformBuffers(uint32_t count) noexcept;
         HmlDescriptorPoolBuilder& withStorageBuffers(uint32_t count) noexcept;
-        HmlDescriptorPoolBuilder& maxSets(uint32_t count) noexcept;
+        HmlDescriptorPoolBuilder& maxDescriptorSets(uint32_t count) noexcept;
         VkDescriptorPool build(std::shared_ptr<HmlDevice> hmlDevice) noexcept;
     };
 

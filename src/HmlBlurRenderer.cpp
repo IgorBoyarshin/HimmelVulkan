@@ -25,6 +25,7 @@ std::unique_ptr<HmlPipeline> HmlBlurRenderer::createPipeline(std::shared_ptr<Hml
         .lineWidth = 1.0f,
         .colorAttachmentCount = hmlRenderPass->colorAttachmentCount,
         .withBlending = false,
+        .withDepthTest = false,
     };
 
     return HmlPipeline::createGraphics(hmlDevice, std::move(config));
@@ -53,7 +54,7 @@ std::unique_ptr<HmlBlurRenderer> HmlBlurRenderer::create(
 
     hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
         .withTextures(imageCount * 2)
-        .maxSets(imageCount * 2)
+        .maxDescriptorSets(imageCount * 2)
         .build(hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 

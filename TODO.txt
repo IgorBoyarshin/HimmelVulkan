@@ -1,0 +1,20 @@
+==== SMALL ====
+-- Make normals VK_FORMAT_R16G16B16A16_SFLOAT. Maybe touch positions
+-- gBufferLightSpacePositions can be reduced because for light??
+-- Check cull mode everywhere and try performance for insatnces
+-- Using LAYOUT_UNDEFINED seems to hinder performance when we actually know the layout
+-- preFunc ability
+===============
+
+==== MODERATE ====
+-- World should really have a vec3, so not just a float height
+-- HmlContext should be passed to super-constructor
+-- Replace queue with a custom curcular buffer OR just insert the appropriate allocator to queues.
+==================
+
+
+==== BIG ====
+-- Allow proper specifyEntitiesToRender: switch from descriptorSet_textures_1 in HmlRenderer to descriptorSet_textures_1_perImage in HmlDeferredRenderer, but implement an automatic system to track update progress to check what frame we are at (and thus which DescriptorSet can be updated).
+-- We need only 1 pipeline per RenderPass for HmlTerrainRenderer, but we end up creating an array of 2 for each. Rething the pipeline storage architecture.
+-- Implement a resource-tracking system. This would allow to have a single pair of DescriptorSet--Resource; upon needing to update the Resource we would mark the old pair as to-be-deleted and create and start using a new pair. (useful for static resources).
+=============

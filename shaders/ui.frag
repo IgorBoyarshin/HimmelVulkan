@@ -14,10 +14,9 @@ layout(location = 0) out vec4 outColor;
 
 void main() {
     outColor = texture(texSamplers[push.textureIndex], inTexCoord);
-    // NOTE can use to linearize Depth:
-    if (push.textureIndex == 3) {
+    if (push.textureIndex == 4) {
         outColor = vec4(1.0 - (1.0 - outColor.r) * 1000.0);
-    } else if (push.textureIndex == 0) {
-        outColor = vec4(1.0 - (1.0 - outColor.w) * 1000.0);
+    } else if (push.textureIndex == 3) {
+        outColor = vec4(1.0 - (1.0 - outColor.z) * 1000.0);
     }
 }

@@ -666,17 +666,17 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         // const auto DST = 4.0f;
         // const auto globalLightPos = glm::vec3(DST * world->start.x, DST * world->height, DST * world->finish.y);
         // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + globalLightDir, glm::vec3{0, 1, 0});
-        static float near = 10.0f;
-        static float far = 1000.0f;
+        static float near = 300.0f;
+        static float far = 1100.0f;
         static float yaw = 210.0f;
         static float pitch = 30.0f;
         const float minDepth = 0.1f;
-        const float maxDepth = 1000.0f;
+        const float maxDepth = 1200.0f;
         const float minYaw = 0.0f;
         const float maxYaw = 360.0f;
         const float minPitch = 0.0f;
         const float maxPitch = 90.0f;
-        const float distanceFromCenter = 500.0f;
+        const float distanceFromCenter = 700.0f;
         // const auto globalLightPos = glm::vec3(-330, 150, 400);
         const auto globalLightPos = HmlCamera::calcDirForward(pitch, yaw) * distanceFromCenter;
         const auto globalLightView = glm::lookAt(globalLightPos, glm::vec3{0,0,0}, glm::vec3{0, 1, 0});
@@ -710,7 +710,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         viewProjUniformBuffers[imageIndex]->update(&generalUbo);
 #ifdef WITH_IMGUI
         ImGui::Begin("Shadowmap");
-        ImGui::DragScalar("near", ImGuiDataType_Float, &near, 0.005f, &minDepth, &maxDepth, "%f");
+        ImGui::DragScalar("near", ImGuiDataType_Float, &near, 0.1f, &minDepth, &maxDepth, "%f");
         ImGui::DragScalar("far", ImGuiDataType_Float, &far, 1.0f, &minDepth, &maxDepth, "%f");
         ImGui::DragScalar("yaw", ImGuiDataType_Float, &yaw, 0.5f, &minYaw, &maxYaw, "%f");
         ImGui::DragScalar("pitch", ImGuiDataType_Float, &pitch, 0.3f, &minPitch, &maxPitch, "%f");
@@ -856,7 +856,8 @@ bool Himmel::prepareResources() noexcept {
         // gBufferPositions[i]           = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
         gBufferNormals[i]             = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         gBufferColors[i]              = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
+        // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
+        gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         // brightness2Textures[i]        = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);

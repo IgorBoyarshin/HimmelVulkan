@@ -61,16 +61,6 @@ void HmlImgui::beginFrame() noexcept {
 
 
 void HmlImgui::finilize() noexcept {
-    // NOTE temp
-    const float scale = 1.0;
-    ImGui::SetWindowPos(ImVec2(20 * scale, 20 * scale), ImGuiCond_FirstUseEver);
-    ImGui::SetWindowSize(ImVec2(300 * scale, 300 * scale), ImGuiCond_Always);
-    ImGui::TextUnformatted("LOVE my MASIK!");
-    ImGui::TextUnformatted("hellow");
-
-    ImGui::Begin("Example settings");
-    ImGui::Text("Camera");
-    ImGui::End();
     // ================ Construct render data ================
     ImGui::Render();
     // ================ Update vertex and index buffers ================

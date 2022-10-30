@@ -394,7 +394,7 @@ bool Himmel::run() noexcept {
     while (!hmlContext->hmlWindow->shouldClose()) {
         hmlContext->hmlQueries->beginFrame();
         // To force initial update of stuff
-        if (hmlContext->currentFrame) hmlCamera.resetChanged();
+        // if (hmlContext->currentFrame) hmlCamera.invalidateCache();
 
         glfwPollEvents();
         hmlContext->hmlImgui->beginFrame();
@@ -473,6 +473,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 
     static bool uiInFocus = false;
+#ifdef WITH_IMGUI
     { // Imgui stuff
         static bool f1Pressed = false;
         if (!f1Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F1) == GLFW_PRESS) {
@@ -489,6 +490,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
             f1Pressed = false;
         }
     }
+#endif
 
     // NOTE allow cursor position update and only disable camera rotation reaction
     // in order not to have the camera jump on re-acquiring control from the ui
@@ -556,18 +558,86 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT)  == GLFW_PRESS) { car->moveRight(-carDistance); }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_UP)    == GLFW_PRESS) { car->moveForward(carDistance); }
         if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_DOWN)  == GLFW_PRESS) { car->moveForward(-carDistance); }
-        if (!car->cachedViewValid) {
-            const auto carPos = glm::vec2{car->posCenter.x, car->posCenter.z};
-            const auto worldHeight = world->heightAt(carPos);
-            car->setHeight(worldHeight);
+    }
 
-            // XXX We rely on the Car to be the last Entity here XXX
-            entities.back()->modelMatrix = car->getView();
-            // NOTE no need to call hmlRenderer->specifyEntitiesToRender(entities)
-            // because the Entities are stored as shared_ptr there, which we have
-            // just updated.
+    if (!car->cachedViewValid) {
+        const auto carPos = glm::vec2{car->posCenter.x, car->posCenter.z};
+        const auto worldHeight = world->heightAt(carPos);
+        car->setHeight(worldHeight);
+
+        // XXX We rely on the Car to be the last Entity here XXX
+        entities.back()->modelMatrix = car->getView();
+        // NOTE no need to call hmlRenderer->specifyEntitiesToRender(entities)
+        // because the Entities are stored as shared_ptr there, which we have
+        // just updated.
+    }
+
+
+#ifdef WITH_IMGUI
+    ImGui::SetNextWindowBgAlpha(0.35f);
+    ImGuiWindowFlags window_flags =
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoNav;
+    if (ImGui::Begin("Stats", nullptr, window_flags)) {
+        {
+            if (uiInFocus) ImGui::Text("Focus: Imgui");
+            else ImGui::Text("Focus: Himmel");
+        }
+        ImGui::Separator();
+        { // Camera
+            auto& pos = hmlCamera.pos;
+            auto& pitch = hmlCamera.pitch;
+            auto& yaw = hmlCamera.yaw;
+
+            const float minPos = -1000.0f;
+            const float maxPos = 1000.0f;
+            const float minYaw = 0.0f;
+            const float maxYaw = 360.0f;
+            const float minPitch = -90.0f;
+            const float maxPitch = 90.0f;
+
+            ImGui::Text("Camera");
+            ImGui::Spacing();
+            ImGui::Text("[%.2f;%.2f;%.2f] p=%.1f y=%.1f", pos.x, pos.y, pos.z, pitch, yaw);
+            ImGui::DragFloat3("pos", &pos[0], 0.8f, minPos, maxPos);
+            ImGui::DragScalar("pitch", ImGuiDataType_Float, &pitch, 0.3f, &minPitch, &maxPitch, "%f");
+            ImGui::DragScalar("yaw", ImGuiDataType_Float, &yaw, 0.7f, &minYaw, &maxYaw, "%f");
+
+            static auto cachedPos = pos;
+            static auto cachedPitch = pitch;
+            static auto cachedYaw = yaw;
+            if (pos != cachedPos || pitch != cachedPitch || yaw != cachedYaw) {
+                hmlCamera.invalidateCache();
+                cachedPos = pos;
+                cachedPitch = pitch;
+                cachedYaw = yaw;
+            }
+        }
+        ImGui::Separator();
+        { // Car
+            auto& pos = car->posCenter;
+
+            const float minPos = -1000.0f;
+            const float maxPos = 1000.0f;
+
+            ImGui::Text("Car");
+            ImGui::Spacing();
+            ImGui::Text("[%.2f;%.2f;%.2f]", pos.x, pos.y, pos.z);
+            ImGui::DragFloat3("position", &pos[0], 0.3f, minPos, maxPos);
+            // ImGui::DragFloat3("dirForward", &car->dirForward[0]);
+            // ImGui::DragFloat3("dirRight", &car->dirRight[0]);
+
+            static auto cachedPos = car->posCenter;
+            if (pos != cachedPos) {
+                car->cachedViewValid = false;
+                cachedPos = pos;
+            }
         }
     }
+    ImGui::End();
+#endif
 
 
     hmlContext->hmlImgui->updateForDt(dt);
@@ -579,59 +649,75 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     {
         // NOTE Takes up to 60mks with (current) CPU-patch implementation
         // const auto startTime = std::chrono::high_resolution_clock::now();
-        if (hmlCamera.positionHasChanged()) hmlTerrainRenderer->update(hmlCamera.getPos());
+        hmlTerrainRenderer->update(hmlCamera.getPos());
         // const auto newMark = std::chrono::high_resolution_clock::now();
         // const auto sinceStart = std::chrono::duration_cast<std::chrono::microseconds>(newMark - startTime).count();
         // const float sinceStartMksSeconds = static_cast<float>(sinceStart);
         // std::cout << "UPD = " << sinceStartMksSeconds << '\n';
     }
+
 }
 
 
 void Himmel::updateForImage(uint32_t imageIndex) noexcept {
-    // NOTE cannot use hmlCamera.somethingHasChanged because we have multiple UBOs (per image)
-    const auto globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f));
-    // const auto DST = 4.0f;
-    // const auto globalLightPos = glm::vec3(DST * world->start.x, DST * world->height, DST * world->finish.y);
-    // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + globalLightDir, glm::vec3{0, 1, 0});
-    const auto calcDirForward = [](float pitch, float yaw){
-        const auto p = glm::radians(pitch);
-        const auto y = glm::radians(yaw);
-        const auto cosp = glm::cos(p);
-        const auto sinp = glm::sin(p);
-        const auto cosy = glm::cos(y);
-        const auto siny = glm::sin(y);
-        return glm::normalize(glm::vec3(siny * cosp, sinp, -cosy * cosp));
-    };
-    const auto globalLightPos = glm::vec3(-330, 150, 400);
-    const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + calcDirForward(-18.15f, 42.4f), glm::vec3{0, 1, 0});
-    const auto globalLightProj = [&](){
-        // glm::mat4 clip = glm::mat4(1.0f, 0.0f, 0.0f, 0.0f,
-        //                            0.0f,-1.0f, 0.0f, 0.0f,
-        //                            0.0f, 0.0f, 0.5f, 0.0f,
-        //                            0.0f, 0.0f, 0.5f, 1.0f);
-        const float near = 0.1f;
-        const float far = 1000.0f;
-        glm::mat4 proj = glm::perspective(glm::radians(45.0f), hmlContext->hmlSwapchain->extentAspect(), near, far);
-        proj[1][1] *= -1; // fix the inverted Y axis of GLM
-        return proj;
-    }();
-    GeneralUbo generalUbo{
-        .view = hmlCamera.view(),
-        .proj = proj,
-        // XXX
-        // XXX
-        .globalLightView = globalLightView,
-        .globalLightProj = globalLightProj,
-        // .globalLightView = hmlCamera.view(),
-        // .globalLightProj = proj,
-        .globalLightDir = globalLightDir,
-        .ambientStrength = 0.1f,
-        .fogColor = weather.fogColor,
-        .fogDensity = weather.fogDensity,
-        .cameraPos = hmlCamera.getPos(),
-    };
-    viewProjUniformBuffers[imageIndex]->update(&generalUbo);
+    {
+        // NOTE cannot use hmlCamera.somethingHasChanged because we have multiple UBOs (per image)
+        const auto globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)); // NOTE probably unused
+        // const auto DST = 4.0f;
+        // const auto globalLightPos = glm::vec3(DST * world->start.x, DST * world->height, DST * world->finish.y);
+        // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + globalLightDir, glm::vec3{0, 1, 0});
+        static float near = 10.0f;
+        static float far = 1000.0f;
+        static float yaw = 210.0f;
+        static float pitch = 30.0f;
+        const float minDepth = 0.1f;
+        const float maxDepth = 1000.0f;
+        const float minYaw = 0.0f;
+        const float maxYaw = 360.0f;
+        const float minPitch = 0.0f;
+        const float maxPitch = 90.0f;
+        const float distanceFromCenter = 500.0f;
+        // const auto globalLightPos = glm::vec3(-330, 150, 400);
+        const auto globalLightPos = HmlCamera::calcDirForward(pitch, yaw) * distanceFromCenter;
+        const auto globalLightView = glm::lookAt(globalLightPos, glm::vec3{0,0,0}, glm::vec3{0, 1, 0});
+        // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + calcDirForward(-18.15f, 42.4f), glm::vec3{0, 1, 0});
+        const auto globalLightProj = [&](){
+            // glm::mat4 clip = glm::mat4(1.0f, 0.0f, 0.0f, 0.0f,
+            //                            0.0f,-1.0f, 0.0f, 0.0f,
+            //                            0.0f, 0.0f, 0.5f, 0.0f,
+            //                            0.0f, 0.0f, 0.5f, 1.0f);
+            // const float near = 0.1f;
+            // const float far = 1000.0f;
+            glm::mat4 proj = glm::perspective(glm::radians(45.0f), hmlContext->hmlSwapchain->extentAspect(), near, far);
+            proj[1][1] *= -1; // fix the inverted Y axis of GLM
+            return proj;
+        }();
+        GeneralUbo generalUbo{
+            .view = hmlCamera.view(),
+                .proj = proj,
+                // XXX
+                // XXX
+                .globalLightView = globalLightView,
+                .globalLightProj = globalLightProj,
+                // .globalLightView = hmlCamera.view(),
+                // .globalLightProj = proj,
+                .globalLightDir = globalLightDir,
+                .ambientStrength = 0.1f,
+                .fogColor = weather.fogColor,
+                .fogDensity = weather.fogDensity,
+                .cameraPos = hmlCamera.getPos(),
+        };
+        viewProjUniformBuffers[imageIndex]->update(&generalUbo);
+#ifdef WITH_IMGUI
+        ImGui::Begin("Shadowmap");
+        ImGui::DragScalar("near", ImGuiDataType_Float, &near, 0.005f, &minDepth, &maxDepth, "%f");
+        ImGui::DragScalar("far", ImGuiDataType_Float, &far, 1.0f, &minDepth, &maxDepth, "%f");
+        ImGui::DragScalar("yaw", ImGuiDataType_Float, &yaw, 0.5f, &minYaw, &maxYaw, "%f");
+        ImGui::DragScalar("pitch", ImGuiDataType_Float, &pitch, 0.3f, &minPitch, &maxPitch, "%f");
+        ImGui::Text("Sun position [%.2f;%.2f;%.2f]", globalLightPos.x, globalLightPos.y, globalLightPos.z);
+        ImGui::End();
+#endif
+    }
 
     {
         const auto lightsCount = pointLightsStatic.size() + pointLightsDynamic.size();
@@ -803,10 +889,6 @@ bool Himmel::prepareResources() noexcept {
     const float VERY_FAR = 10000.0f;
     bool allGood = true;
 
-    // TODO
-    // TODO Maybe create pre-func???
-    // TODO for terrain!!!!!!
-    // TODO
     // ================================= PASS =================================
     // ======== Render shadow-casting geometry into shadow map ========
     hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);

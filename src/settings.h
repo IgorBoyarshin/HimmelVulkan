@@ -12,5 +12,7 @@
 
 #define LOG_STATS 1 && USE_TIMESTAMP_QUERIES
 
+#define WITH_IMGUI 1
+
 
 #endif

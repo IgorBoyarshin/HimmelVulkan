@@ -269,6 +269,10 @@ void HmlTerrainRenderer::constructTree(SubTerrain& subTerrain, const glm::vec3& 
 
 
 void HmlTerrainRenderer::update(const glm::vec3& cameraPos) noexcept {
+    static glm::vec3 cachedCameraPos;
+    if (cachedCameraPos == cameraPos) return;
+    cachedCameraPos = cameraPos;
+
     for (auto& subTerrain : subTerrains) constructTree(subTerrain, cameraPos);
 }
 

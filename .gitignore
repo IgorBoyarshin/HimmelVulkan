@@ -1,5 +1,4 @@
 shaders/out
-libs
 main
 *.o
 models/

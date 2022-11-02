@@ -355,6 +355,15 @@ bool Himmel::init() noexcept {
                 modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 0.0, 1.0));
                 entities.back()->modelMatrix = modelMatrix;
             }
+            { // back side
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, { 0.0f, 50.0f, -200.0f - 0.001f });
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(150.0f));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 0.0, 1.0));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 1.0, 0.0));
+                entities.back()->modelMatrix = modelMatrix;
+            }
 
             entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
             entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 30.0f});
@@ -366,7 +375,7 @@ bool Himmel::init() noexcept {
             entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 90.0f});
 
             // Flat surface with a tree
-            {
+            { // #1
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
                 auto modelMatrix = glm::mat4(1.0f);
                 modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f, 0.0f });
@@ -374,12 +383,28 @@ bool Himmel::init() noexcept {
                 modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f + 180.0f), glm::vec3(1, 0, 0));
                 entities.back()->modelMatrix = modelMatrix;
             }
-            {
+            { // #1 back side
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f - 0.001f, 0.0f });
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(1, 0, 0));
+                entities.back()->modelMatrix = modelMatrix;
+            }
+            { // $2
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
                 auto modelMatrix = glm::mat4(1.0f);
                 modelMatrix = glm::translate(modelMatrix, { 0.0f, 60.0f, -20.0f });
                 modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
                 // modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(0, 0, 1));
+                entities.back()->modelMatrix = modelMatrix;
+            }
+            { // $2 back side
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, { 0.0f, 60.0f, -20.0f - 0.001f });
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(1, 0, 0));
                 entities.back()->modelMatrix = modelMatrix;
             }
             {

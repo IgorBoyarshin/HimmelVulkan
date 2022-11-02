@@ -181,6 +181,16 @@ bool Himmel::init() noexcept {
             .radius = LIGHT_RADIUS,
         });
     }
+    { // The light for 2 flat planes
+        const auto pos = glm::vec3(0.0, 60.0, 20.0);
+        const auto color = glm::vec3(1.0, 1.0, 1.0);
+        pointLightsStatic.push_back(HmlLightRenderer::PointLight{
+            .color = color,
+            .intensity = 100.0f,
+            .position = pos,
+            .radius = LIGHT_RADIUS,
+        });
+    }
     {
         pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(1.0, 0.0, 0.0),
@@ -207,8 +217,8 @@ bool Himmel::init() noexcept {
     hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
 
-    hmlCamera = HmlCamera{{ 25.0f, 40.0f, 35.0f }};
-    hmlCamera.rotateDir(-15.0f, -40.0f);
+    hmlCamera = HmlCamera{{ 205.0f, 135.0f, 215.0f }};
+    hmlCamera.rotateDir(-28.0f, 307.0f);
     cursor = hmlContext->hmlWindow->getCursor();
     proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
 
@@ -241,6 +251,36 @@ bool Himmel::init() noexcept {
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
             const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/girl.png", VK_FILTER_LINEAR);
+            models.push_back(model);
+        }
+
+        { // Just a 2D plane
+            std::vector<HmlSimpleModel::Vertex> vertices;
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {-0.5f, -0.5f, 0.0f},
+                .texCoord = {1.0f, 0.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {0.5f, -0.5f, 0.0f},
+                .texCoord = {0.0f, 0.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {0.5f, 0.5f, 0.0f},
+                .texCoord = {0.0f, 1.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
+            });
+            vertices.push_back(HmlSimpleModel::Vertex{
+                .pos = {-0.5f, 0.5f, 0.0f},
+                .texCoord = {1.0f, 1.0f},
+                .normal = {0.0f, 0.0f, 1.0f},
+            });
+
+            std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
+
+            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
             models.push_back(model);
         }
 
@@ -295,11 +335,12 @@ bool Himmel::init() noexcept {
         }
 
         const auto& phonyModel = models[0];
-        const auto& vikingModel = models[1];
-        const auto& planeModel = models[2];
-        const auto& carModel = models[3];
-        const auto& treeModel = models[4];
-        const auto& treeModel2 = models[5];
+        const auto& flatModel = models[1];
+        const auto& vikingModel = models[2];
+        const auto& planeModel = models[3];
+        const auto& carModel = models[4];
+        const auto& treeModel = models[5];
+        const auto& treeModel2 = models[6];
 
 
         // Add Entities
@@ -324,6 +365,32 @@ bool Himmel::init() noexcept {
             entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.2f, 0.2f, 0.9f }));
             entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 90.0f});
 
+            // Flat surface with a tree
+            {
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f, 0.0f });
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f + 180.0f), glm::vec3(1, 0, 0));
+                entities.back()->modelMatrix = modelMatrix;
+            }
+            {
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, { 0.0f, 60.0f, -20.0f });
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
+                // modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(0, 0, 1));
+                entities.back()->modelMatrix = modelMatrix;
+            }
+            {
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(treeModel2));
+                const auto pos = glm::vec3{ 0, 40, 0 };
+                const float scale = 7.0f;
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, pos);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
+                entities.back()->modelMatrix = std::move(modelMatrix);
+            }
             entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
             entities.back()->modelMatrix = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0, 10.0, 10.0)), glm::vec3{40.0f, 30.0f, 70.0f});
 
@@ -688,19 +755,20 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             //                            0.0f, 0.0f, 0.5f, 1.0f);
             // const float near = 0.1f;
             // const float far = 1000.0f;
-            glm::mat4 proj = glm::perspective(glm::radians(45.0f), hmlContext->hmlSwapchain->extentAspect(), near, far);
+            const float width = hmlContext->hmlSwapchain->extent.width;
+            const float height = hmlContext->hmlSwapchain->extent.height;
+            const float f = 0.2f;
+            glm::mat4 proj = glm::ortho(-width*f, width*f, -height*f, height*f, near, far);
+            // glm::mat4 proj = glm::perspective(glm::radians(45.0f), hmlContext->hmlSwapchain->extentAspect(), near, far);
             proj[1][1] *= -1; // fix the inverted Y axis of GLM
             return proj;
         }();
         GeneralUbo generalUbo{
             .view = hmlCamera.view(),
                 .proj = proj,
-                // XXX
-                // XXX
+                // .globalLightView = hmlCamera.view(),
                 .globalLightView = globalLightView,
                 .globalLightProj = globalLightProj,
-                // .globalLightView = hmlCamera.view(),
-                // .globalLightProj = proj,
                 .globalLightDir = globalLightDir,
                 .ambientStrength = 0.1f,
                 .fogColor = weather.fogColor,

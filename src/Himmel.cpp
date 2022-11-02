@@ -11,7 +11,7 @@ bool Himmel::init() noexcept {
     hmlContext = std::make_shared<HmlContext>();
     hmlContext->maxFramesInFlight = 2;
 
-    hmlContext->hmlWindow = HmlWindow::create(1920, 1080, windowName);
+    hmlContext->hmlWindow = HmlWindow::create(1080, 720, windowName);
     if (!hmlContext->hmlWindow) return false;
 
     hmlContext->hmlDevice = HmlDevice::create(hmlContext->hmlWindow);
@@ -502,6 +502,31 @@ bool Himmel::run() noexcept {
         // const auto mark1 = std::chrono::high_resolution_clock::now();
         // const auto updateMs = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(mark1 - newMark).count()) / 1'000.0f;
 
+#if WITH_IMGUI && USE_TIMESTAMP_QUERIES
+        static uint32_t timeMks = 0;
+        {
+            static constexpr uint32_t showEvery = 10;
+            static uint32_t showCounter = 0;
+            static uint32_t showedTime = 0;
+            ImGui::SetNextWindowBgAlpha(0.5f);
+            ImGuiWindowFlags window_flags =
+                ImGuiWindowFlags_NoDecoration |
+                ImGuiWindowFlags_AlwaysAutoResize |
+                ImGuiWindowFlags_NoFocusOnAppearing |
+                ImGuiWindowFlags_NoNav;
+            if (ImGui::Begin("Perf", nullptr, window_flags)) {
+                if (showCounter == 0) {
+                    showedTime = timeMks;
+                }
+                ImGui::Text("GPU time = %.1fms", showedTime / 1000.0f);
+            }
+            ImGui::End();
+
+            showCounter++;
+            showCounter %= showEvery;
+        }
+#endif // WITH_IMGUI
+
         if (!drawFrame()) return false;
 
         hmlContext->hmlResourceManager->tickFrame(hmlContext->currentFrame);
@@ -514,8 +539,12 @@ bool Himmel::run() noexcept {
             << '\n';
 #endif
 
+#if USE_TIMESTAMP_QUERIES
+        const auto frameStatOpt = hmlContext->hmlQueries->popOldestFrameStat();
+#endif // USE_TIMESTAMP_QUERIES
+
 #if LOG_STATS
-        if (const auto frameStatOpt = hmlContext->hmlQueries->popOldestFrameStat(); frameStatOpt) {
+        if (frameStatOpt) {
             static uint64_t lastFrameStart = 0;
 
             // for (const auto& eventName : *(frameStatOpt->layout)) std::cout << eventName << "===";
@@ -539,7 +568,17 @@ bool Himmel::run() noexcept {
             }
             std::cout << '\n';
         }
-#endif
+#endif // LOG_STATS
+
+#if WITH_IMGUI && USE_TIMESTAMP_QUERIES
+        if (frameStatOpt) {
+            const auto& firstOpt = frameStatOpt->data.front();
+            const auto& lastOpt = frameStatOpt->data.back();
+            if (frameStatOpt->data.size() >= 2 && firstOpt && lastOpt) {
+                timeMks = (*lastOpt - *firstOpt) / 1000;
+            }
+        }
+#endif // WITH_IMGUI
 
         hmlContext->currentFrame++;
     }

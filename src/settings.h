@@ -2,7 +2,7 @@
 #define HML_SETTINGS
 
 
-#define DEBUG 1
+#define EDIT_ON_ERROR 1
 
 #define LOG_DESTROYS 0
 

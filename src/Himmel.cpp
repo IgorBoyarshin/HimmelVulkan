@@ -525,6 +525,39 @@ bool Himmel::run() noexcept {
             showCounter++;
             showCounter %= showEvery;
         }
+#endif // WITH_IMGUI && USE_TIMESTAMP_QUERIES
+
+#if WITH_IMGUI
+        {
+            static constexpr uint32_t showEvery = 10;
+            static uint32_t showCounter = 0;
+            static float showedElapsedMicrosWait1 = 0;
+            static float showedElapsedMicrosAcquire = 0;
+            static float showedElapsedMicrosWait2 = 0;
+            static float showedElapsedMicrosPresent = 0;
+            ImGui::SetNextWindowBgAlpha(0.5f);
+            ImGuiWindowFlags window_flags =
+                // ImGuiWindowFlags_NoDecoration |
+                ImGuiWindowFlags_AlwaysAutoResize |
+                ImGuiWindowFlags_NoFocusOnAppearing |
+                ImGuiWindowFlags_NoNav;
+            if (ImGui::Begin("CPU times", nullptr, window_flags)) {
+                if (showCounter == 0) {
+                    showedElapsedMicrosWait1 = stats.elapsedMicrosWait1;
+                    showedElapsedMicrosAcquire = stats.elapsedMicrosAcquire;
+                    showedElapsedMicrosWait2 = stats.elapsedMicrosWait2;
+                    showedElapsedMicrosPresent = stats.elapsedMicrosPresent;
+                }
+                ImGui::Text("Wait1 = %.1fmks", showedElapsedMicrosWait1);
+                ImGui::Text("Acquire = %.1fmks", showedElapsedMicrosAcquire);
+                ImGui::Text("Wait2 = %.1fmks", showedElapsedMicrosWait2);
+                ImGui::Text("Present = %.1fmks", showedElapsedMicrosPresent);
+            }
+            ImGui::End();
+
+            showCounter++;
+            showCounter %= showEvery;
+        }
 #endif // WITH_IMGUI
 
         if (!drawFrame()) return false;
@@ -886,7 +919,9 @@ bool Himmel::drawFrame() noexcept {
     // Wait for next-in-order frame to become rendered (for its commandBuffer
     // to finish). This ensures that no more than MAX_FRAMES_IN_FLIGHT frames
     // are inside the rendering pipeline at the same time.
+    const auto startWait1 = std::chrono::high_resolution_clock::now();
     vkWaitForFences(hmlContext->hmlDevice->device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    const auto endWait1 = std::chrono::high_resolution_clock::now();
 
     // vkAcquireNextImageKHR only specifies which image will be made
     // available next, so that we can e.g. start recording command
@@ -899,6 +934,7 @@ bool Himmel::drawFrame() noexcept {
     uint32_t imageIndex; // the available image we will be given by the presentation engine from the swapchain
     // The next-in-order imageAvailableSemaphore has already retired because
     // its inFlightFence has just been waited upon.
+    const auto startAcquire = std::chrono::high_resolution_clock::now();
     if (const VkResult result = vkAcquireNextImageKHR(hmlContext->hmlDevice->device, hmlContext->hmlSwapchain->swapchain, UINT64_MAX,
                 imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
             result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -908,7 +944,9 @@ bool Himmel::drawFrame() noexcept {
         std::cerr << "::> Failed to acquire swap chain image.\n";
         return false;
     }
+    const auto endAcquire = std::chrono::high_resolution_clock::now();
 
+    const auto startWait2 = std::chrono::high_resolution_clock::now();
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) [[likely]] {
         // For each image we submit, we track which inFlightFence was bound
         // to it; for cases when the to-be-acquired image is still in use by
@@ -917,6 +955,7 @@ bool Himmel::drawFrame() noexcept {
         // this particular image exits the pipeline.
         vkWaitForFences(hmlContext->hmlDevice->device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
+    const auto endWait2 = std::chrono::high_resolution_clock::now();
 
     // The image has at least finished being rendered.
     // Mark the image as now being in use by this frame
@@ -937,6 +976,7 @@ bool Himmel::drawFrame() noexcept {
 
 // ============================================================================
 
+    const auto startPresent = std::chrono::high_resolution_clock::now();
     {
         VkSemaphore waitSemaphores[] = { renderFinishedSemaphores[currentFrame] };
 
@@ -960,6 +1000,13 @@ bool Himmel::drawFrame() noexcept {
             return false;
         }
     }
+    const auto endPresent = std::chrono::high_resolution_clock::now();
+// ============================================================================
+    stats.elapsedMicrosWait1 = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWait1 - startWait1).count()) / 1.0f;
+    stats.elapsedMicrosAcquire = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endAcquire - startAcquire).count()) / 1.0f;
+    stats.elapsedMicrosWait2 = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWait2 - startWait2).count()) / 1.0f;
+    stats.elapsedMicrosPresent = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endPresent - startPresent).count()) / 1.0f;
+// ============================================================================
 
     currentFrame = (currentFrame + 1) % hmlContext->maxFramesInFlight;
     return true;
@@ -1131,7 +1178,8 @@ bool Himmel::prepareResources() noexcept {
         {}, // post transitions
         std::nullopt // post func
     );
-    // Renders on top of the deferred texture using the depth info from the prep pass
+    // ================================= PASS =================================
+    // ======== Renders on top of the deferred texture using the depth info from the prep pass ========
 #if DEBUG_TERRAIN
     hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
 #endif

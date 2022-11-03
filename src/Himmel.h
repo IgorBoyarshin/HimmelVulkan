@@ -215,6 +215,13 @@ struct Himmel {
     Weather weather;
     const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
 
+    struct Stats {
+        float elapsedMicrosWait1 = 0;
+        float elapsedMicrosAcquire = 0;
+        float elapsedMicrosWait2 = 0;
+        float elapsedMicrosPresent = 0;
+    } stats;
+
     std::shared_ptr<HmlContext> hmlContext;
 
     std::shared_ptr<HmlRenderPass> hmlRenderPassDeferredPrep;

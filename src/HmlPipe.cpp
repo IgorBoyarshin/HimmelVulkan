@@ -97,14 +97,14 @@ void HmlPipe::run(const HmlFrameData& frameData) noexcept {
 
             VkSubmitInfo submitInfo{
                 .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                    .pNext = nullptr,
-                    .waitSemaphoreCount = 1,
-                    .pWaitSemaphores = waitSemaphores,
-                    .pWaitDstStageMask = waitStages,
-                    .commandBufferCount = 1,
-                    .pCommandBuffers = &commandBuffer,
-                    .signalSemaphoreCount = 1,
-                    .pSignalSemaphores = signalSemaphores,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = waitSemaphores,
+                .pWaitDstStageMask = waitStages,
+                .commandBufferCount = 1,
+                .pCommandBuffers = &commandBuffer,
+                .signalSemaphoreCount = 1,
+                .pSignalSemaphores = signalSemaphores,
             };
 
             VkFence signalFence = VK_NULL_HANDLE;
@@ -115,7 +115,7 @@ void HmlPipe::run(const HmlFrameData& frameData) noexcept {
             }
             if (vkQueueSubmit(hmlContext->hmlDevice->graphicsQueue, 1, &submitInfo, signalFence) != VK_SUCCESS) {
                 std::cerr << "::> Failed to submit draw command buffer.\n";
-#if DEBUG
+#if EXIT_ON_ERROR
                 // To quickly crash the application and not wait for it to un-hang
                 exit(-1);
 #endif

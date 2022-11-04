@@ -2,7 +2,7 @@
 #define HML_SETTINGS
 
 
-#define EDIT_ON_ERROR 1
+#define EXIT_ON_ERROR 1
 
 #define LOG_DESTROYS 0
 
@@ -10,9 +10,12 @@
 
 #define USE_TIMESTAMP_QUERIES 1
 
-#define LOG_STATS 0 && USE_TIMESTAMP_QUERIES
+#define LOG_STATS 1 && USE_TIMESTAMP_QUERIES
 
 #define WITH_IMGUI 1
+
+#define MERGE_CMD_SUBMITS 0
+#define MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE 1
 
 
 #endif

@@ -278,13 +278,13 @@ void HmlTerrainRenderer::update(const glm::vec3& cameraPos) noexcept {
 
 
 VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept {
-    auto commandBuffer = getCurrentCommands()[frameData.imageIndex];
+    auto commandBuffer = getCurrentCommands()[frameData.swapchainImageIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
         .renderPass = currentRenderPass->renderPass,
         .subpass = 0, // we only have a single one
-        .framebuffer = currentRenderPass->framebuffers[frameData.imageIndex],
+        .framebuffer = currentRenderPass->framebuffers[frameData.swapchainImageIndex],
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)

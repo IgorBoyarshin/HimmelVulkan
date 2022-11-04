@@ -28,7 +28,8 @@
 #include "HmlCamera.h"
 #include "util.h"
 #include "HmlRenderPass.h"
-#include "HmlPipe.h"
+// #include "HmlPipe.h"
+#include "HmlDispatcher.h"
 #include "HmlQueries.h"
 #include "HmlImguiRenderer.h"
 #include "HmlImgui.h"
@@ -215,12 +216,13 @@ struct Himmel {
     Weather weather;
     const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
 
-    struct Stats {
-        float elapsedMicrosWait1 = 0;
-        float elapsedMicrosAcquire = 0;
-        float elapsedMicrosWait2 = 0;
-        float elapsedMicrosPresent = 0;
-    } stats;
+    // struct Stats {
+    //     float elapsedMicrosWait1 = 0;
+    //     float elapsedMicrosAcquire = 0;
+    //     float elapsedMicrosWait2 = 0;
+    //     float elapsedMicrosPresent = 0;
+    // } stats;
+    HmlDispatcher::FrameResult::Stats frameStats;
 
     std::shared_ptr<HmlContext> hmlContext;
 
@@ -230,7 +232,6 @@ struct Himmel {
     std::shared_ptr<HmlRenderPass> hmlRenderPassUi;
     std::shared_ptr<HmlRenderer> hmlRenderer;
     std::shared_ptr<HmlUiRenderer> hmlUiRenderer;
-    // std::shared_ptr<HmlBlurRenderer> hmlBlurRenderer;
     std::shared_ptr<HmlBloomRenderer> hmlBloomRenderer;
     std::shared_ptr<HmlDeferredRenderer> hmlDeferredRenderer;
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
@@ -243,10 +244,9 @@ struct Himmel {
     std::vector<std::shared_ptr<HmlImageResource>> gBufferColors;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferLightSpacePositions;
     std::vector<std::shared_ptr<HmlImageResource>> brightness1Textures;
-    // std::vector<std::shared_ptr<HmlImageResource>> brightness2Textures;
     std::vector<std::shared_ptr<HmlImageResource>> mainTextures;
-    std::shared_ptr<HmlImageResource> hmlDepthResource;
-    std::shared_ptr<HmlImageResource> hmlShadow;
+    std::vector<std::shared_ptr<HmlImageResource>> hmlDepthResources;
+    std::vector<std::shared_ptr<HmlImageResource>> hmlShadows;
 
 
     std::unique_ptr<World> world;
@@ -259,10 +259,10 @@ struct Himmel {
 
 
     // Sync objects
-    std::vector<VkSemaphore> imageAvailableSemaphores; // for each frame in flight
-    std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
-    std::vector<VkFence> inFlightFences;               // for each frame in flight
-    std::vector<VkFence> imagesInFlight;               // for each swapChainImage
+    // std::vector<VkSemaphore> imageAvailableSemaphores; // for each frame in flight
+    // std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
+    // std::vector<VkFence> inFlightFences;               // for each frame in flight
+    // std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
     std::vector<std::unique_ptr<HmlBuffer>> viewProjUniformBuffers;
 
@@ -274,7 +274,7 @@ struct Himmel {
     VkDescriptorSetLayout generalDescriptorSetLayout;
     std::vector<VkDescriptorSet> generalDescriptorSet_0_perImage;
 
-    std::unique_ptr<HmlPipe> hmlPipe;
+    std::unique_ptr<HmlDispatcher> hmlDispatcher;
 
 
     // NOTE Later it will probably be a hashmap from model name
@@ -296,7 +296,6 @@ struct Himmel {
     void recordDrawEnd(VkCommandBuffer commandBuffer) noexcept;
     bool prepareResources() noexcept;
     void recreateSwapchain() noexcept;
-    bool createSyncObjects() noexcept;
     ~Himmel() noexcept;
     static glm::mat4 projFrom(float aspect_w_h) noexcept;
 };

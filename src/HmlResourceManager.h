@@ -16,21 +16,21 @@
 
 struct HmlImageResource {
     enum class Type {
-        BLANK, TEXTURE, RENDER_TARGET, DEPTH, SHADOW_MAP
+        BLANK, TEXTURE, RENDER_TARGET, DEPTH, SHADOW_MAP, SWAPCHAIN_IMAGE
     } type;
 
     std::shared_ptr<HmlDevice> hmlDevice;
 
-    VkImage        image;
-    VkDeviceMemory memory;
-    VkImageView    view;
-    VkFormat       format;
-    VkImageLayout  layout;
+    VkImage        image = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkImageView    view = VK_NULL_HANDLE;
+    VkFormat       format = VK_FORMAT_UNDEFINED;
+    VkImageLayout  layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkSampler      sampler = VK_NULL_HANDLE; // NOTE only applicable to textures
     // TODO find a way to reuse sampler across textures
 
-    uint32_t width;
-    uint32_t height;
+    uint32_t width = 0;
+    uint32_t height = 0;
 
     bool blockingTransitionLayoutTo(VkImageLayout newLayout, std::shared_ptr<HmlCommands> hmlCommands) noexcept;
     bool transitionLayoutTo(VkImageLayout newLayout, VkCommandBuffer commandBuffer) noexcept;
@@ -146,6 +146,8 @@ struct HmlResourceManager {
     std::unique_ptr<HmlImageResource> newTextureResource(const char* fileName, uint32_t componentsCount, VkFormat format, VkFilter filter) noexcept;
     std::unique_ptr<HmlImageResource> newImageResource(VkExtent2D extent) noexcept;
     std::unique_ptr<HmlImageResource> newDepthResource(VkExtent2D extent) noexcept;
+    std::vector<std::shared_ptr<HmlImageResource>> wrapSwapchainImagesIntoImageResources(
+        std::vector<VkImage>&& images, VkFormat format, VkExtent2D extent) noexcept;
     std::unique_ptr<HmlImageResource> newBlankImageResource(
         VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlagBits aspect) noexcept;
     // Model with color

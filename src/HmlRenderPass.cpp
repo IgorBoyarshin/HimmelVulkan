@@ -44,20 +44,13 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         });
 
+        assert(!attachment.imageResources.empty() && "::> ColorAttachment with no imageResources.");
+        const auto imageFormat = attachment.imageResources[0]->format;
         attachments.push_back({
             .flags = 0,
-            .format = attachment.imageFormat,
+            .format = imageFormat,
             .samples = VK_SAMPLE_COUNT_1_BIT, // multisampling
-            // loadOp:
-            // VK_ATTACHMENT_LOAD_OP_LOAD: Preserve the existing contents of the attachment;
-            // VK_ATTACHMENT_LOAD_OP_CLEAR: Clear the values to a constant at the start;
-            // VK_ATTACHMENT_LOAD_OP_DONT_CARE: Existing contents are undefined; we don't care about them.
             .loadOp = attachment.clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
-            // storeOp:
-            // VK_ATTACHMENT_STORE_OP_STORE: Rendered contents will be stored
-            // in memory and can be read later;
-            // VK_ATTACHMENT_STORE_OP_DONT_CARE: Contents of the framebuffer will be
-            // undefined after the rendering operation.
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -69,15 +62,18 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
     // Depth
     VkAttachmentReference depthAttachmentRef;
     if (config.depthStencilAttachment) {
-        const auto attachment = *config.depthStencilAttachment;
+        const auto& attachment = *config.depthStencilAttachment;
         const uint32_t index = attachments.size();
         depthAttachmentRef = VkAttachmentReference{
             .attachment = index,
             .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         };
+
+        assert(!attachment.imageResources.empty() && "::> DepthStencilAttachment with no imageResources.");
+        const auto imageFormat = attachment.imageResources[0]->format;
         attachments.push_back({
             .flags = 0,
-            .format = attachment.imageFormat,
+            .format = imageFormat,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = attachment.clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
             .storeOp = (config.depthStencilAttachment->store) ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -98,16 +94,16 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
     }
 
 
-    VkSubpassDependency dependency = {};
-    {
-        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependency.dstSubpass = 0;
-        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dependency.srcAccessMask = 0;
-        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT // XXX
-            | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // because we have a loadOp that clears
-    }
+    // VkSubpassDependency dependency = {};
+    // {
+    //     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    //     dependency.dstSubpass = 0;
+    //     dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    //     dependency.srcAccessMask = 0;
+    //     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    //     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT // XXX
+    //         | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // because we have a loadOp that clears
+    // }
 
 
     VkRenderPassCreateInfo renderPassInfo = {};
@@ -117,8 +113,8 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
         renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
-        renderPassInfo.dependencyCount = 1;
-        renderPassInfo.pDependencies = &dependency;
+        renderPassInfo.dependencyCount = config.subpassDependencies.size();
+        renderPassInfo.pDependencies = config.subpassDependencies.data();
     }
 
     VkRenderPass renderPass;
@@ -134,26 +130,34 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
     hmlRenderPass->extent = config.extent;
     hmlRenderPass->colorAttachmentCount = config.colorAttachments.size();
 
-    if (config.depthStencilAttachment) {
-        // NOTE In order to make sure the depth resource is not destroyed before we are finished
-        // hmlRenderPass->_hmlDepthResource = config.depthStencilAttachment->hmlDepthResource;
-    }
-
     // Create and store framebuffers
-    // assert(!config.colorAttachments.empty() && "::> No color attachments specified for HmlRenderPass.");
-    // const auto images = config.colorAttachments[0].imageViews.size();
-    const auto images = 3; // NOTE XXX terrible hack!!!
-    for (size_t i = 0; i < images; i++) {
+    // NOTE The logic allows to specify only one imageResource if the top-level
+    // decides not to create multiple resources per image-in-flight. However,
+    // as of now there must be at least one Attachment (color/depth) that has
+    // all (3) imageResources specified, so that we can deduce the size (3).
+    // NOTE Maybe it is worth passing the image-in-flight count to avoid this edger case?
+    assert((!config.colorAttachments.empty() || config.depthStencilAttachment) && "::> Trying to create HmlRenderPass with no color/depth attachments.");
+    size_t imageCount = 0;
+    for (const auto& attachment : config.colorAttachments) {
+        imageCount = std::max(imageCount, attachment.imageResources.size());
+    }
+    if (config.depthStencilAttachment) {
+        imageCount = std::max(imageCount, config.depthStencilAttachment->imageResources.size());
+    }
+    assert(imageCount && "::> Trying to create HmlRenderPass with no HmlImageResources in color/depth attachments.");
+    // NOTE remove this check once we have improved the count logic:
+    assert(imageCount == 3 && "::> At least one attachment must have all (3) HmlImageResources specified!");
+    for (size_t i = 0; i < imageCount; i++) {
         std::vector<VkImageView> imageViews;
         for (const auto& colorAttachment : config.colorAttachments) {
-            imageViews.push_back(colorAttachment.imageViews[i]);
+            const bool singular = colorAttachment.imageResources.size() == 1;
+            const auto imageView = singular ? colorAttachment.imageResources[0]->view : colorAttachment.imageResources[i]->view;
+            imageViews.push_back(imageView);
         }
-        // NOTE It might actually be true!
-        // TODO XXX Why is this true?
-        // The same depth image can be shared because only a single subpass
-        // is running at the same time due to our semaphores.
         if (config.depthStencilAttachment) {
-            imageViews.push_back(config.depthStencilAttachment->imageView);
+            const bool singular = config.depthStencilAttachment->imageResources.size() == 1;
+            const auto imageView = singular ? config.depthStencilAttachment->imageResources[0]->view : config.depthStencilAttachment->imageResources[i]->view;
+            imageViews.push_back(imageView);
         }
         const auto framebuffer = hmlRenderPass->createFramebuffer(imageViews);
         if (!framebuffer) {

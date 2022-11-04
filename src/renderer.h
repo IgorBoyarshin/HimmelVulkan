@@ -9,8 +9,8 @@
 
 
 struct HmlFrameData {
-    uint32_t frameIndex;
-    uint32_t imageIndex;
+    uint32_t frameInFlightIndex;
+    uint32_t swapchainImageIndex;
     VkDescriptorSet generalDescriptorSet_0; // per image
 };
 

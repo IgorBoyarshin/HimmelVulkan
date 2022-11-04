@@ -211,13 +211,13 @@ void HmlSnowParticleRenderer::updateForImage(uint32_t imageIndex) noexcept {
 
 
 VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noexcept {
-    auto commandBuffer = getCurrentCommands()[frameData.frameIndex];
+    auto commandBuffer = getCurrentCommands()[frameData.frameInFlightIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
         .renderPass = currentRenderPass->renderPass,
         .subpass = 0, // we only have a single one
-        .framebuffer = currentRenderPass->framebuffers[frameData.imageIndex],
+        .framebuffer = currentRenderPass->framebuffers[frameData.swapchainImageIndex],
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
@@ -230,7 +230,7 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noe
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
     std::array<VkDescriptorSet, 3> descriptorSets = {
-        frameData.generalDescriptorSet_0, descriptorSet_textures_1, descriptorSet_instances_2_perImage[frameData.imageIndex]
+        frameData.generalDescriptorSet_0, descriptorSet_textures_1, descriptorSet_instances_2_perImage[frameData.swapchainImageIndex]
     };
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);

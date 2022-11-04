@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 #include <memory>
+#include <algorithm>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -17,15 +18,17 @@
 
 struct HmlRenderPass {
     struct ColorAttachment {
-        VkFormat imageFormat;
-        std::vector<VkImageView> imageViews;
+        // VkFormat imageFormat;
+        // std::vector<VkImageView> imageViews;
+        std::vector<std::shared_ptr<HmlImageResource>> imageResources;
         std::optional<VkClearColorValue> clearColor;
         VkImageLayout preLayout;
         VkImageLayout postLayout;
     };
     struct DepthStencilAttachment {
-        VkFormat imageFormat;
-        VkImageView imageView;
+        // VkFormat imageFormat;
+        // VkImageView imageView;
+        std::vector<std::shared_ptr<HmlImageResource>> imageResources;
         std::optional<VkClearDepthStencilValue> clearColor;
         bool store;
         VkImageLayout preLayout;
@@ -37,6 +40,7 @@ struct HmlRenderPass {
         std::vector<ColorAttachment> colorAttachments;
         std::optional<DepthStencilAttachment> depthStencilAttachment;
         VkExtent2D extent;
+        std::vector<VkSubpassDependency> subpassDependencies;
     };
 
 
@@ -53,6 +57,7 @@ struct HmlRenderPass {
     VkExtent2D extent;
 
 
+    // TODO nocheckin can remove?
     uint32_t colorAttachmentCount;
 
 

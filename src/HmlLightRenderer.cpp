@@ -124,7 +124,7 @@ void HmlLightRenderer::bake() noexcept {
 
 
 VkCommandBuffer HmlLightRenderer::draw(const HmlFrameData& frameData) noexcept {
-    return getCurrentCommands()[frameData.imageIndex];
+    return getCurrentCommands()[frameData.swapchainImageIndex];
 }
 
 

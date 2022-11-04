@@ -99,13 +99,13 @@ void HmlBloomRenderer::specify(
 
 
 VkCommandBuffer HmlBloomRenderer::draw(const HmlFrameData& frameData) noexcept {
-    auto commandBuffer = getCurrentCommands()[frameData.frameIndex];
+    auto commandBuffer = getCurrentCommands()[frameData.frameInFlightIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
         .renderPass = currentRenderPass->renderPass,
         .subpass = 0, // we only have a single one
-        .framebuffer = currentRenderPass->framebuffers[frameData.imageIndex],
+        .framebuffer = currentRenderPass->framebuffers[frameData.swapchainImageIndex],
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
@@ -118,7 +118,7 @@ VkCommandBuffer HmlBloomRenderer::draw(const HmlFrameData& frameData) noexcept {
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
     std::array<VkDescriptorSet, 1> descriptorSets = {
-        descriptorSet_textures_0_perImage[frameData.imageIndex]
+        descriptorSet_textures_0_perImage[frameData.swapchainImageIndex]
     };
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);

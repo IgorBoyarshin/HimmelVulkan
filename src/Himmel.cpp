@@ -9,9 +9,9 @@ bool Himmel::init() noexcept {
     const char* windowName = "Planes game";
 
     hmlContext = std::make_shared<HmlContext>();
-    hmlContext->maxFramesInFlight = 2;
+    hmlContext->maxFramesInFlight = 3;
 
-    hmlContext->hmlWindow = HmlWindow::create(1080, 720, windowName);
+    hmlContext->hmlWindow = HmlWindow::create(1900, 1000, windowName);
     if (!hmlContext->hmlWindow) return false;
 
     hmlContext->hmlDevice = HmlDevice::create(hmlContext->hmlWindow);
@@ -472,7 +472,7 @@ bool Himmel::init() noexcept {
         }
     }
 
-    if (!createSyncObjects()) return false;
+    // if (!createSyncObjects()) return false;
     if (!prepareResources()) return false;
 
 
@@ -518,7 +518,7 @@ bool Himmel::run() noexcept {
                 if (showCounter == 0) {
                     showedTime = timeMks;
                 }
-                ImGui::Text("GPU time = %.1fms", showedTime / 1000.0f);
+                ImGui::Text("GPU time = %.2fms", showedTime / 1000.0f);
             }
             ImGui::End();
 
@@ -543,10 +543,10 @@ bool Himmel::run() noexcept {
                 ImGuiWindowFlags_NoNav;
             if (ImGui::Begin("CPU times", nullptr, window_flags)) {
                 if (showCounter == 0) {
-                    showedElapsedMicrosWait1 = stats.elapsedMicrosWait1;
-                    showedElapsedMicrosAcquire = stats.elapsedMicrosAcquire;
-                    showedElapsedMicrosWait2 = stats.elapsedMicrosWait2;
-                    showedElapsedMicrosPresent = stats.elapsedMicrosPresent;
+                    showedElapsedMicrosWait1 = frameStats.elapsedMicrosWait1;
+                    showedElapsedMicrosAcquire = frameStats.elapsedMicrosAcquire;
+                    showedElapsedMicrosWait2 = frameStats.elapsedMicrosWait2;
+                    showedElapsedMicrosPresent = frameStats.elapsedMicrosPresent;
                 }
                 ImGui::Text("Wait1 = %.1fmks", showedElapsedMicrosWait1);
                 ImGui::Text("Acquire = %.1fmks", showedElapsedMicrosAcquire);
@@ -560,7 +560,17 @@ bool Himmel::run() noexcept {
         }
 #endif // WITH_IMGUI
 
-        if (!drawFrame()) return false;
+        const auto frameResult = hmlDispatcher->doFrame();
+        if (!frameResult) {
+            std::cerr << "::> Himmel: something bad happened while doing a frame: exiting.\n";
+            return false;
+        }
+        if (frameResult->mustRecreateSwapchain) {
+            recreateSwapchain();
+            // continue;
+        }
+        if (frameResult->stats) frameStats = *(frameResult->stats);
+
 
         hmlContext->hmlResourceManager->tickFrame(hmlContext->currentFrame);
         hmlContext->hmlQueries->endFrame(hmlContext->currentFrame);
@@ -852,8 +862,8 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             //                            0.0f, 0.0f, 0.5f, 1.0f);
             // const float near = 0.1f;
             // const float far = 1000.0f;
-            const float width = hmlContext->hmlSwapchain->extent.width;
-            const float height = hmlContext->hmlSwapchain->extent.height;
+            const float width = hmlContext->hmlSwapchain->extent().width;
+            const float height = hmlContext->hmlSwapchain->extent().height;
             const float f = 0.2f;
             glm::mat4 proj = glm::ortho(-width*f, width*f, -height*f, height*f, near, far);
             // glm::mat4 proj = glm::perspective(glm::radians(45.0f), hmlContext->hmlSwapchain->extentAspect(), near, far);
@@ -908,127 +918,23 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
 }
 
 
-/*
- * "In flight" -- "in GPU rendering pipeline": either waiting to be rendered,
- * or already being rendered; but not finished rendering yet!
- * So, its commandBuffer has been submitted, but has not finished yet.
- * */
-bool Himmel::drawFrame() noexcept {
-    static uint32_t currentFrame = 0;
-
-    // Wait for next-in-order frame to become rendered (for its commandBuffer
-    // to finish). This ensures that no more than MAX_FRAMES_IN_FLIGHT frames
-    // are inside the rendering pipeline at the same time.
-    const auto startWait1 = std::chrono::high_resolution_clock::now();
-    vkWaitForFences(hmlContext->hmlDevice->device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-    const auto endWait1 = std::chrono::high_resolution_clock::now();
-
-    // vkAcquireNextImageKHR only specifies which image will be made
-    // available next, so that we can e.g. start recording command
-    // buffers that reference this image. However, the image itself may
-    // not be available yet. So we use (preferably) a semaphore in order
-    // to tell the commands when the image actually becomes available.
-    // Thus we keep the syncronization on the GPU, improving the performance.
-    // If we for some reason wanted to actually syncronize with CPU, we'd
-    // use a fence.
-    uint32_t imageIndex; // the available image we will be given by the presentation engine from the swapchain
-    // The next-in-order imageAvailableSemaphore has already retired because
-    // its inFlightFence has just been waited upon.
-    const auto startAcquire = std::chrono::high_resolution_clock::now();
-    if (const VkResult result = vkAcquireNextImageKHR(hmlContext->hmlDevice->device, hmlContext->hmlSwapchain->swapchain, UINT64_MAX,
-                imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
-            result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreateSwapchain();
-        return true;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        std::cerr << "::> Failed to acquire swap chain image.\n";
-        return false;
-    }
-    const auto endAcquire = std::chrono::high_resolution_clock::now();
-
-    const auto startWait2 = std::chrono::high_resolution_clock::now();
-    if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) [[likely]] {
-        // For each image we submit, we track which inFlightFence was bound
-        // to it; for cases when the to-be-acquired image is still in use by
-        // the pipeline (too slow pipeline; out-of-order acquisition;
-        // MAX_FRAMES_IN_FLIGHT > swapChainImages.size()) -- we wait until
-        // this particular image exits the pipeline.
-        vkWaitForFences(hmlContext->hmlDevice->device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
-    }
-    const auto endWait2 = std::chrono::high_resolution_clock::now();
-
-    // The image has at least finished being rendered.
-    // Mark the image as now being in use by this frame
-    imagesInFlight[imageIndex] = inFlightFences[currentFrame];
-
-    // Once we know what image we work with...
-
-    updateForImage(imageIndex);
-// ============================================================================
-    const HmlFrameData frameData{
-        .frameIndex = currentFrame,
-        .imageIndex = imageIndex,
-        .generalDescriptorSet_0 = generalDescriptorSet_0_perImage[imageIndex],
-    };
-    hmlPipe->run(frameData);
-
-
-
-// ============================================================================
-
-    const auto startPresent = std::chrono::high_resolution_clock::now();
-    {
-        VkSemaphore waitSemaphores[] = { renderFinishedSemaphores[currentFrame] };
-
-        VkPresentInfoKHR presentInfo = {};
-        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = waitSemaphores;
-        presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = &(hmlContext->hmlSwapchain->swapchain);
-        presentInfo.pImageIndices = &imageIndex;
-
-        // NOTE We recreate the swapchain twice: first we get notified through
-        // vkQueuePresentKHR and on the next iteration through framebufferResizeRequested.
-        // The second call is probably redundant but non-harmful.
-        if (const VkResult result = vkQueuePresentKHR(hmlContext->hmlDevice->presentQueue, &presentInfo);
-                result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || hmlContext->hmlWindow->framebufferResizeRequested) {
-            hmlContext->hmlWindow->framebufferResizeRequested = false;
-            recreateSwapchain();
-        } else if (result != VK_SUCCESS) {
-            std::cerr << "::> Failed to present swapchain image.\n";
-            return false;
-        }
-    }
-    const auto endPresent = std::chrono::high_resolution_clock::now();
-// ============================================================================
-    stats.elapsedMicrosWait1 = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWait1 - startWait1).count()) / 1.0f;
-    stats.elapsedMicrosAcquire = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endAcquire - startAcquire).count()) / 1.0f;
-    stats.elapsedMicrosWait2 = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWait2 - startWait2).count()) / 1.0f;
-    stats.elapsedMicrosPresent = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endPresent - startPresent).count()) / 1.0f;
-// ============================================================================
-
-    currentFrame = (currentFrame + 1) % hmlContext->maxFramesInFlight;
-    return true;
-}
-
-
 bool Himmel::prepareResources() noexcept {
-    static const auto viewsFrom = [](const std::vector<std::shared_ptr<HmlImageResource>>& resources){
-        std::vector<VkImageView> views;
-        for (const auto& res : resources) views.push_back(res->view);
-        return views;
-    };
+    // static const auto viewsFrom = [](const std::vector<std::shared_ptr<HmlImageResource>>& resources){
+    //     std::vector<VkImageView> views;
+    //     for (const auto& res : resources) views.push_back(res->view);
+    //     return views;
+    // };
 
-    const auto extent = hmlContext->hmlSwapchain->extent;
+    const auto extent = hmlContext->hmlSwapchain->extent();
     const size_t count = hmlContext->imageCount();
     gBufferPositions.resize(count);
     gBufferNormals.resize(count);
     gBufferColors.resize(count);
     gBufferLightSpacePositions.resize(count);
     brightness1Textures.resize(count);
-    // brightness2Textures.resize(count);
     mainTextures.resize(count);
+    hmlDepthResources.resize(count);
+    hmlShadows.resize(count);
     for (size_t i = 0; i < count; i++) {
         // XXX TODO use modified findDepthFormat()
         gBufferPositions[i]           = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
@@ -1037,159 +943,160 @@ bool Himmel::prepareResources() noexcept {
         gBufferColors[i]              = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
         gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
-        // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
-        // brightness2Textures[i]        = hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         mainTextures[i]               = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        hmlDepthResources[i]          = hmlContext->hmlResourceManager->newDepthResource(extent);
+        hmlShadows[i]                 = hmlContext->hmlResourceManager->newShadowResource(extent, VK_FORMAT_D32_SFLOAT);
         if (!gBufferPositions[i])           return false;
         if (!gBufferNormals[i])             return false;
         if (!gBufferColors[i])              return false;
         if (!gBufferLightSpacePositions[i]) return false;
         if (!brightness1Textures[i])        return false;
-        // if (!brightness2Textures[i])        return false;
         if (!mainTextures[i])               return false;
+        if (!hmlDepthResources[i]) return false;
+        if (!hmlShadows[i]) return false;
     }
-    hmlDepthResource = hmlContext->hmlResourceManager->newDepthResource(extent);
-    if (!hmlDepthResource) return false;
-
-    hmlShadow = hmlContext->hmlResourceManager->newShadowResource(extent, VK_FORMAT_D32_SFLOAT);
-    if (!hmlShadow) return false;
 
 
-    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, {hmlShadow,hmlShadow,hmlShadow} });
-    hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, {hmlShadow,hmlShadow,hmlShadow} });
-    // hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
-    // hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions });
-    // hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors });
-    // hmlBlurRenderer->specify(brightness1Textures, brightness2Textures);
+    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, hmlShadows });
+    hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, hmlShadows });
     hmlBloomRenderer->specify(mainTextures, brightness1Textures);
 
 
-    hmlPipe = std::make_unique<HmlPipe>(hmlContext, imageAvailableSemaphores, renderFinishedSemaphores, inFlightFences);
+    hmlDispatcher = std::make_unique<HmlDispatcher>(hmlContext, generalDescriptorSet_0_perImage, [&](uint32_t imageIndex){ updateForImage(imageIndex); });
+
+    // Perform initial layout transitions to set up the layouts as they would
+    // have been before starting the next iteration in an ongoing looping.
+    { 
+        VkCommandBuffer commandBuffer = hmlContext->hmlCommands->beginSingleTimeCommands();
+
+        // NOTE oldLayout is correct for the moment because the resources have just been created with correct layouts specified
+        for (auto res : hmlShadows) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : mainTextures) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : brightness1Textures) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : gBufferPositions) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : gBufferColors) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : gBufferNormals) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : gBufferLightSpacePositions) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : hmlContext->hmlSwapchain->imageResources) res->transitionLayoutTo(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
+
+        hmlContext->hmlCommands->endSingleTimeCommands(commandBuffer);
+    }
+
     const float VERY_FAR = 10000.0f;
     bool allGood = true;
-
     // ================================= PASS =================================
     // ======== Render shadow-casting geometry into shadow map ========
-    hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
-    hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
-    allGood &= hmlPipe->addStage(
-        [&](){ // pre func
+    allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .preFunc = [&](bool prepPhase){
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
             hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
         },
-        { hmlTerrainRenderer, hmlRenderer }, // drawers
-        {}, // output color attachments
-        { // optional depth attachment
+        .drawers = { hmlTerrainRenderer, hmlRenderer },
+        .colorAttachments = {},
+        .depthAttachment = {
             HmlRenderPass::DepthStencilAttachment{
-                .imageFormat = hmlShadow->format,
-                .imageView = hmlShadow->view,
+                .imageResources = hmlShadows,
                 .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
                 .store = true,
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             }
         },
-        {}, // post transitions
-        std::nullopt // post func
-        // [&](uint32_t imageIndex){ // post func
-        //     hmlRenderer->setMode(HmlRenderer::Mode::Regular);
-        // }
-    );
+        .subpassDependencies = {},
+        .postFunc = std::nullopt,
+        .flags = HmlDispatcher::STAGE_NO_FLAGS,
+    });
     // ================================= PASS =================================
     // ======== Renders main geometry into the GBuffer ========
-    hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
-    hmlRenderer->setMode(HmlRenderer::Mode::Regular);
-    allGood &= hmlPipe->addStage( // deferred prep
-        [&](){ // pre func
+    allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .preFunc = [&](bool prepPhase){
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
             hmlRenderer->setMode(HmlRenderer::Mode::Regular);
         },
-        { hmlTerrainRenderer, hmlRenderer }, // drawers
-        { // output color attachments
+        .drawers = { hmlTerrainRenderer, hmlRenderer },
+        .colorAttachments = {
             HmlRenderPass::ColorAttachment{
-                .imageFormat = gBufferPositions[0]->format,
-                .imageViews = viewsFrom(gBufferPositions),
+                .imageResources = gBufferPositions,
                 .clearColor = {{ VERY_FAR, VERY_FAR, VERY_FAR, 1.0f }},
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
-                .imageFormat = gBufferNormals[0]->format,
-                .imageViews = viewsFrom(gBufferNormals),
+                .imageResources = gBufferNormals,
                 .clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }},
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
-                .imageFormat = gBufferColors[0]->format,
-                .imageViews = viewsFrom(gBufferColors),
+                .imageResources = gBufferColors,
                 .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
-                .imageFormat = gBufferLightSpacePositions[0]->format,
-                .imageViews = viewsFrom(gBufferLightSpacePositions),
+                .imageResources = gBufferLightSpacePositions,
                 .clearColor = {{ 2.0f, 2.0f, 2.0f, 2.0f }}, // TODO i dunno!!!
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
         },
-        { // optional depth attachment
+        .depthAttachment = {
             HmlRenderPass::DepthStencilAttachment{
-                .imageFormat = hmlDepthResource->format,
-                .imageView = hmlDepthResource->view,
+                .imageResources = hmlDepthResources,
                 .clearColor = VkClearDepthStencilValue{ 1.0f, 0 }, // 1.0 is farthest
                 .store = true,
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .preLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             }
         },
-        {}, // post transitions
-        std::nullopt // post func
-        // [&](uint32_t imageIndex){ // post func
-        //     gBufferPositions[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        //     gBufferNormals[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        //     gBufferColors[imageIndex].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        // }
-    );
+        .subpassDependencies = {},
+        .postFunc = std::nullopt,
+        .flags = HmlDispatcher::STAGE_NO_FLAGS,
+    });
     // ================================= PASS =================================
     // ======== Renders a 2D texture using the GBuffer ========
-    allGood &= hmlPipe->addStage( // deferred
-        std::nullopt, // pre func
-        { hmlDeferredRenderer }, // drawers
-        { // output color attachments
+    allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .preFunc = std::nullopt,
+        .drawers = { hmlDeferredRenderer },
+        .colorAttachments = {
             HmlRenderPass::ColorAttachment{
-                // .imageFormat = hmlSwapchain->imageFormat,
-                // .imageViews = hmlSwapchain->imageViews,
-                .imageFormat = mainTextures[0]->format,
-                .imageViews = viewsFrom(mainTextures),
-                .clearColor = {{ 1.0f, 0.0f, 0.0f, 1.0f }}, // TODO confirm that validation complains otherwise
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .imageResources = mainTextures,
+                .clearColor = {{ 1.0f, 0.0f, 0.0f, 1.0f }},
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                // .postLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             },
         },
-        std::nullopt, // optional depth attachment
-        {}, // post transitions
-        std::nullopt // post func
-    );
+        .depthAttachment = std::nullopt,
+        .subpassDependencies = {
+            VkSubpassDependency{
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                // Wait for all these to finish:
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT // gbuffer color outputs
+                              | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, // shadowmap depth outputs
+                // ... and only after that allow us to:
+                .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                               | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT, // read textures in FS
+                            //    | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, // XXX not allowed for FS! perform a clearing loadOp
+                .dependencyFlags = 0,
+            }
+        },
+        .postFunc = std::nullopt,
+        .flags = HmlDispatcher::STAGE_NO_FLAGS,
+    });
     // ================================= PASS =================================
     // ======== Renders on top of the deferred texture using the depth info from the prep pass ========
-#if DEBUG_TERRAIN
-    hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
-#endif
-    allGood &= hmlPipe->addStage( // forward
-        [&](){ // pre func
+    // Input: ---
+    allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .preFunc = [&](bool prepPhase){
 #if DEBUG_TERRAIN
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
 #endif
         },
-        {
+        .drawers = {
 #if SNOW_IS_ON
             hmlSnowRenderer,
 #endif
@@ -1198,126 +1105,118 @@ bool Himmel::prepareResources() noexcept {
             , hmlTerrainRenderer
 #endif
         },
-        { // output color attachments
+        .colorAttachments = {
             HmlRenderPass::ColorAttachment{
-                .imageFormat = mainTextures[0]->format,
-                .imageViews = viewsFrom(mainTextures),
+                .imageResources = mainTextures,
                 .clearColor = std::nullopt,
-                // .clearColor = {{ 1.0f, 0.0f, 0.0f, 1.0f }}, // TODO confirm that validation complains otherwise
                 .preLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
-                .imageFormat = brightness1Textures[0]->format,
-                .imageViews = viewsFrom(brightness1Textures),
+                .imageResources = brightness1Textures,
                 .clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }},
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                // .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
         },
-        { // optional depth attachment
+        .depthAttachment = {
             HmlRenderPass::DepthStencilAttachment{
-                .imageFormat = hmlDepthResource->format,
-                .imageView = hmlDepthResource->view,
+                .imageResources = hmlDepthResources,
                 .clearColor = std::nullopt,
                 .store = false,
                 .preLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             }
         },
-        { // post transitions
-            // {
-            //     .resourcePerImage = brightness1Textures,
-            //     .dstLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            // },
-            // {
-            //     .resourcePerImage = mainTextures,
-            //     .dstLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            // },
+        .subpassDependencies = {
+            VkSubpassDependency{
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                // Wait for all these to finish:
+                // NOTE we don't specify the depth because it has been done by the start of the previous stage
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,// deferred mainTexture output
+                // ... and only after that allow us to:
+                .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+                              | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, // for the depth read
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT // read textures in FS
+                            //    | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT // perform a clearing loadOp
+                               | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, // read and compare depth
+                .dependencyFlags = 0,
+            }
         },
-        std::nullopt // post func
-    );
-
+        .postFunc = std::nullopt,
+        .flags = HmlDispatcher::STAGE_NO_FLAGS,
+    });
     // ================================= PASS =================================
-    // hmlBlurRenderer->modeVertical();
-    // hmlBlurRenderer->modeHorizontal();
-    // for (auto i = 0; i < 1; i++) {
-    //     allGood &= hmlPipe->addStage( // horizontal blur
-    //         { hmlBlurRenderer }, // drawers
-    //         { // output color attachments
-    //             {
-    //                 .imageFormat = brightness2Textures[0]->format,
-    //                 .imageViews = viewsFrom(brightness2Textures),
-    //                 .clearColor = (i == 0) ? std::make_optional<VkClearColorValue>({ 0.0f, 0.0f, 0.0f, 1.0f }) : std::nullopt,
-    //                 .preLayout = (i == 0) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    //                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    //             },
-    //         },
-    //         std::nullopt, // optional depth attachment
-    //         {}, // post transitions
-    //         [hmlBlurRenderer=hmlBlurRenderer](uint32_t){ hmlBlurRenderer->modeVertical(); } // post func
-    //     );
-    //
-    //     allGood &= hmlPipe->addStage( // vertical blur
-    //         { hmlBlurRenderer }, // drawers
-    //         { // output color attachments
-    //             HmlRenderPass::ColorAttachment{
-    //                 .imageFormat = brightness1Textures[0]->format,
-    //                 .imageViews = viewsFrom(brightness1Textures),
-    //                 .clearColor = std::nullopt,
-    //                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    //                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    //             },
-    //         },
-    //         std::nullopt, // optional depth attachment
-    //         {}, // post transitions
-    //         [hmlBlurRenderer=hmlBlurRenderer](uint32_t){ hmlBlurRenderer->modeHorizontal(); } // post func
-    //     );
-    // }
-    // ================================= PASS =================================
-    allGood &= hmlPipe->addStage( // bloom
-        std::nullopt, // pre func
-        { hmlBloomRenderer }, // drawers
-        { // output color attachments
+    // TODO write description
+    // Input: mainTexture, brightness1Textures
+    allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .preFunc = std::nullopt,
+        .drawers = { hmlBloomRenderer },
+        .colorAttachments = {
             HmlRenderPass::ColorAttachment{
-                .imageFormat = hmlContext->hmlSwapchain->imageFormat,
-                .imageViews = hmlContext->hmlSwapchain->imageViews,
+                .imageResources = hmlContext->hmlSwapchain->imageResources,
                 .clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }}, // TODO confirm that validation complains otherwise
-                .preLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .preLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                 .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             },
         },
-        std::nullopt, // optional depth attachment
-        {}, // post transitions
-        std::nullopt // post func
-    );
+        .depthAttachment = std::nullopt,
+        .subpassDependencies = {
+            VkSubpassDependency{
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                // Wait for all these to finish:
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // mainTexture, brightness1Textures (and swapchain image) output
+                // ... and only after that allow us to:
+                .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT, // read textures in FS
+                            //    | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, // perform a clearing loadOp
+                .dependencyFlags = 0,
+            }
+        },
+        .postFunc = std::nullopt,
+        .flags = HmlDispatcher::STAGE_FLAG_FIRST_USAGE_OF_SWAPCHAIN_IMAGE,
+    });
     // ================================= PASS =================================
     // ======== Renders multiple 2D textures on top of everything ========
-    allGood &= hmlPipe->addStage( // ui
-        [&](){ // pre func
-            hmlContext->hmlImgui->finilize();
+    // Input: shadowmap, all gBuffers
+    allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .preFunc = [&](bool prepPhase){
+            if (!prepPhase) hmlContext->hmlImgui->finilize();
         },
-        { hmlUiRenderer, hmlImguiRenderer }, // drawers
-        { // output color attachments
+        .drawers = { hmlUiRenderer, hmlImguiRenderer },
+        .colorAttachments = {
             HmlRenderPass::ColorAttachment{
-                .imageFormat = hmlContext->hmlSwapchain->imageFormat,
-                .imageViews = hmlContext->hmlSwapchain->imageViews,
+                .imageResources = hmlContext->hmlSwapchain->imageResources,
                 .clearColor = std::nullopt,
                 .preLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             },
         },
-        std::nullopt, // optional depth attachment
-        {}, // post transitions
-        std::nullopt // post func
-        // [&](uint32_t imageIndex){ // post func
-        //     hmlContext->hmlImgui->beginFrame();
-        // }
-    );
+        .depthAttachment = std::nullopt,
+        .subpassDependencies = {
+            VkSubpassDependency{
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                // Wait for all these to finish:
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // into swapchain image
+                // ... and only after that allow us to:
+                .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT, // read textures in FS
+                            //    | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dependencyFlags = 0,
+            }
+        },
+        .postFunc = std::nullopt,
+        .flags = HmlDispatcher::STAGE_FLAG_LAST_USAGE_OF_SWAPCHAIN_IMAGE,
+    });
 
     if (!allGood) {
-        std::cerr << "::> Could not create some stages in HmlPipe.\n";
+        std::cerr << "::> Could not create some stages in HmlDispatcher.\n";
         return false;
     }
 
@@ -1351,36 +1250,6 @@ void Himmel::recreateSwapchain() noexcept {
 }
 
 
-bool Himmel::createSyncObjects() noexcept {
-    imageAvailableSemaphores.resize(hmlContext->maxFramesInFlight);
-    renderFinishedSemaphores.resize(hmlContext->maxFramesInFlight);
-    inFlightFences.resize(hmlContext->maxFramesInFlight);
-    imagesInFlight.resize(hmlContext->imageCount(), VK_NULL_HANDLE); // initially not a single frame is using an image
-
-    VkSemaphoreCreateInfo semaphoreInfo = {};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    VkFenceCreateInfo fenceInfo = {};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    // So that the fences start in signaled state (which means the frame is
-    // available to be acquired by CPU). Subsequent frames are signaled by
-    // Vulkan upon command buffer execution finish.
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-    for (size_t i = 0; i < hmlContext->maxFramesInFlight; i++) {
-        if (vkCreateSemaphore(hmlContext->hmlDevice->device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(hmlContext->hmlDevice->device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-            vkCreateFence    (hmlContext->hmlDevice->device, &fenceInfo,     nullptr, &inFlightFences[i])           != VK_SUCCESS) {
-
-            std::cerr << "::> Failed to create sync objects.\n";
-            return false;
-        }
-    }
-
-    return true;
-}
-
-
 Himmel::~Himmel() noexcept {
 #if LOG_DESTROYS
     std::cout << ":> Destroying Himmel...\n";
@@ -1392,11 +1261,11 @@ Himmel::~Himmel() noexcept {
         return;
     }
 
-    for (size_t i = 0; i < hmlContext->maxFramesInFlight; i++) {
-        vkDestroySemaphore(hmlContext->hmlDevice->device, renderFinishedSemaphores[i], nullptr);
-        vkDestroySemaphore(hmlContext->hmlDevice->device, imageAvailableSemaphores[i], nullptr);
-        vkDestroyFence(hmlContext->hmlDevice->device, inFlightFences[i], nullptr);
-    }
+    // for (size_t i = 0; i < hmlContext->maxFramesInFlight; i++) {
+    //     vkDestroySemaphore(hmlContext->hmlDevice->device, renderFinishedSemaphores[i], nullptr);
+    //     vkDestroySemaphore(hmlContext->hmlDevice->device, imageAvailableSemaphores[i], nullptr);
+    //     vkDestroyFence(hmlContext->hmlDevice->device, inFlightFences[i], nullptr);
+    // }
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.

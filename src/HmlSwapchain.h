@@ -13,10 +13,12 @@
 
 struct HmlSwapchain {
     VkSwapchainKHR swapchain;
-    VkFormat imageFormat;
-    VkExtent2D extent;
+    // VkFormat imageFormat;
+    // VkExtent2D extent;
 
-    std::vector<VkImageView> imageViews;
+    // std::vector<VkImageView> imageViews;
+
+    std::vector<std::shared_ptr<HmlImageResource>> imageResources;
 
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlResourceManager> hmlResourceManager;
@@ -30,11 +32,18 @@ struct HmlSwapchain {
     ~HmlSwapchain() noexcept;
 
     inline size_t imageCount() const noexcept {
-        return imageViews.size();
+        return imageResources.size();
+    }
+
+    inline VkExtent2D extent() const noexcept {
+        assert((!imageResources.empty()) && (imageResources[0]) && "::> Swapchain image resources are unexpectedly empty.\n");
+        const auto& image = imageResources[0];
+        return VkExtent2D{ image->width, image->height };
     }
 
     inline float extentAspect() const noexcept {
-        return static_cast<float>(extent.width) / static_cast<float>(extent.height);
+        const auto e = extent();
+        return static_cast<float>(e.width) / static_cast<float>(e.height);
     }
 
     private:
@@ -42,8 +51,9 @@ struct HmlSwapchain {
     static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) noexcept;
     static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) noexcept;
     static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities,
-            const std::pair<uint32_t, uint32_t>& framebufferSize) noexcept;
-    std::vector<VkImageView> createSwapchainImageViews() noexcept;
+        const std::pair<uint32_t, uint32_t>& framebufferSize) noexcept;
+    // TODO nocheckin remove
+    // std::vector<VkImageView> createSwapchainImageViews() noexcept;
 };
 
 #endif

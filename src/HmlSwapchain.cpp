@@ -12,9 +12,10 @@ std::unique_ptr<HmlSwapchain> HmlSwapchain::create(
 
     const auto swapChainSupportDetails = HmlDevice::querySwapChainSupport(hmlDevice->physicalDevice, hmlDevice->surface);
 
-    auto surfaceFormat = chooseSwapSurfaceFormat(swapChainSupportDetails.formats);
-    hmlSwapchain->imageFormat = surfaceFormat.format;
-    hmlSwapchain->extent = hmlSwapchain->chooseSwapExtent(swapChainSupportDetails.capabilities, hmlWindow->getFramebufferSize());
+    const auto extent = hmlSwapchain->chooseSwapExtent(swapChainSupportDetails.capabilities, hmlWindow->getFramebufferSize());
+    const auto surfaceFormat = chooseSwapSurfaceFormat(swapChainSupportDetails.formats);
+    // hmlSwapchain->imageFormat = surfaceFormat.format;
+    // hmlSwapchain->extent = hmlSwapchain->chooseSwapExtent(swapChainSupportDetails.capabilities, hmlWindow->getFramebufferSize());
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupportDetails.presentModes);
 
     // NOTE for current use the logic can be simplified
@@ -24,13 +25,14 @@ std::unique_ptr<HmlSwapchain> HmlSwapchain::create(
         imageCount = swapChainSupportDetails.capabilities.maxImageCount;
     }
 
+
     VkSwapchainCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = hmlDevice->surface;
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = surfaceFormat.format;
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
-    createInfo.imageExtent = hmlSwapchain->extent;
+    createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1; // always 1
     // Any from VkImageUsageFlags.
     // VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT is always supported.
@@ -64,9 +66,16 @@ std::unique_ptr<HmlSwapchain> HmlSwapchain::create(
         return { nullptr };
     }
 
-    hmlSwapchain->imageViews = hmlSwapchain->createSwapchainImageViews();
-    if (hmlSwapchain->imageViews.empty()) {
-        std::cerr << "::> Failed to create Swapchain ImageViews.\n";
+    // Create swapchain image views and create HmlImageResources with them
+    vkGetSwapchainImagesKHR(hmlDevice->device, hmlSwapchain->swapchain, &imageCount, nullptr);
+    std::vector<VkImage> swapChainImages(imageCount);
+    vkGetSwapchainImagesKHR(hmlDevice->device, hmlSwapchain->swapchain, &imageCount, swapChainImages.data());
+
+    hmlSwapchain->imageResources = hmlResourceManager->wrapSwapchainImagesIntoImageResources(
+        std::move(swapChainImages), surfaceFormat.format, extent);
+
+    if (hmlSwapchain->imageResources.empty()) {
+        std::cerr << "::> Failed to create Swapchain HmlImageResources.\n";
         return { nullptr };
     }
 
@@ -79,9 +88,6 @@ HmlSwapchain::~HmlSwapchain() noexcept {
     std::cout << ":> Destroying HmlSwapchain...\n";
 #endif
 
-    for (auto imageView : imageViews) {
-        vkDestroyImageView(hmlDevice->device, imageView, nullptr);
-    }
     vkDestroySwapchainKHR(hmlDevice->device, swapchain, nullptr);
 }
 
@@ -111,8 +117,8 @@ VkPresentModeKHR HmlSwapchain::chooseSwapPresentMode(const std::vector<VkPresent
     //     }
     // }
 
-    // return VK_PRESENT_MODE_IMMEDIATE_KHR;
-    return VK_PRESENT_MODE_FIFO_KHR; // guaranteed to be available
+    return VK_PRESENT_MODE_IMMEDIATE_KHR;
+    // return VK_PRESENT_MODE_FIFO_KHR; // guaranteed to be available
 }
 
 
@@ -136,18 +142,19 @@ VkExtent2D HmlSwapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabi
 }
 
 
-// TODO either inline or extract the other code of swapchain creation into a separate function
-std::vector<VkImageView> HmlSwapchain::createSwapchainImageViews() noexcept {
-    uint32_t imageCount;
-    vkGetSwapchainImagesKHR(hmlDevice->device, swapchain, &imageCount, nullptr);
-    std::vector<VkImage> swapChainImages(imageCount);
-    vkGetSwapchainImagesKHR(hmlDevice->device, swapchain, &imageCount, swapChainImages.data());
-
-    std::vector<VkImageView> imageViews(imageCount);
-    for (size_t i = 0; i < swapChainImages.size(); i++) {
-        imageViews[i] = hmlResourceManager->createImageView(swapChainImages[i], imageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
-        if (!imageViews[i]) return {};
-    }
-
-    return imageViews;
-}
+// TODO nocheckin remove
+// // TODO either inline or extract the other code of swapchain creation into a separate function
+// std::vector<VkImageView> HmlSwapchain::createSwapchainImageViews() noexcept {
+//     uint32_t imageCount;
+//     vkGetSwapchainImagesKHR(hmlDevice->device, swapchain, &imageCount, nullptr);
+//     std::vector<VkImage> swapChainImages(imageCount);
+//     vkGetSwapchainImagesKHR(hmlDevice->device, swapchain, &imageCount, swapChainImages.data());
+//
+//     std::vector<VkImageView> imageViews(imageCount);
+//     for (size_t i = 0; i < swapChainImages.size(); i++) {
+//         imageViews[i] = hmlResourceManager->createImageView(swapChainImages[i], imageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+//         if (!imageViews[i]) return {};
+//     }
+//
+//     return imageViews;
+// }

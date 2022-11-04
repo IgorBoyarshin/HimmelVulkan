@@ -36,7 +36,7 @@ std::unique_ptr<HmlImgui> HmlImgui::create(
     ImGui_ImplGlfw_InitForVulkan(hmlWindow->window, true);
 
     return hmlImgui;
-};
+}
 
 
 HmlImgui::~HmlImgui() {

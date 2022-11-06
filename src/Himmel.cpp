@@ -509,6 +509,8 @@ bool Himmel::run() noexcept {
             static float showedElapsedMicrosAcquire = 0;
             static float showedElapsedMicrosWait2 = 0;
             static float showedElapsedMicrosPresent = 0;
+            static float showedFps = 0;
+            static float showedDeltaMillis = 0;
 #if USE_TIMESTAMP_QUERIES
             static float showedElapsedMicrosGpu = 0;
 #endif
@@ -520,6 +522,8 @@ bool Himmel::run() noexcept {
                 ImGuiWindowFlags_NoNav;
             if (ImGui::Begin("Performance", nullptr, window_flags)) {
                 if (showCounter == 0) {
+                    showedFps = 1.0 / deltaSeconds;
+                    showedDeltaMillis = deltaSeconds * 1000.0f;
                     showedElapsedMicrosWait1 = frameStats.cpu.elapsedMicrosWait1;
                     showedElapsedMicrosAcquire = frameStats.cpu.elapsedMicrosAcquire;
                     showedElapsedMicrosWait2 = frameStats.cpu.elapsedMicrosWait2;
@@ -528,13 +532,16 @@ bool Himmel::run() noexcept {
                     showedElapsedMicrosGpu = frameStats.elapsedMicrosGpu;
 #endif
                 }
+                ImGui::Text("FPS = %.0f", showedFps);
+                ImGui::Text("Delta = %.1fms", showedDeltaMillis);
+                ImGui::Separator();
                 ImGui::Text("CPU Wait1 = %.1fmks", showedElapsedMicrosWait1);
                 ImGui::Text("CPU Acquire = %.1fmks", showedElapsedMicrosAcquire);
                 ImGui::Text("CPU Wait2 = %.1fmks", showedElapsedMicrosWait2);
                 ImGui::Text("CPU Present = %.1fmks", showedElapsedMicrosPresent);
 #if USE_TIMESTAMP_QUERIES
                 ImGui::Separator();
-                ImGui::Text("GPU total = %.2fms", showedElapsedMicrosGpu / 1000.0f);
+                ImGui::Text("GPU time = %.2fms", showedElapsedMicrosGpu / 1000.0f);
 #endif
             }
             ImGui::End();

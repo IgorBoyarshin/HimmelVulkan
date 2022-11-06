@@ -175,8 +175,13 @@ void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
                     .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
                     .pWaitSemaphores = waitSemaphores.data(),
                     .pWaitDstStageMask = waitStages.data(),
+#if MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
+                    .commandBufferCount = primaryCommandBuffers.size(),
+                    .pCommandBuffers = primaryCommandBuffers.data(),
+#else
                     .commandBufferCount = 1,
                     .pCommandBuffers = &commandBuffer,
+#endif // MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
                     .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
                     .pSignalSemaphores = signalSemaphores.data(),
                 };
@@ -191,10 +196,12 @@ void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
 #endif
                     return;
                 }
+
 #if MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
+                primaryCommandBuffers.clear();
             }
-#endif
-#endif // MERGE_CMD_SUBMITS
+#endif // MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
+#endif // !MERGE_CMD_SUBMITS || MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
         }
 
         // ================ Post-stage funcs ================

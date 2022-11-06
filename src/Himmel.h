@@ -216,13 +216,10 @@ struct Himmel {
     Weather weather;
     const glm::vec4 FOG_COLOR = glm::vec4(0.7, 0.7, 0.7, 1.0);
 
-    // struct Stats {
-    //     float elapsedMicrosWait1 = 0;
-    //     float elapsedMicrosAcquire = 0;
-    //     float elapsedMicrosWait2 = 0;
-    //     float elapsedMicrosPresent = 0;
-    // } stats;
-    HmlDispatcher::FrameResult::Stats frameStats;
+    struct FrameStats {
+        HmlDispatcher::FrameResult::Stats cpu;
+        float elapsedMicrosGpu = 0;
+    } frameStats;
 
     std::shared_ptr<HmlContext> hmlContext;
 
@@ -256,13 +253,6 @@ struct Himmel {
     HmlCamera hmlCamera;
     glm::mat4 proj;
     std::pair<int32_t, int32_t> cursor;
-
-
-    // Sync objects
-    // std::vector<VkSemaphore> imageAvailableSemaphores; // for each frame in flight
-    // std::vector<VkSemaphore> renderFinishedSemaphores; // for each frame in flight
-    // std::vector<VkFence> inFlightFences;               // for each frame in flight
-    // std::vector<VkFence> imagesInFlight;               // for each swapChainImage
 
     std::vector<std::unique_ptr<HmlBuffer>> viewProjUniformBuffers;
 

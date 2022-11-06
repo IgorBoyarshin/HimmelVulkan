@@ -472,7 +472,6 @@ bool Himmel::init() noexcept {
         }
     }
 
-    // if (!createSyncObjects()) return false;
     if (!prepareResources()) return false;
 
 
@@ -502,56 +501,41 @@ bool Himmel::run() noexcept {
         // const auto mark1 = std::chrono::high_resolution_clock::now();
         // const auto updateMs = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(mark1 - newMark).count()) / 1'000.0f;
 
-#if WITH_IMGUI && USE_TIMESTAMP_QUERIES
-        static uint32_t timeMks = 0;
-        {
-            static constexpr uint32_t showEvery = 10;
-            static uint32_t showCounter = 0;
-            static uint32_t showedTime = 0;
-            ImGui::SetNextWindowBgAlpha(0.5f);
-            ImGuiWindowFlags window_flags =
-                ImGuiWindowFlags_NoDecoration |
-                ImGuiWindowFlags_AlwaysAutoResize |
-                ImGuiWindowFlags_NoFocusOnAppearing |
-                ImGuiWindowFlags_NoNav;
-            if (ImGui::Begin("Perf", nullptr, window_flags)) {
-                if (showCounter == 0) {
-                    showedTime = timeMks;
-                }
-                ImGui::Text("GPU time = %.2fms", showedTime / 1000.0f);
-            }
-            ImGui::End();
-
-            showCounter++;
-            showCounter %= showEvery;
-        }
-#endif // WITH_IMGUI && USE_TIMESTAMP_QUERIES
-
 #if WITH_IMGUI
         {
-            static constexpr uint32_t showEvery = 10;
+            static constexpr uint32_t showEvery = 12;
             static uint32_t showCounter = 0;
             static float showedElapsedMicrosWait1 = 0;
             static float showedElapsedMicrosAcquire = 0;
             static float showedElapsedMicrosWait2 = 0;
             static float showedElapsedMicrosPresent = 0;
+#if USE_TIMESTAMP_QUERIES
+            static float showedElapsedMicrosGpu = 0;
+#endif
             ImGui::SetNextWindowBgAlpha(0.5f);
             ImGuiWindowFlags window_flags =
                 // ImGuiWindowFlags_NoDecoration |
-                ImGuiWindowFlags_AlwaysAutoResize |
+                // ImGuiWindowFlags_AlwaysAutoResize |
                 ImGuiWindowFlags_NoFocusOnAppearing |
                 ImGuiWindowFlags_NoNav;
-            if (ImGui::Begin("CPU times", nullptr, window_flags)) {
+            if (ImGui::Begin("Performance", nullptr, window_flags)) {
                 if (showCounter == 0) {
-                    showedElapsedMicrosWait1 = frameStats.elapsedMicrosWait1;
-                    showedElapsedMicrosAcquire = frameStats.elapsedMicrosAcquire;
-                    showedElapsedMicrosWait2 = frameStats.elapsedMicrosWait2;
-                    showedElapsedMicrosPresent = frameStats.elapsedMicrosPresent;
+                    showedElapsedMicrosWait1 = frameStats.cpu.elapsedMicrosWait1;
+                    showedElapsedMicrosAcquire = frameStats.cpu.elapsedMicrosAcquire;
+                    showedElapsedMicrosWait2 = frameStats.cpu.elapsedMicrosWait2;
+                    showedElapsedMicrosPresent = frameStats.cpu.elapsedMicrosPresent;
+#if USE_TIMESTAMP_QUERIES
+                    showedElapsedMicrosGpu = frameStats.elapsedMicrosGpu;
+#endif
                 }
-                ImGui::Text("Wait1 = %.1fmks", showedElapsedMicrosWait1);
-                ImGui::Text("Acquire = %.1fmks", showedElapsedMicrosAcquire);
-                ImGui::Text("Wait2 = %.1fmks", showedElapsedMicrosWait2);
-                ImGui::Text("Present = %.1fmks", showedElapsedMicrosPresent);
+                ImGui::Text("CPU Wait1 = %.1fmks", showedElapsedMicrosWait1);
+                ImGui::Text("CPU Acquire = %.1fmks", showedElapsedMicrosAcquire);
+                ImGui::Text("CPU Wait2 = %.1fmks", showedElapsedMicrosWait2);
+                ImGui::Text("CPU Present = %.1fmks", showedElapsedMicrosPresent);
+#if USE_TIMESTAMP_QUERIES
+                ImGui::Separator();
+                ImGui::Text("GPU total = %.2fms", showedElapsedMicrosGpu / 1000.0f);
+#endif
             }
             ImGui::End();
 
@@ -569,7 +553,7 @@ bool Himmel::run() noexcept {
             recreateSwapchain();
             // continue;
         }
-        if (frameResult->stats) frameStats = *(frameResult->stats);
+        if (frameResult->stats) frameStats.cpu = *(frameResult->stats);
 
 
         hmlContext->hmlResourceManager->tickFrame(hmlContext->currentFrame);
@@ -618,7 +602,7 @@ bool Himmel::run() noexcept {
             const auto& firstOpt = frameStatOpt->data.front();
             const auto& lastOpt = frameStatOpt->data.back();
             if (frameStatOpt->data.size() >= 2 && firstOpt && lastOpt) {
-                timeMks = (*lastOpt - *firstOpt) / 1000;
+                frameStats.elapsedMicrosGpu = (*lastOpt - *firstOpt) / 1000;
             }
         }
 #endif // WITH_IMGUI
@@ -884,7 +868,12 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         };
         viewProjUniformBuffers[imageIndex]->update(&generalUbo);
 #ifdef WITH_IMGUI
-        ImGui::Begin("Shadowmap");
+        ImGuiWindowFlags window_flags =
+            // ImGuiWindowFlags_NoDecoration |
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoFocusOnAppearing |
+            ImGuiWindowFlags_NoNav;
+        ImGui::Begin("Shadowmap", nullptr, window_flags);
         ImGui::DragScalar("near", ImGuiDataType_Float, &near, 0.1f, &minDepth, &maxDepth, "%f");
         ImGui::DragScalar("far", ImGuiDataType_Float, &far, 1.0f, &minDepth, &maxDepth, "%f");
         ImGui::DragScalar("yaw", ImGuiDataType_Float, &yaw, 0.5f, &minYaw, &maxYaw, "%f");
@@ -1260,12 +1249,6 @@ Himmel::~Himmel() noexcept {
         std::cerr << "::> Himmel init has not finished successfully, so no proper cleanup is node.\n";
         return;
     }
-
-    // for (size_t i = 0; i < hmlContext->maxFramesInFlight; i++) {
-    //     vkDestroySemaphore(hmlContext->hmlDevice->device, renderFinishedSemaphores[i], nullptr);
-    //     vkDestroySemaphore(hmlContext->hmlDevice->device, imageAvailableSemaphores[i], nullptr);
-    //     vkDestroyFence(hmlContext->hmlDevice->device, inFlightFences[i], nullptr);
-    // }
 
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.

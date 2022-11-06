@@ -13,10 +13,6 @@
 
 struct HmlSwapchain {
     VkSwapchainKHR swapchain;
-    // VkFormat imageFormat;
-    // VkExtent2D extent;
-
-    // std::vector<VkImageView> imageViews;
 
     std::vector<std::shared_ptr<HmlImageResource>> imageResources;
 
@@ -52,8 +48,6 @@ struct HmlSwapchain {
     static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) noexcept;
     static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities,
         const std::pair<uint32_t, uint32_t>& framebufferSize) noexcept;
-    // TODO nocheckin remove
-    // std::vector<VkImageView> createSwapchainImageViews() noexcept;
 };
 
 #endif

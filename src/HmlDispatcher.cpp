@@ -168,7 +168,7 @@ void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
 
 #if MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
             if (waitForSwapchainImage || signalSwapchainImageReady || lastStage) {
-#endif
+#endif // MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
                 VkSubmitInfo submitInfo{
                     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                     .pNext = nullptr,
@@ -214,31 +214,18 @@ void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
     std::vector<VkSemaphore> waitSemaphores;
     std::vector<VkSemaphore> signalSemaphores;
 
-    // const bool waitForSwapchainImage = stage.flags & STAGE_FLAG_FIRST_USAGE_OF_SWAPCHAIN_IMAGE;
-    const bool waitForSwapchainImage = true;
-    if (waitForSwapchainImage) {
-        // Before starting to write into the swapchain image (so at
-        // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT), wait for it
-        // to become available.
-        waitSemaphores.push_back(swapchainImageAvailable[frameData.frameInFlightIndex]);
-        waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    }
+    // Before starting to write into the swapchain image (so at
+    // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT), wait for it
+    // to become available.
+    waitSemaphores.push_back(swapchainImageAvailable[frameData.frameInFlightIndex]);
+    waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-    // const bool signalSwapchainImageReady = stage.flags & STAGE_FLAG_LAST_USAGE_OF_SWAPCHAIN_IMAGE;
-    const bool signalSwapchainImageReady = true;
-    if (signalSwapchainImageReady) {
-        // Use this semaphore to tell the presentation engine when we have finished rendering into the swapchain image
-        signalSemaphores.push_back(renderToSwapchainImageFinished[frameData.frameInFlightIndex]);
-    }
+    // Use this semaphore to tell the presentation engine when we have finished rendering into the swapchain image
+    signalSemaphores.push_back(renderToSwapchainImageFinished[frameData.frameInFlightIndex]);
 
-    VkFence signalFence = VK_NULL_HANDLE;
-    // const bool lastStage = stageIndex == stages.size() - 1;
-    const bool lastStage = true;
-    if (lastStage) {
-        // Use this fence to know when we can start dispatching a new frame in flight
-        vkResetFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[frameData.frameInFlightIndex]);
-        signalFence = finishedLastStageOf[frameData.frameInFlightIndex];
-    }
+    // Use this fence to know when we can start dispatching a new frame in flight
+    vkResetFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[frameData.frameInFlightIndex]);
+    VkFence signalFence = finishedLastStageOf[frameData.frameInFlightIndex];
 
     VkSubmitInfo submitInfo{
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -246,10 +233,8 @@ void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
         .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
         .pWaitSemaphores = waitSemaphores.data(),
         .pWaitDstStageMask = waitStages.data(),
-        .commandBufferCount = primaryCommandBuffers.size(),
+        .commandBufferCount = static_cast<uint32_t>(primaryCommandBuffers.size()),
         .pCommandBuffers = primaryCommandBuffers.data(),
-        // .commandBufferCount = 1,
-        // .pCommandBuffers = &commandBuffer,
         .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
         .pSignalSemaphores = signalSemaphores.data(),
     };

@@ -18,16 +18,12 @@
 
 struct HmlRenderPass {
     struct ColorAttachment {
-        // VkFormat imageFormat;
-        // std::vector<VkImageView> imageViews;
         std::vector<std::shared_ptr<HmlImageResource>> imageResources;
         std::optional<VkClearColorValue> clearColor;
         VkImageLayout preLayout;
         VkImageLayout postLayout;
     };
     struct DepthStencilAttachment {
-        // VkFormat imageFormat;
-        // VkImageView imageView;
         std::vector<std::shared_ptr<HmlImageResource>> imageResources;
         std::optional<VkClearDepthStencilValue> clearColor;
         bool store;
@@ -57,7 +53,6 @@ struct HmlRenderPass {
     VkExtent2D extent;
 
 
-    // TODO nocheckin can remove?
     uint32_t colorAttachmentCount;
 
 

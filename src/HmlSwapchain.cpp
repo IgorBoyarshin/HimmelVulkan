@@ -140,21 +140,3 @@ VkExtent2D HmlSwapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabi
         return capabilities.currentExtent;
     }
 }
-
-
-// TODO nocheckin remove
-// // TODO either inline or extract the other code of swapchain creation into a separate function
-// std::vector<VkImageView> HmlSwapchain::createSwapchainImageViews() noexcept {
-//     uint32_t imageCount;
-//     vkGetSwapchainImagesKHR(hmlDevice->device, swapchain, &imageCount, nullptr);
-//     std::vector<VkImage> swapChainImages(imageCount);
-//     vkGetSwapchainImagesKHR(hmlDevice->device, swapchain, &imageCount, swapChainImages.data());
-//
-//     std::vector<VkImageView> imageViews(imageCount);
-//     for (size_t i = 0; i < swapChainImages.size(); i++) {
-//         imageViews[i] = hmlResourceManager->createImageView(swapChainImages[i], imageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
-//         if (!imageViews[i]) return {};
-//     }
-//
-//     return imageViews;
-// }

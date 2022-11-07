@@ -29,7 +29,7 @@ bool Himmel::init() noexcept {
     hmlContext->hmlSwapchain = HmlSwapchain::create(hmlContext->hmlWindow, hmlContext->hmlDevice, hmlContext->hmlResourceManager, std::nullopt);
     if (!hmlContext->hmlSwapchain) return false;
 
-    hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, hmlContext->imageCount());
+    hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, 2 * hmlContext->imageCount());
     if (!hmlContext->hmlQueries) return false;
 
     hmlContext->hmlImgui = HmlImgui::create(hmlContext->hmlWindow, hmlContext->hmlResourceManager);

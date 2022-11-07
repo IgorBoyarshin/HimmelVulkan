@@ -65,6 +65,8 @@ std::unique_ptr<HmlSnowParticleRenderer> HmlSnowParticleRenderer::createSnowRend
 
     hmlRenderer->snowTextureResources.push_back(hmlContext->hmlResourceManager->newTextureResource("../models/snow/snowflake1.png", 1, VK_FORMAT_R8_SRGB, VK_FILTER_NEAREST));
     hmlRenderer->snowTextureResources.push_back(hmlContext->hmlResourceManager->newTextureResource("../models/snow/snowflake2.png", 1, VK_FORMAT_R8_SRGB, VK_FILTER_NEAREST));
+    // hmlRenderer->snowTextureResources.push_back(hmlContext->hmlResourceManager->newTextureResource("../models/snow/snowflake1.png", 4, VK_FORMAT_R8G8B8A8_SRGB, VK_FILTER_NEAREST));
+    // hmlRenderer->snowTextureResources.push_back(hmlContext->hmlResourceManager->newTextureResource("../models/snow/snowflake2.png", 4, VK_FORMAT_R8G8B8A8_SRGB, VK_FILTER_NEAREST));
 
 
     hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()

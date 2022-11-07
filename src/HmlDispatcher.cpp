@@ -118,7 +118,7 @@ std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFr
         const auto& stage = stages[stageIndex];
 
         // ================ Pre-stage funcs ================
-        if (stage.preFunc) (*stage.preFunc)(false);
+        if (stage.preFunc) (*stage.preFunc)(false, hmlContext->currentFrame);
 
         // ================ Submit ================
         {
@@ -307,7 +307,7 @@ bool HmlDispatcher::addStage(StageCreateInfo&& stageCreateInfo) noexcept {
 
 
     // NOTE This is done here to allow HmlDrawer re-configuration in-between addStages
-    if (stageCreateInfo.preFunc) (*stageCreateInfo.preFunc)(true);
+    if (stageCreateInfo.preFunc) (*stageCreateInfo.preFunc)(true, hmlContext->currentFrame);
     for (auto& drawer : stageCreateInfo.drawers) {
         if (!clearedDrawers.contains(drawer)) {
             clearedDrawers.insert(drawer);

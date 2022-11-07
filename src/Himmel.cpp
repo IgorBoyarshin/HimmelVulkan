@@ -539,12 +539,12 @@ bool Himmel::run() noexcept {
                 ImGui::Text("FPS = %.0f", showedFps);
                 ImGui::Text("Delta = %.1fms", showedDeltaMillis);
                 ImGui::Separator();
-                ImGui::Text("CPU Wait1 = %.1fmks", showedElapsedMicrosWait1);
-                ImGui::Text("CPU Acquire = %.1fmks", showedElapsedMicrosAcquire);
-                ImGui::Text("CPU Wait2 = %.1fmks", showedElapsedMicrosWait2);
-                ImGui::Text("CPU Present = %.1fmks", showedElapsedMicrosPresent);
-                ImGui::Text("CPU Record = %.0fmks", showedElapsedMicrosRecord);
-                ImGui::Text("CPU Submit = %.0fmks", showedElapsedMicrosSubmit);
+                ImGui::Text("CPU Wait1 = %.0f mks", showedElapsedMicrosWait1);
+                ImGui::Text("CPU Acquire = %.0f mks", showedElapsedMicrosAcquire);
+                ImGui::Text("CPU Wait2 = %.0f mks", showedElapsedMicrosWait2);
+                ImGui::Text("CPU Present = %.0f mks", showedElapsedMicrosPresent);
+                ImGui::Text("CPU Record = %.0f mks", showedElapsedMicrosRecord);
+                ImGui::Text("CPU Submit = %.0f mks", showedElapsedMicrosSubmit);
 #if USE_TIMESTAMP_QUERIES
                 ImGui::Separator();
                 ImGui::Text("GPU time = %.2fms", showedElapsedMicrosGpu / 1000.0f);
@@ -990,7 +990,7 @@ bool Himmel::prepareResources() noexcept {
     // ================================= PASS =================================
     // ======== Render shadow-casting geometry into shadow map ========
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase){
+        .preFunc = [&](bool prepPhase, uint32_t currentFrame){
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
             hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
         },
@@ -1012,7 +1012,7 @@ bool Himmel::prepareResources() noexcept {
     // ================================= PASS =================================
     // ======== Renders main geometry into the GBuffer ========
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase){
+        .preFunc = [&](bool prepPhase, uint32_t currentFrame){
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
             hmlRenderer->setMode(HmlRenderer::Mode::Regular);
         },
@@ -1093,7 +1093,7 @@ bool Himmel::prepareResources() noexcept {
     // ======== Renders on top of the deferred texture using the depth info from the prep pass ========
     // Input: ---
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase){
+        .preFunc = [&](bool prepPhase, uint32_t currentFrame){
 #if DEBUG_TERRAIN
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
 #endif
@@ -1186,8 +1186,8 @@ bool Himmel::prepareResources() noexcept {
     // ======== Renders multiple 2D textures on top of everything ========
     // Input: shadowmap, all gBuffers
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase){
-            if (!prepPhase) hmlContext->hmlImgui->finilize();
+        .preFunc = [&](bool prepPhase, uint32_t currentFrame){
+            if (!prepPhase) hmlContext->hmlImgui->finilize(currentFrame);
         },
         .drawers = { hmlUiRenderer, hmlImguiRenderer },
         .colorAttachments = {

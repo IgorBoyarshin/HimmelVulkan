@@ -60,10 +60,32 @@ bool HmlBuffer::unmap() noexcept {
 
 bool HmlBuffer::update(const void* newData) noexcept {
     if (!mappable) {
-        std::cerr << "::> HmlBuffer: trying to unmap an unmappable buffer.\n";
+        std::cerr << "::> HmlBuffer: trying to update an unmappable buffer.\n";
         return false;
     }
-    if (mappedPtr) memcpy(mappedPtr, newData, sizeBytes);
+    if (!mappedPtr) {
+        std::cerr << "::> HmlBuffer: trying to update a buffer that has not been mapped.\n";
+        return false;
+    }
+    memcpy(mappedPtr, newData, sizeBytes);
+    return true;
+}
+
+
+bool HmlBuffer::update(const void* newData, VkDeviceSize customUpdateSizeBytes) noexcept {
+    if (!mappable) {
+        std::cerr << "::> HmlBuffer: trying to update an unmappable buffer.\n";
+        return false;
+    }
+    if (customUpdateSizeBytes > sizeBytes) {
+        std::cerr << "::> HmlBuffer: trying to update with size larger than allocated buffer.\n";
+        return false;
+    }
+    if (!mappedPtr) {
+        std::cerr << "::> HmlBuffer: trying to update a buffer that has not been mapped.\n";
+        return false;
+    }
+    memcpy(mappedPtr, newData, customUpdateSizeBytes);
     return true;
 }
 

@@ -60,7 +60,7 @@ void HmlImgui::beginFrame() noexcept {
 }
 
 
-void HmlImgui::finilize() noexcept {
+void HmlImgui::finilize(uint32_t currentFrame) noexcept {
     // ================ Construct render data ================
     ImGui::Render();
     // ================ Update vertex and index buffers ================
@@ -85,17 +85,27 @@ void HmlImgui::finilize() noexcept {
     }
 
     // Vertex buffer
-    if (true) {
-        auto newVertexBuffer = hmlResourceManager->createVertexBufferWithData(vertexData.data(), newVertexBufferSizeBytes);
+    const bool vertexBufferEmpty = !(*vertexBuffer);
+    const bool needNewVertexBuffer = vertexBufferEmpty || (newVertexBufferSizeBytes > (*vertexBuffer)->sizeBytes);
+    if (needNewVertexBuffer) {
+        auto newVertexBuffer = hmlResourceManager->createVertexBuffer(newVertexBufferSizeBytes);
+        newVertexBuffer->map();
         // NOTE we write "(*a)." instead of "a->" explicitly in order to highlihght
         // that we call swap on the inner object
+        hmlResourceManager->markForRelease(std::move(*vertexBuffer), currentFrame);
         (*vertexBuffer).swap(newVertexBuffer);
     }
+    (*vertexBuffer)->update(vertexData.data(), newVertexBufferSizeBytes);
 
     // Index buffer
-    if (true) {
-        auto newIndexBuffer = hmlResourceManager->createIndexBufferWithData(indexData.data(), newIndexBufferSizeBytes);
+    const bool indexBufferEmpty = !(*indexBuffer);
+    const bool needNewIndexBuffer = indexBufferEmpty || (newIndexBufferSizeBytes > (*indexBuffer)->sizeBytes);
+    if (needNewIndexBuffer) {
+        auto newIndexBuffer = hmlResourceManager->createIndexBuffer(newIndexBufferSizeBytes);
+        newIndexBuffer->map();
         // NOTE see comment above about vertexBuffer
+        hmlResourceManager->markForRelease(std::move(*indexBuffer), currentFrame);
         (*indexBuffer).swap(newIndexBuffer);
     }
+    (*indexBuffer)->update(indexData.data(), newIndexBufferSizeBytes);
 }

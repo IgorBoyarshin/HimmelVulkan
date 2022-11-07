@@ -23,7 +23,7 @@ struct HmlImgui {
 
     void updateForDt(float dt) noexcept;
     void beginFrame() noexcept;
-    void finilize() noexcept;
+    void finilize(uint32_t currentFrame) noexcept;
     static std::unique_ptr<HmlImgui> create(
         std::shared_ptr<HmlWindow> hmlWindow,
         std::shared_ptr<HmlResourceManager> hmlResourceManager) noexcept;

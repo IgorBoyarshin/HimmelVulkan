@@ -61,6 +61,7 @@ struct HmlBuffer {
     bool map() noexcept;
     bool unmap() noexcept;
     bool update(const void* newData) noexcept;
+    bool update(const void* newData, VkDeviceSize customUpdateSizeBytes) noexcept;
     HmlBuffer(bool mappable) noexcept;
     ~HmlBuffer() noexcept;
 

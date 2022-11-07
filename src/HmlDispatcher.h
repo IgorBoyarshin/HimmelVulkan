@@ -48,7 +48,7 @@ struct HmlDispatcher {
 
 
     struct StageCreateInfo {
-        std::optional<std::function<void(bool)>> preFunc;
+        std::optional<std::function<void(bool, uint32_t)>> preFunc;
         std::vector<std::shared_ptr<HmlDrawer>> drawers;
         // std::vector<HmlRenderPass::ColorAttachment> inputAttachments;
         std::vector<HmlRenderPass::ColorAttachment> colorAttachments;
@@ -71,7 +71,7 @@ struct HmlDispatcher {
         std::vector<VkCommandBuffer> commandBuffers;
         std::shared_ptr<HmlRenderPass> renderPass;
         // std::vector<HmlTransitionRequest> postTransitions;
-        std::optional<std::function<void(bool)>> preFunc;
+        std::optional<std::function<void(bool, uint32_t)>> preFunc;
         std::optional<std::function<void(uint32_t)>> postFunc;
         StageFlags flags;
         // std::vector<Transition> postTransitions;

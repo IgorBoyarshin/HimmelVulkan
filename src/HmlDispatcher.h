@@ -26,12 +26,20 @@ struct HmlDispatcher {
     };
 
 
+    struct DoStagesResult {
+        float elapsedMicrosRecord;
+        float elapsedMicrosSubmit;
+    };
+
+
     struct FrameResult {
         struct Stats {
             float elapsedMicrosWait1;
             float elapsedMicrosAcquire;
             float elapsedMicrosWait2;
             float elapsedMicrosPresent;
+            float elapsedMicrosRecord;
+            float elapsedMicrosSubmit;
         };
 
         std::optional<Stats> stats;
@@ -112,7 +120,7 @@ struct HmlDispatcher {
 
     private:
     bool createSyncObjects() noexcept;
-    void doStages(const HmlFrameData& frameData) noexcept;
+    std::optional<DoStagesResult> doStages(const HmlFrameData& frameData) noexcept;
 };
 
 

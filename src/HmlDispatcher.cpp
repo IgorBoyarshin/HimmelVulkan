@@ -60,7 +60,7 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
 
     updateForImage(imageIndex);
 // ============================================================================
-    doStages(HmlFrameData{
+    const auto doStagesResult = doStages(HmlFrameData{
         .frameInFlightIndex = currentFrame,
         .swapchainImageIndex = imageIndex,
         .generalDescriptorSet_0 = generalDescriptorSet_0_perImage[imageIndex],
@@ -101,16 +101,19 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
             .elapsedMicrosAcquire = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endAcquire - startAcquire).count()) / 1.0f,
             .elapsedMicrosWait2 = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWait2 - startWait2).count()) / 1.0f,
             .elapsedMicrosPresent = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endPresent - startPresent).count()) / 1.0f,
+            .elapsedMicrosRecord = doStagesResult ? doStagesResult->elapsedMicrosRecord : 0.0f,
+            .elapsedMicrosSubmit = doStagesResult ? doStagesResult->elapsedMicrosSubmit : 0.0f,
         },
         .mustRecreateSwapchain = mustRecreateSwapchain,
     }};
 }
 
 
-void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
+std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
 #if MERGE_CMD_SUBMITS || MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
     std::vector<VkCommandBuffer> primaryCommandBuffers;
 #endif
+    const auto startRecord = std::chrono::high_resolution_clock::now();
     for (size_t stageIndex = 0; stageIndex < stages.size(); stageIndex++) {
         const auto& stage = stages[stageIndex];
 
@@ -194,7 +197,7 @@ void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
                     // To quickly crash the application and not wait for it to un-hang
                     exit(-1);
 #endif
-                    return;
+                    return std::nullopt;
                 }
 
 #if MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
@@ -207,7 +210,9 @@ void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
         // ================ Post-stage funcs ================
         if (stage.postFunc) (*stage.postFunc)(frameData.swapchainImageIndex);
     }
+    const auto endRecord = std::chrono::high_resolution_clock::now();
 
+    const auto startSubmit = std::chrono::high_resolution_clock::now();
 #if MERGE_CMD_SUBMITS
     // ======== Submit primary command buffer ========
     std::vector<VkPipelineStageFlags> waitStages;
@@ -245,9 +250,15 @@ void HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
         // To quickly crash the application and not wait for it to un-hang
         exit(-1);
 #endif
-        return;
+        return std::nullopt;
     }
 #endif // MERGE_CMD_SUBMITS
+    const auto endSubmit = std::chrono::high_resolution_clock::now();
+
+    return { DoStagesResult{
+        .elapsedMicrosRecord = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endRecord - startRecord).count()) / 1.0f,
+        .elapsedMicrosSubmit = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endSubmit - startSubmit).count()) / 1.0f,
+    }};
 }
 
 

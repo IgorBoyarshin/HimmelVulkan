@@ -509,6 +509,8 @@ bool Himmel::run() noexcept {
             static float showedElapsedMicrosAcquire = 0;
             static float showedElapsedMicrosWait2 = 0;
             static float showedElapsedMicrosPresent = 0;
+            static float showedElapsedMicrosRecord = 0;
+            static float showedElapsedMicrosSubmit = 0;
             static float showedFps = 0;
             static float showedDeltaMillis = 0;
 #if USE_TIMESTAMP_QUERIES
@@ -528,6 +530,8 @@ bool Himmel::run() noexcept {
                     showedElapsedMicrosAcquire = frameStats.cpu.elapsedMicrosAcquire;
                     showedElapsedMicrosWait2 = frameStats.cpu.elapsedMicrosWait2;
                     showedElapsedMicrosPresent = frameStats.cpu.elapsedMicrosPresent;
+                    showedElapsedMicrosRecord = frameStats.cpu.elapsedMicrosRecord;
+                    showedElapsedMicrosSubmit = frameStats.cpu.elapsedMicrosSubmit;
 #if USE_TIMESTAMP_QUERIES
                     showedElapsedMicrosGpu = frameStats.elapsedMicrosGpu;
 #endif
@@ -539,6 +543,8 @@ bool Himmel::run() noexcept {
                 ImGui::Text("CPU Acquire = %.1fmks", showedElapsedMicrosAcquire);
                 ImGui::Text("CPU Wait2 = %.1fmks", showedElapsedMicrosWait2);
                 ImGui::Text("CPU Present = %.1fmks", showedElapsedMicrosPresent);
+                ImGui::Text("CPU Record = %.0fmks", showedElapsedMicrosRecord);
+                ImGui::Text("CPU Submit = %.0fmks", showedElapsedMicrosSubmit);
 #if USE_TIMESTAMP_QUERIES
                 ImGui::Separator();
                 ImGui::Text("GPU time = %.2fms", showedElapsedMicrosGpu / 1000.0f);

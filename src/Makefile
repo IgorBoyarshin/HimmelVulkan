@@ -33,7 +33,7 @@ LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvul
 ../build/util.o: util.cpp util.h settings.h
 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
 
-../build/Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h HmlTerrainRenderer.h util.h HmlRenderPass.h HmlUiRenderer.h HmlDeferredRenderer.h HmlLightRenderer.h HmlBloomRenderer.h renderer.h HmlContext.h HmlPipe.h HmlQueries.h settings.h HmlDispatcher.h
+../build/Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h HmlTerrainRenderer.h util.h HmlRenderPass.h HmlUiRenderer.h HmlDeferredRenderer.h HmlLightRenderer.h HmlBloomRenderer.h renderer.h HmlContext.h HmlQueries.h settings.h HmlDispatcher.h
 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
 
 ../build/HmlCamera.o: HmlCamera.cpp HmlCamera.h settings.h
@@ -53,9 +53,6 @@ LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvul
 
 ../build/HmlPipeline.o: HmlPipeline.cpp HmlPipeline.h HmlDevice.h settings.h
 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
-
-# ../build/HmlPipe.o: HmlPipe.cpp HmlPipe.h HmlDevice.h HmlCommands.h HmlSwapchain.h HmlRenderPass.h renderer.h settings.h
-# 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
 
 ../build/HmlDispatcher.o: HmlDispatcher.cpp HmlDispatcher.h HmlDevice.h HmlCommands.h HmlSwapchain.h HmlRenderPass.h renderer.h settings.h
 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@

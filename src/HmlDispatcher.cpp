@@ -12,9 +12,9 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
     // Wait for next-in-order frame to become rendered (for its commandBuffer
     // to finish). This ensures that no more than MAX_FRAMES_IN_FLIGHT frames
     // are inside the rendering pipeline at the same time.
-    const auto startWait1 = std::chrono::high_resolution_clock::now();
+    const auto startWaitNextInFlightFrame = std::chrono::high_resolution_clock::now();
     vkWaitForFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[currentFrame], VK_TRUE, UINT64_MAX);
-    const auto endWait1 = std::chrono::high_resolution_clock::now();
+    const auto endWaitNextInFlightFrame = std::chrono::high_resolution_clock::now();
 
     // vkAcquireNextImageKHR only specifies which image will be made
     // available next, so that we can e.g. start recording command
@@ -41,7 +41,7 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
     }
     const auto endAcquire = std::chrono::high_resolution_clock::now();
 
-    const auto startWait2 = std::chrono::high_resolution_clock::now();
+    const auto startWaitSwapchainImage = std::chrono::high_resolution_clock::now();
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) [[likely]] {
         // For each image we submit, we track which inFlightFence was bound
         // to it; for cases when the to-be-acquired image is still in use by
@@ -50,7 +50,7 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
         // this particular image exits the pipeline.
         vkWaitForFences(hmlContext->hmlDevice->device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
-    const auto endWait2 = std::chrono::high_resolution_clock::now();
+    const auto endWaitSwapchainImage = std::chrono::high_resolution_clock::now();
 
     // The image has at least finished being rendered.
     // Mark the image as now being in use by this frame
@@ -97,12 +97,12 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
 // ============================================================================
     return { FrameResult{
         .stats = FrameResult::Stats{
-            .elapsedMicrosWait1 = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWait1 - startWait1).count()) / 1.0f,
+            .elapsedMicrosWaitNextInFlightFrame = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWaitNextInFlightFrame - startWaitNextInFlightFrame).count()) / 1.0f,
             .elapsedMicrosAcquire = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endAcquire - startAcquire).count()) / 1.0f,
-            .elapsedMicrosWait2 = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWait2 - startWait2).count()) / 1.0f,
-            .elapsedMicrosPresent = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endPresent - startPresent).count()) / 1.0f,
+            .elapsedMicrosWaitSwapchainImage = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWaitSwapchainImage - startWaitSwapchainImage).count()) / 1.0f,
             .elapsedMicrosRecord = doStagesResult ? doStagesResult->elapsedMicrosRecord : 0.0f,
             .elapsedMicrosSubmit = doStagesResult ? doStagesResult->elapsedMicrosSubmit : 0.0f,
+            .elapsedMicrosPresent = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endPresent - startPresent).count()) / 1.0f,
         },
         .mustRecreateSwapchain = mustRecreateSwapchain,
     }};

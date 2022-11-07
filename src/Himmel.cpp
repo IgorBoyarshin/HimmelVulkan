@@ -503,14 +503,14 @@ bool Himmel::run() noexcept {
 
 #if WITH_IMGUI
         {
-            static constexpr uint32_t showEvery = 12;
+            static constexpr uint32_t showEvery = 20;
             static uint32_t showCounter = 0;
-            static float showedElapsedMicrosWait1 = 0;
+            static float showedElapsedMicrosWaitNextInFlightFrame = 0;
             static float showedElapsedMicrosAcquire = 0;
-            static float showedElapsedMicrosWait2 = 0;
-            static float showedElapsedMicrosPresent = 0;
+            static float showedElapsedMicrosWaitSwapchainImage = 0;
             static float showedElapsedMicrosRecord = 0;
             static float showedElapsedMicrosSubmit = 0;
+            static float showedElapsedMicrosPresent = 0;
             static float showedFps = 0;
             static float showedDeltaMillis = 0;
 #if USE_TIMESTAMP_QUERIES
@@ -526,12 +526,12 @@ bool Himmel::run() noexcept {
                 if (showCounter == 0) {
                     showedFps = 1.0 / deltaSeconds;
                     showedDeltaMillis = deltaSeconds * 1000.0f;
-                    showedElapsedMicrosWait1 = frameStats.cpu.elapsedMicrosWait1;
+                    showedElapsedMicrosWaitNextInFlightFrame = frameStats.cpu.elapsedMicrosWaitNextInFlightFrame;
                     showedElapsedMicrosAcquire = frameStats.cpu.elapsedMicrosAcquire;
-                    showedElapsedMicrosWait2 = frameStats.cpu.elapsedMicrosWait2;
-                    showedElapsedMicrosPresent = frameStats.cpu.elapsedMicrosPresent;
+                    showedElapsedMicrosWaitSwapchainImage = frameStats.cpu.elapsedMicrosWaitSwapchainImage;
                     showedElapsedMicrosRecord = frameStats.cpu.elapsedMicrosRecord;
                     showedElapsedMicrosSubmit = frameStats.cpu.elapsedMicrosSubmit;
+                    showedElapsedMicrosPresent = frameStats.cpu.elapsedMicrosPresent;
 #if USE_TIMESTAMP_QUERIES
                     showedElapsedMicrosGpu = frameStats.elapsedMicrosGpu;
 #endif
@@ -539,12 +539,12 @@ bool Himmel::run() noexcept {
                 ImGui::Text("FPS = %.0f", showedFps);
                 ImGui::Text("Delta = %.1fms", showedDeltaMillis);
                 ImGui::Separator();
-                ImGui::Text("CPU Wait1 = %.0f mks", showedElapsedMicrosWait1);
+                ImGui::Text("CPU WaitNextInFlightFrame = %.0f mks", showedElapsedMicrosWaitNextInFlightFrame);
                 ImGui::Text("CPU Acquire = %.0f mks", showedElapsedMicrosAcquire);
-                ImGui::Text("CPU Wait2 = %.0f mks", showedElapsedMicrosWait2);
-                ImGui::Text("CPU Present = %.0f mks", showedElapsedMicrosPresent);
+                ImGui::Text("CPU WaitSwapchainImage = %.0f mks", showedElapsedMicrosWaitSwapchainImage);
                 ImGui::Text("CPU Record = %.0f mks", showedElapsedMicrosRecord);
                 ImGui::Text("CPU Submit = %.0f mks", showedElapsedMicrosSubmit);
+                ImGui::Text("CPU Present = %.0f mks", showedElapsedMicrosPresent);
 #if USE_TIMESTAMP_QUERIES
                 ImGui::Separator();
                 ImGui::Text("GPU time = %.2fms", showedElapsedMicrosGpu / 1000.0f);

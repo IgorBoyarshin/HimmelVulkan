@@ -34,12 +34,12 @@ struct HmlDispatcher {
 
     struct FrameResult {
         struct Stats {
-            float elapsedMicrosWait1;
+            float elapsedMicrosWaitNextInFlightFrame;
             float elapsedMicrosAcquire;
-            float elapsedMicrosWait2;
-            float elapsedMicrosPresent;
+            float elapsedMicrosWaitSwapchainImage;
             float elapsedMicrosRecord;
             float elapsedMicrosSubmit;
+            float elapsedMicrosPresent;
         };
 
         std::optional<Stats> stats;

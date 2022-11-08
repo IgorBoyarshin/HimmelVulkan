@@ -28,15 +28,15 @@ struct HmlImguiRenderer : HmlDrawer {
     std::unique_ptr<HmlImageResource> fontTexture;
 
     // NOTE see explanation about the data structure in HmlImgui.h
-    std::shared_ptr<std::unique_ptr<HmlBuffer>> vertexBuffer;
-    std::shared_ptr<std::unique_ptr<HmlBuffer>> indexBuffer;
+    std::vector<std::shared_ptr<std::unique_ptr<HmlBuffer>>> vertexBuffers;
+    std::vector<std::shared_ptr<std::unique_ptr<HmlBuffer>>> indexBuffers;
 
 
     std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlImguiRenderer> create(
-        std::shared_ptr<std::unique_ptr<HmlBuffer>> vertexBuffer,
-        std::shared_ptr<std::unique_ptr<HmlBuffer>> indexBuffer,
+        const std::vector<std::shared_ptr<std::unique_ptr<HmlBuffer>>>& vertexBuffers,
+        const std::vector<std::shared_ptr<std::unique_ptr<HmlBuffer>>>& indexBuffers,
         std::shared_ptr<HmlContext> hmlContext) noexcept;
     ~HmlImguiRenderer() noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;

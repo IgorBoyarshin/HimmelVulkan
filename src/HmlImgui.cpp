@@ -3,13 +3,16 @@
 
 std::unique_ptr<HmlImgui> HmlImgui::create(
         std::shared_ptr<HmlWindow> hmlWindow,
-        std::shared_ptr<HmlResourceManager> hmlResourceManager) noexcept {
+        std::shared_ptr<HmlResourceManager> hmlResourceManager,
+        uint32_t framesInFlight) noexcept {
     auto hmlImgui = std::make_unique<HmlImgui>();
     hmlImgui->hmlWindow = hmlWindow;
     hmlImgui->hmlResourceManager = hmlResourceManager;
 
-    hmlImgui->vertexBuffer = std::make_shared<std::unique_ptr<HmlBuffer>>(std::unique_ptr<HmlBuffer>());
-    hmlImgui->indexBuffer  = std::make_shared<std::unique_ptr<HmlBuffer>>(std::unique_ptr<HmlBuffer>());
+    for (size_t i = 0; i < framesInFlight; i++) {
+        hmlImgui->vertexBuffers.push_back(std::make_shared<std::unique_ptr<HmlBuffer>>(std::unique_ptr<HmlBuffer>()));
+        hmlImgui->indexBuffers.push_back(std::make_shared<std::unique_ptr<HmlBuffer>>(std::unique_ptr<HmlBuffer>()));
+    }
 
     ImGui::CreateContext();
 
@@ -60,7 +63,7 @@ void HmlImgui::beginFrame() noexcept {
 }
 
 
-void HmlImgui::finilize(uint32_t currentFrame) noexcept {
+void HmlImgui::finilize(uint32_t currentFrameIndex, uint32_t frameInFlightIndex) noexcept {
     // ================ Construct render data ================
     ImGui::Render();
     // ================ Update vertex and index buffers ================
@@ -85,26 +88,28 @@ void HmlImgui::finilize(uint32_t currentFrame) noexcept {
     }
 
     // Vertex buffer
+    auto& vertexBuffer = vertexBuffers[frameInFlightIndex];
     const bool vertexBufferEmpty = !(*vertexBuffer);
     const bool needNewVertexBuffer = vertexBufferEmpty || (newVertexBufferSizeBytes > (*vertexBuffer)->sizeBytes);
     if (needNewVertexBuffer) {
         auto newVertexBuffer = hmlResourceManager->createVertexBuffer(newVertexBufferSizeBytes);
         newVertexBuffer->map();
-        // NOTE we write "(*a)." instead of "a->" explicitly in order to highlihght
+        // NOTE we write "(*a)." instead of "a->" explicitly in order to highlight
         // that we call swap on the inner object
-        hmlResourceManager->markForRelease(std::move(*vertexBuffer), currentFrame);
+        if (*vertexBuffer) hmlResourceManager->markForRelease(std::move(*vertexBuffer), currentFrameIndex);
         (*vertexBuffer).swap(newVertexBuffer);
     }
     (*vertexBuffer)->update(vertexData.data(), newVertexBufferSizeBytes);
 
     // Index buffer
+    auto& indexBuffer = indexBuffers[frameInFlightIndex];
     const bool indexBufferEmpty = !(*indexBuffer);
     const bool needNewIndexBuffer = indexBufferEmpty || (newIndexBufferSizeBytes > (*indexBuffer)->sizeBytes);
     if (needNewIndexBuffer) {
         auto newIndexBuffer = hmlResourceManager->createIndexBuffer(newIndexBufferSizeBytes);
         newIndexBuffer->map();
         // NOTE see comment above about vertexBuffer
-        hmlResourceManager->markForRelease(std::move(*indexBuffer), currentFrame);
+        if (*indexBuffer) hmlResourceManager->markForRelease(std::move(*indexBuffer), currentFrameIndex);
         (*indexBuffer).swap(newIndexBuffer);
     }
     (*indexBuffer)->update(indexData.data(), newIndexBufferSizeBytes);

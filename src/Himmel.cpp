@@ -32,7 +32,7 @@ bool Himmel::init() noexcept {
     hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, 2 * hmlContext->imageCount());
     if (!hmlContext->hmlQueries) return false;
 
-    hmlContext->hmlImgui = HmlImgui::create(hmlContext->hmlWindow, hmlContext->hmlResourceManager);
+    hmlContext->hmlImgui = HmlImgui::create(hmlContext->hmlWindow, hmlContext->hmlResourceManager, hmlContext->maxFramesInFlight);
     if (!hmlContext->hmlImgui) return false;
 
 
@@ -116,7 +116,7 @@ bool Himmel::init() noexcept {
     if (!hmlBloomRenderer) return false;
 
     // NOTE specify buffers explicitly, even though we have context already, to highlight this dependency
-    hmlImguiRenderer = HmlImguiRenderer::create(hmlContext->hmlImgui->vertexBuffer, hmlContext->hmlImgui->indexBuffer, hmlContext);
+    hmlImguiRenderer = HmlImguiRenderer::create(hmlContext->hmlImgui->vertexBuffers, hmlContext->hmlImgui->indexBuffers, hmlContext);
     if (!hmlImguiRenderer) return false;
 
 
@@ -990,7 +990,7 @@ bool Himmel::prepareResources() noexcept {
     // ================================= PASS =================================
     // ======== Render shadow-casting geometry into shadow map ========
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase, uint32_t currentFrame){
+        .preFunc = [&](bool prepPhase, const HmlFrameData& frameData){
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
             hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
         },
@@ -1012,7 +1012,7 @@ bool Himmel::prepareResources() noexcept {
     // ================================= PASS =================================
     // ======== Renders main geometry into the GBuffer ========
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase, uint32_t currentFrame){
+        .preFunc = [&](bool prepPhase, const HmlFrameData& frameData){
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
             hmlRenderer->setMode(HmlRenderer::Mode::Regular);
         },
@@ -1093,7 +1093,7 @@ bool Himmel::prepareResources() noexcept {
     // ======== Renders on top of the deferred texture using the depth info from the prep pass ========
     // Input: ---
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase, uint32_t currentFrame){
+        .preFunc = [&](bool prepPhase, const HmlFrameData& frameData){
 #if DEBUG_TERRAIN
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
 #endif
@@ -1186,8 +1186,8 @@ bool Himmel::prepareResources() noexcept {
     // ======== Renders multiple 2D textures on top of everything ========
     // Input: shadowmap, all gBuffers
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase, uint32_t currentFrame){
-            if (!prepPhase) hmlContext->hmlImgui->finilize(currentFrame);
+        .preFunc = [&](bool prepPhase, const HmlFrameData& frameData){
+            if (!prepPhase) hmlContext->hmlImgui->finilize(frameData.currentFrameIndex, frameData.frameInFlightIndex);
         },
         .drawers = { hmlUiRenderer, hmlImguiRenderer },
         .colorAttachments = {

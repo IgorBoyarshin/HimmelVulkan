@@ -63,6 +63,7 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
     const auto doStagesResult = doStages(HmlFrameData{
         .frameInFlightIndex = frameInFlightIndex,
         .swapchainImageIndex = imageIndex,
+        .currentFrameIndex = hmlContext->currentFrame,
         .generalDescriptorSet_0 = generalDescriptorSet_0_perImage[imageIndex],
     });
 // ============================================================================
@@ -118,7 +119,7 @@ std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFr
         const auto& stage = stages[stageIndex];
 
         // ================ Pre-stage funcs ================
-        if (stage.preFunc) (*stage.preFunc)(false, hmlContext->currentFrame);
+        if (stage.preFunc) (*stage.preFunc)(false, frameData);
 
         // ================ Submit ================
         {
@@ -208,7 +209,7 @@ std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFr
         }
 
         // ================ Post-stage funcs ================
-        if (stage.postFunc) (*stage.postFunc)(frameData.swapchainImageIndex);
+        if (stage.postFunc) (*stage.postFunc)(frameData);
     }
     const auto endRecord = std::chrono::high_resolution_clock::now();
 
@@ -307,7 +308,10 @@ bool HmlDispatcher::addStage(StageCreateInfo&& stageCreateInfo) noexcept {
 
 
     // NOTE This is done here to allow HmlDrawer re-configuration in-between addStages
-    if (stageCreateInfo.preFunc) (*stageCreateInfo.preFunc)(true, hmlContext->currentFrame);
+    // NOTE there is no valid frame data for the prep stage, and funcs should not
+    // use that data in prep stage anyway.
+    HmlFrameData frameData = {};
+    if (stageCreateInfo.preFunc) (*stageCreateInfo.preFunc)(true, frameData);
     for (auto& drawer : stageCreateInfo.drawers) {
         if (!clearedDrawers.contains(drawer)) {
             clearedDrawers.insert(drawer);
@@ -315,8 +319,7 @@ bool HmlDispatcher::addStage(StageCreateInfo&& stageCreateInfo) noexcept {
         }
         drawer->addRenderPass(hmlRenderPass);
     }
-    // TODO probably remove or change arg
-    if (stageCreateInfo.postFunc) (*stageCreateInfo.postFunc)(0); // XXX should've passed frameIndex but we should not use it inside anyway
+    if (stageCreateInfo.postFunc) (*stageCreateInfo.postFunc)(frameData);
 
     const auto count = hmlContext->imageCount();
     const auto pool = hmlContext->hmlCommands->commandPoolOnetimeFrames;

@@ -65,13 +65,13 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlImguiRenderer::createPipelines(
 
 
 std::unique_ptr<HmlImguiRenderer> HmlImguiRenderer::create(
-        std::shared_ptr<std::unique_ptr<HmlBuffer>> vertexBuffer,
-        std::shared_ptr<std::unique_ptr<HmlBuffer>> indexBuffer,
+        const std::vector<std::shared_ptr<std::unique_ptr<HmlBuffer>>>& vertexBuffers,
+        const std::vector<std::shared_ptr<std::unique_ptr<HmlBuffer>>>& indexBuffers,
         std::shared_ptr<HmlContext> hmlContext) noexcept {
     auto hmlImguiRenderer = std::make_unique<HmlImguiRenderer>();
     hmlImguiRenderer->hmlContext = hmlContext;
-    hmlImguiRenderer->vertexBuffer = vertexBuffer;
-    hmlImguiRenderer->indexBuffer = indexBuffer;
+    hmlImguiRenderer->vertexBuffers = vertexBuffers;
+    hmlImguiRenderer->indexBuffers = indexBuffers;
 
     // Create font texture
     {
@@ -168,10 +168,14 @@ VkCommandBuffer HmlImguiRenderer::draw(const HmlFrameData& frameData) noexcept {
     int32_t vertexOffset = 0;
     int32_t indexOffset = 0;
     if (imDrawData->CmdListsCount > 0) {
-        assert((vertexBuffer && indexBuffer) && "::> Vertex or index buffer is null.");
+        const auto index = frameData.frameInFlightIndex;
+        assert((vertexBuffers.size() > index && vertexBuffers[index] && *(vertexBuffers[index])) && "::> Vertex buffer is not initialized.");
+        assert((indexBuffers.size() > index  && indexBuffers[index]  && *(indexBuffers[index]))  && "::> Index buffer is not initialized.");
+        const auto& vertexBuffer = *(vertexBuffers[index]);
+        const auto& indexBuffer  = *(indexBuffers[index]);
         VkDeviceSize offsets[1] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &((*vertexBuffer)->buffer), offsets);
-        vkCmdBindIndexBuffer(commandBuffer, (*indexBuffer)->buffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &(vertexBuffer->buffer), offsets);
+        vkCmdBindIndexBuffer(commandBuffer, indexBuffer->buffer, 0, VK_INDEX_TYPE_UINT16);
 
         for (int32_t i = 0; i < imDrawData->CmdListsCount; i++) {
             const ImDrawList* cmd_list = imDrawData->CmdLists[i];

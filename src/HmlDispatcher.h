@@ -48,14 +48,14 @@ struct HmlDispatcher {
 
 
     struct StageCreateInfo {
-        std::optional<std::function<void(bool, uint32_t)>> preFunc;
+        std::optional<std::function<void(bool, const HmlFrameData& frameData)>> preFunc;
         std::vector<std::shared_ptr<HmlDrawer>> drawers;
         // std::vector<HmlRenderPass::ColorAttachment> inputAttachments;
         std::vector<HmlRenderPass::ColorAttachment> colorAttachments;
         std::optional<HmlRenderPass::DepthStencilAttachment> depthAttachment;
         std::vector<VkSubpassDependency> subpassDependencies;
         // std::vector<HmlTransitionRequest> postTransitions;
-        std::optional<std::function<void(uint32_t)>> postFunc;
+        std::optional<std::function<void(const HmlFrameData& frameData)>> postFunc;
         StageFlags flags;
     };
 
@@ -71,8 +71,8 @@ struct HmlDispatcher {
         std::vector<VkCommandBuffer> commandBuffers;
         std::shared_ptr<HmlRenderPass> renderPass;
         // std::vector<HmlTransitionRequest> postTransitions;
-        std::optional<std::function<void(bool, uint32_t)>> preFunc;
-        std::optional<std::function<void(uint32_t)>> postFunc;
+        std::optional<std::function<void(bool, const HmlFrameData& frameData)>> preFunc;
+        std::optional<std::function<void(const HmlFrameData& frameData)>> postFunc;
         StageFlags flags;
         // std::vector<Transition> postTransitions;
     };

@@ -34,6 +34,7 @@ struct HmlDrawer {
             if (renderPass == currentRenderPass) return pipelines;
         }
         assert(false && "::> Failed to look up a HmlPipeline for the current HmlRenderPass.\n");
+        return pipelineForRenderPassStorage[0].second; // stub
     }
 
     inline size_t getCurrentRenderPassIndex() const noexcept {
@@ -43,6 +44,7 @@ struct HmlDrawer {
             i++;
         }
         assert(false && "::> Failed to look up the index for the current HmlRenderPass.\n");
+        return 0; // stub
     }
 
     inline const std::vector<VkCommandBuffer>& getCurrentCommands() const noexcept {

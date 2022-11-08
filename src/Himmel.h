@@ -122,7 +122,9 @@ struct Himmel {
 
 
     // TODO move out
-    struct Car {
+    struct Car : HmlCameraFollow::Followable {
+        inline glm::vec3 queryPos() const noexcept override { return posCenter; }
+
         // float width;
         // float length;
         // glm::vec2 size;
@@ -247,7 +249,7 @@ struct Himmel {
 
 
     std::unique_ptr<World> world;
-    std::unique_ptr<Car> car;
+    std::shared_ptr<Car> car;
 
 
     std::unique_ptr<HmlCamera> hmlCamera;

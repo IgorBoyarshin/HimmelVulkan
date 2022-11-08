@@ -135,7 +135,7 @@ bool Himmel::init() noexcept {
         const float carZ = 0.0f;
         const auto carPos = glm::vec3{carX, world->heightAt({ carX, carZ }), carZ};
         const auto carSizeScaler = 2.5f;
-        car = std::make_unique<Car>(carPos, carSizeScaler);
+        car = std::make_shared<Car>(carPos, carSizeScaler);
     }
 
 
@@ -217,9 +217,13 @@ bool Himmel::init() noexcept {
     hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
 
-    hmlCamera = std::make_unique<HmlCameraFreeFly>();
-    hmlCamera->pos = { 205.0f, 135.0f, 215.0f };
-    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
+    // hmlCamera = std::make_unique<HmlCameraFreeFly>();
+    // hmlCamera->pos = { 205.0f, 135.0f, 215.0f };
+    // dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
+    hmlCamera = std::make_unique<HmlCameraFollow>(100);
+    dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
+    dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->target(car);
+
     proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
 
 
@@ -662,6 +666,29 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
     }
 #endif
+    { // Switch camera
+        static bool f2Pressed = false;
+        if (!f2Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F2) == GLFW_PRESS) {
+            f2Pressed = true;
+
+            if (hmlCamera->isFollow()) {
+                const auto oldPitch = hmlCamera->pitch;
+                const auto oldYaw = hmlCamera->yaw;
+                hmlCamera = std::make_unique<HmlCameraFreeFly>(hmlCamera->pos);
+                hmlCamera->asFreeFly()->rotateDir(oldPitch, oldYaw);
+            } else if (hmlCamera->isFreeFly()) {
+                const auto oldPitch = hmlCamera->pitch;
+                const auto oldYaw = hmlCamera->yaw;
+                hmlCamera = std::make_unique<HmlCameraFollow>(100);
+                hmlCamera->asFollow()->rotateDir(oldPitch, oldYaw);
+                hmlCamera->asFollow()->target(car);
+            } else {
+                assert(false && "::> Unhandled HmlCamera type in update().");
+            }
+        } else if (f2Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F2) == GLFW_RELEASE) {
+            f2Pressed = false;
+        }
+    }
 
     // NOTE allow cursor position update and only disable camera rotation reaction
     // in order not to have the camera jump on re-acquiring control from the ui
@@ -720,10 +747,13 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
             const float minPitch = -90.0f;
             const float maxPitch = 90.0f;
 
-            ImGui::Text("Camera");
+            if      (hmlCamera->isFreeFly()) ImGui::Text("Camera: FreeFly");
+            else if (hmlCamera->isFollow())  ImGui::Text("Camera: Follow");
             ImGui::Spacing();
             ImGui::Text("[%.2f;%.2f;%.2f] p=%.1f y=%.1f", pos.x, pos.y, pos.z, pitch, yaw);
-            ImGui::DragFloat3("pos", &pos[0], 0.8f, minPos, maxPos);
+            if (hmlCamera->isFreeFly()) {
+                ImGui::DragFloat3("pos", &pos[0], 0.8f, minPos, maxPos);
+            }
             ImGui::DragScalar("pitch", ImGuiDataType_Float, &pitch, 0.3f, &minPitch, &maxPitch, "%f");
             ImGui::DragScalar("yaw", ImGuiDataType_Float, &yaw, 0.7f, &minYaw, &maxYaw, "%f");
 
@@ -731,7 +761,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
             static auto cachedPitch = pitch;
             static auto cachedYaw = yaw;
             if (pos != cachedPos || pitch != cachedPitch || yaw != cachedYaw) {
-                hmlCamera->invalidateCache();
+                if (hmlCamera->isFreeFly()) hmlCamera->asFreeFly()->invalidateCache();
                 cachedPos = pos;
                 cachedPitch = pitch;
                 cachedYaw = yaw;

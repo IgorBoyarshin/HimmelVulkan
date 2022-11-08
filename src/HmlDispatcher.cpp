@@ -7,13 +7,13 @@
  * So, its commandBuffer has been submitted, but has not finished yet.
  * */
 std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
-    static uint32_t currentFrame = 0;
+    static uint32_t frameInFlightIndex = 0;
 
     // Wait for next-in-order frame to become rendered (for its commandBuffer
     // to finish). This ensures that no more than MAX_FRAMES_IN_FLIGHT frames
     // are inside the rendering pipeline at the same time.
     const auto startWaitNextInFlightFrame = std::chrono::high_resolution_clock::now();
-    vkWaitForFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[currentFrame], VK_TRUE, UINT64_MAX);
+    vkWaitForFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[frameInFlightIndex], VK_TRUE, UINT64_MAX);
     const auto endWaitNextInFlightFrame = std::chrono::high_resolution_clock::now();
 
     // vkAcquireNextImageKHR only specifies which image will be made
@@ -29,7 +29,7 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
     // its inFlightFence has just been waited upon.
     const auto startAcquire = std::chrono::high_resolution_clock::now();
     if (const VkResult result = vkAcquireNextImageKHR(hmlContext->hmlDevice->device, hmlContext->hmlSwapchain->swapchain, UINT64_MAX,
-                swapchainImageAvailable[currentFrame], VK_NULL_HANDLE, &imageIndex);
+                swapchainImageAvailable[frameInFlightIndex], VK_NULL_HANDLE, &imageIndex);
             result == VK_ERROR_OUT_OF_DATE_KHR) {
         return { FrameResult{
             .stats = std::nullopt,
@@ -54,14 +54,14 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
 
     // The image has at least finished being rendered.
     // Mark the image as now being in use by this frame
-    imagesInFlight[imageIndex] = finishedLastStageOf[currentFrame];
+    imagesInFlight[imageIndex] = finishedLastStageOf[frameInFlightIndex];
 
     // Once we know what image we work with...
 
     updateForImage(imageIndex);
 // ============================================================================
     const auto doStagesResult = doStages(HmlFrameData{
-        .frameInFlightIndex = currentFrame,
+        .frameInFlightIndex = frameInFlightIndex,
         .swapchainImageIndex = imageIndex,
         .generalDescriptorSet_0 = generalDescriptorSet_0_perImage[imageIndex],
     });
@@ -69,7 +69,7 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
     bool mustRecreateSwapchain = false;
     const auto startPresent = std::chrono::high_resolution_clock::now();
     {
-        VkSemaphore waitSemaphores[] = { renderToSwapchainImageFinished[currentFrame] };
+        VkSemaphore waitSemaphores[] = { renderToSwapchainImageFinished[frameInFlightIndex] };
 
         VkPresentInfoKHR presentInfo = {};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -93,7 +93,7 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
     }
     const auto endPresent = std::chrono::high_resolution_clock::now();
 // ============================================================================
-    currentFrame = (currentFrame + 1) % hmlContext->maxFramesInFlight;
+    frameInFlightIndex = (frameInFlightIndex + 1) % hmlContext->maxFramesInFlight;
 // ============================================================================
     return { FrameResult{
         .stats = FrameResult::Stats{

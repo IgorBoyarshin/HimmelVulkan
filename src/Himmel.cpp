@@ -134,7 +134,7 @@ bool Himmel::init() noexcept {
         const float carX = 0.0f;
         const float carZ = 0.0f;
         const auto carPos = glm::vec3{carX, world->heightAt({ carX, carZ }), carZ};
-        const auto carSizeScaler = 0.5f;
+        const auto carSizeScaler = 2.5f;
         car = std::make_unique<Car>(carPos, carSizeScaler);
     }
 
@@ -217,9 +217,9 @@ bool Himmel::init() noexcept {
     hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
 
-    hmlCamera = HmlCamera{{ 205.0f, 135.0f, 215.0f }};
-    hmlCamera.rotateDir(-28.0f, 307.0f);
-    cursor = hmlContext->hmlWindow->getCursor();
+    hmlCamera = std::make_unique<HmlCameraFreeFly>();
+    hmlCamera->pos = { 205.0f, 135.0f, 215.0f };
+    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
     proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
 
 
@@ -666,57 +666,8 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     // NOTE allow cursor position update and only disable camera rotation reaction
     // in order not to have the camera jump on re-acquiring control from the ui
     // due to the cursor (pointer) position change that will have happened.
-    { // Camera rotation from mouse
-        const auto newCursor = hmlContext->hmlWindow->getCursor();
-        const int32_t dx = newCursor.first - cursor.first;
-        const int32_t dy = newCursor.second - cursor.second;
-        cursor = newCursor;
-        const float rotateSpeed = 0.05f;
-        if (!uiInFocus) {
-            if (dx || dy) hmlCamera.rotateDir(-dy * rotateSpeed, dx * rotateSpeed);
-        }
-    }
-
-    if (!uiInFocus) { // Camera movement from keyboard
-        constexpr float movementSpeed = 16.0f;
-        constexpr float boostUp = 10.0f;
-        constexpr float boostDown = 0.2f;
-        float length = movementSpeed * dt;
-        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-            length *= boostUp;
-        } else if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
-            length *= boostDown;
-        }
-
-        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_W) == GLFW_PRESS) {
-            hmlCamera.forward(length);
-        }
-        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_S) == GLFW_PRESS) {
-            hmlCamera.forward(-length);
-        }
-        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_D) == GLFW_PRESS) {
-            hmlCamera.right(length);
-        }
-        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_A) == GLFW_PRESS) {
-            hmlCamera.right(-length);
-        }
-        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            hmlCamera.lift(length);
-        }
-        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_C) == GLFW_PRESS) {
-            hmlCamera.lift(-length);
-        }
-    }
-
-    if (!uiInFocus) { // Camera print position
-        static bool pPressed = false;
-        if (!pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_PRESS) {
-            pPressed = true;
-            hmlCamera.printStats();
-        } else if (pPressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_P) == GLFW_RELEASE) {
-            pPressed = false;
-        }
-    }
+    const bool cameraIgnoreInput = uiInFocus;
+    hmlCamera->handleInput(hmlContext->hmlWindow, dt, cameraIgnoreInput);
 
     if (!uiInFocus) { // Car movement
         constexpr float carSpeed = 10.0f;
@@ -758,9 +709,9 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
         ImGui::Separator();
         { // Camera
-            auto& pos = hmlCamera.pos;
-            auto& pitch = hmlCamera.pitch;
-            auto& yaw = hmlCamera.yaw;
+            auto& pos = hmlCamera->pos;
+            auto& pitch = hmlCamera->pitch;
+            auto& yaw = hmlCamera->yaw;
 
             const float minPos = -1000.0f;
             const float maxPos = 1000.0f;
@@ -780,7 +731,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
             static auto cachedPitch = pitch;
             static auto cachedYaw = yaw;
             if (pos != cachedPos || pitch != cachedPitch || yaw != cachedYaw) {
-                hmlCamera.invalidateCache();
+                hmlCamera->invalidateCache();
                 cachedPos = pos;
                 cachedPitch = pitch;
                 cachedYaw = yaw;
@@ -820,7 +771,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     {
         // NOTE Takes up to 60mks with (current) CPU-patch implementation
         // const auto startTime = std::chrono::high_resolution_clock::now();
-        hmlTerrainRenderer->update(hmlCamera.getPos());
+        hmlTerrainRenderer->update(hmlCamera->pos);
         // const auto newMark = std::chrono::high_resolution_clock::now();
         // const auto sinceStart = std::chrono::duration_cast<std::chrono::microseconds>(newMark - startTime).count();
         // const float sinceStartMksSeconds = static_cast<float>(sinceStart);
@@ -868,16 +819,16 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             return proj;
         }();
         GeneralUbo generalUbo{
-            .view = hmlCamera.view(),
-                .proj = proj,
-                // .globalLightView = hmlCamera.view(),
-                .globalLightView = globalLightView,
-                .globalLightProj = globalLightProj,
-                .globalLightDir = globalLightDir,
-                .ambientStrength = 0.1f,
-                .fogColor = weather.fogColor,
-                .fogDensity = weather.fogDensity,
-                .cameraPos = hmlCamera.getPos(),
+            .view = hmlCamera->view(),
+            .proj = proj,
+            // .globalLightView = hmlCamera->view(),
+            .globalLightView = globalLightView,
+            .globalLightProj = globalLightProj,
+            .globalLightDir = globalLightDir,
+            .ambientStrength = 0.5f,
+            .fogColor = weather.fogColor,
+            .fogDensity = weather.fogDensity,
+            .cameraPos = hmlCamera->pos,
         };
         viewProjUniformBuffers[imageIndex]->update(&generalUbo);
 #ifdef WITH_IMGUI
@@ -906,7 +857,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         for (const auto& light : pointLightsDynamic) lightUbo.pointLights[i++] = light;
         // Sort to enable proper transparency
         std::sort(lightUbo.pointLights.begin(), lightUbo.pointLights.begin() + lightsCount,
-                [cameraPos = hmlCamera.getPos()](const auto& l1, const auto& l2){
+                [cameraPos = hmlCamera->pos](const auto& l1, const auto& l2){
                 const auto v1 = cameraPos - l1.position;
                 const auto v2 = cameraPos - l2.position;
                 return glm::dot(v1, v1) > glm::dot(v2, v2);

@@ -88,7 +88,7 @@ void main() {
     vec2 shadowmapCoord = lightSpacePos.xy * 0.5 + 0.5;
     float shadowDepth = texture(texSamplers[G_SHADOWMAP], shadowmapCoord).r;
     if (lightSpacePos.z > shadowDepth) {
-        light *= 0.2;
+        light *= 0.6;
         /* outColor = vec4(light, 1.0); */
         /* return; */
     }

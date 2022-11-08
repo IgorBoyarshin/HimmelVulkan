@@ -1,7 +1,7 @@
 #include "HmlCamera.h"
 
 
-void HmlCamera::rotateDir(float dPitch, float dYaw) noexcept {
+void HmlCameraFreeFly::rotateDir(float dPitch, float dYaw) noexcept {
     static const float MIN_PITCH = -89.0f;
     static const float MAX_PITCH = +89.0f;
     static const float YAW_PERIOD = 360.0f;
@@ -14,37 +14,25 @@ void HmlCamera::rotateDir(float dPitch, float dYaw) noexcept {
     while (yaw < 0.0f)       yaw += YAW_PERIOD;
     while (YAW_PERIOD <= yaw) yaw -= YAW_PERIOD;
 
-    // std::cout << "Pitch = " << pitch << "; Yaw = " << yaw << '\n';
-
-    // rotationChanged = true;
     cachedView = std::nullopt;
 }
 
 
-void HmlCamera::forward(float length) noexcept {
+void HmlCameraFreeFly::forward(float length) noexcept {
     pos += length * calcDirForward(pitch, yaw);
-    // positionChanged = true;
     cachedView = std::nullopt;
 }
 
 
-void HmlCamera::right(float length) noexcept {
+void HmlCameraFreeFly::right(float length) noexcept {
     pos += length * calcDirRight();
-    // positionChanged = true;
     cachedView = std::nullopt;
 }
 
 
-void HmlCamera::lift(float length) noexcept {
+void HmlCameraFreeFly::lift(float length) noexcept {
     pos += length * dirUp;
-    // positionChanged = true;
     cachedView = std::nullopt;
-}
-
-
-void HmlCamera::recacheView() noexcept {
-    // From where, to where, up
-    cachedView = { glm::lookAt(pos, pos + calcDirForward(pitch, yaw), dirUp) };
 }
 
 
@@ -64,6 +52,59 @@ glm::vec3 HmlCamera::calcDirRight() const noexcept {
 }
 
 
-void HmlCamera::printStats() const noexcept {
+
+void HmlCameraFreeFly::recacheView() noexcept {
+    // From where, to where, up
+    cachedView = { glm::lookAt(pos, pos + calcDirForward(pitch, yaw), dirUp) };
+}
+
+void HmlCameraFreeFly::printStats() const noexcept {
     std::cout << "Camera: [" << pos.x << ";" << pos.y << ";" << pos.z << "] pitch=" << pitch << " yaw =" << yaw << "\n";
+}
+
+void HmlCameraFreeFly::handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, float dt, bool ignore) noexcept {
+    // Keyboard
+    if (!ignore) {
+        constexpr float movementSpeed = 16.0f;
+        constexpr float boostUp       = 10.0f;
+        constexpr float boostDown     = 0.2f;
+
+        float length = movementSpeed * dt;
+        if      (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) length *= boostUp;
+        else if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_ALT)   == GLFW_PRESS) length *= boostDown;
+
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_W)     == GLFW_PRESS) forward(length);
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_S)     == GLFW_PRESS) forward(-length);
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_D)     == GLFW_PRESS) right(length);
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_A)     == GLFW_PRESS) right(-length);
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS) lift(length);
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_C)     == GLFW_PRESS) lift(-length);
+
+        static bool pPressed = false;
+        if (!pPressed && glfwGetKey(hmlWindow->window, GLFW_KEY_P) == GLFW_PRESS) {
+            pPressed = true;
+            printStats();
+        } else if (pPressed && glfwGetKey(hmlWindow->window, GLFW_KEY_P) == GLFW_RELEASE) {
+            pPressed = false;
+        }
+    }
+
+    // Mouse
+    {
+        static std::pair<int32_t, int32_t> cursor;
+        static bool firstTime = true;
+        const auto newCursor = hmlWindow->getCursor();
+        if (firstTime) {
+            firstTime = false;
+            cursor = newCursor;
+        }
+        const int32_t dx = newCursor.first - cursor.first;
+        const int32_t dy = newCursor.second - cursor.second;
+        cursor = newCursor;
+
+        constexpr float rotateSpeed = 0.05f;
+        if (!ignore) {
+            if (dx || dy) rotateDir(-dy * rotateSpeed, dx * rotateSpeed);
+        }
+    }
 }

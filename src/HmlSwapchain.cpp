@@ -117,8 +117,8 @@ VkPresentModeKHR HmlSwapchain::chooseSwapPresentMode(const std::vector<VkPresent
     //     }
     // }
 
-    return VK_PRESENT_MODE_IMMEDIATE_KHR;
-    // return VK_PRESENT_MODE_FIFO_KHR; // guaranteed to be available
+    // return VK_PRESENT_MODE_IMMEDIATE_KHR;
+    return VK_PRESENT_MODE_FIFO_KHR; // guaranteed to be available
 }
 
 

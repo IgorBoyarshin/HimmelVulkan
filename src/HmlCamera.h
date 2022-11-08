@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <optional>
+#include <memory>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -10,56 +11,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "settings.h"
+#include "HmlWindow.h"
 
 
 struct HmlCamera {
-    inline HmlCamera() {}
-
-    inline HmlCamera(const glm::vec3& pos) : pos(pos), dirUp({ 0.0f, 1.0f, 0.0f }) {}
-
-    inline const glm::mat4& view() noexcept {
-        if (!cachedView) recacheView();
-        return *cachedView;
-    }
-
-    inline glm::vec3 getPos() const noexcept {
-        return pos;
-    }
-
-    inline float getPitch() const noexcept {
-        return pitch;
-    }
-
-    inline float getYaw() const noexcept {
-        return yaw;
-    }
-
-    void rotateDir(float dPitch, float dYaw) noexcept;
-    void forward(float length) noexcept;
-    void right(float length) noexcept;
-    void lift(float length) noexcept;
-
-    void printStats() const noexcept;
-
-    // inline void resetChanged() noexcept {
-    //     positionChanged = false;
-    //     rotationChanged = false;
-    // }
-
-    // inline bool positionHasChanged() const noexcept { return positionChanged; }
-    // inline bool rotationHasChanged() const noexcept { return rotationChanged; }
-    // inline bool somethingHasChanged() const noexcept { return rotationChanged || positionChanged; }
-
-    inline void invalidateCache() noexcept { cachedView = std::nullopt; }
-
-    // private:
-    glm::vec3 pos;
-    glm::vec3 dirUp;
-
-    // Just some flags for outside usage not to duplicate the checking logic in multiple places.
-    // Must be manually reset by resetChanged().
-    // bool positionChanged = true;
-    // bool rotationChanged = true;
+    glm::vec3 pos   = {0, 0, 0};
+    glm::vec3 dirUp = {0, 1, 0};
 
     // NOTE 0-degree direction is towards -Z
     float pitch = 0.0f; /* (-90;+90) */
@@ -67,9 +24,40 @@ struct HmlCamera {
 
     std::optional<glm::mat4> cachedView = std::nullopt;
 
-    void recacheView() noexcept;
     static glm::vec3 calcDirForward(float pitch, float yaw) noexcept;
     glm::vec3 calcDirRight() const noexcept;
+
+    inline void invalidateCache() noexcept { cachedView = std::nullopt; }
+
+    inline const glm::mat4& view() noexcept {
+        if (!cachedView) recacheView();
+        return *cachedView;
+    }
+
+    virtual void recacheView() noexcept = 0;
+    virtual inline void handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, float dt, bool ignore) noexcept {}
+    virtual void printStats() const noexcept = 0;
+
+    virtual inline ~HmlCamera() noexcept {}
 };
+
+struct HmlCameraFreeFly : HmlCamera {
+    void recacheView() noexcept override;
+    void handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, float dt, bool ignore) noexcept override;
+    void printStats() const noexcept override;
+
+    void rotateDir(float dPitch, float dYaw) noexcept;
+    void forward(float length) noexcept;
+    void right(float length) noexcept;
+    void lift(float length) noexcept;
+
+    virtual inline ~HmlCameraFreeFly() noexcept {}
+};
+
+// struct HmlCameraFollow : HmlCamera {
+//     void handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, float dt, bool ignore) noexcept override;
+//     void printStats() const noexcept override;
+// };
+
 
 #endif

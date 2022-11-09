@@ -151,7 +151,7 @@ void HmlCameraFollow::handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, f
         else if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_ALT)   == GLFW_PRESS) length *= boostDown;
 
         if (glfwGetKey(hmlWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS) distance += length;
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_C)     == GLFW_PRESS) distance -= -length;
+        if (glfwGetKey(hmlWindow->window, GLFW_KEY_C)     == GLFW_PRESS) distance -= length;
     }
 
     // Mouse

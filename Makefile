@@ -1,4 +1,9 @@
-run: $(mainFileName)
+compile:
+	$(MAKE) -C libs/imgui compileLibs
+	$(MAKE) -C shaders compileShaders
+	$(MAKE) -C src compileCode
+
+run:
 	$(MAKE) -C libs/imgui compileLibs
 	$(MAKE) -C shaders compileShaders
 	$(MAKE) -C src compileCode

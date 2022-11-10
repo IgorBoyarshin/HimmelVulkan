@@ -474,7 +474,24 @@ bool Himmel::init() noexcept {
 
             hmlRenderer->specifyStaticEntitiesToRender(staticEntities);
         }
+
+        { // Physics Entities
+            hmlPhysics = std::make_unique<HmlPhysics>();
+            {
+                const auto id = hmlPhysics->registerObject(HmlPhysics::Object::createBox({0,0,0}, {100,100,100}));
+                physicsIdToEntity[id] = entities.back(); // TODO
+            }
+            {
+                const auto id = hmlPhysics->registerObject(HmlPhysics::Object::createSphere({0,10,0}, 5));
+                physicsIdToEntity[id] = entities.back(); // TODO
+            }
+            {
+                const auto id = hmlPhysics->registerObject(HmlPhysics::Object::createSphere({10,10,20}, 8));
+                physicsIdToEntity[id] = entities.back(); // TODO
+            }
+        }
     }
+
 
     if (!prepareResources()) return false;
 
@@ -952,7 +969,7 @@ bool Himmel::prepareResources() noexcept {
 
     // Perform initial layout transitions to set up the layouts as they would
     // have been before starting the next iteration in an ongoing looping.
-    { 
+    {
         VkCommandBuffer commandBuffer = hmlContext->hmlCommands->beginSingleTimeCommands();
 
         // NOTE oldLayout is correct for the moment because the resources have just been created with correct layouts specified

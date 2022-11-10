@@ -34,6 +34,7 @@
 #include "HmlImguiRenderer.h"
 #include "HmlImgui.h"
 #include "HmlContext.h"
+#include "HmlPhysics.h"
 
 #include "../libs/stb_image.h"
 
@@ -246,6 +247,11 @@ struct Himmel {
     std::vector<std::shared_ptr<HmlImageResource>> mainTextures;
     std::vector<std::shared_ptr<HmlImageResource>> hmlDepthResources;
     std::vector<std::shared_ptr<HmlImageResource>> hmlShadows;
+
+
+    // Physics
+    std::unique_ptr<HmlPhysics> hmlPhysics;
+    std::unordered_map<HmlPhysics::Id, std::shared_ptr<HmlRenderer::Entity>> physicsIdToEntity;
 
 
     std::unique_ptr<World> world;

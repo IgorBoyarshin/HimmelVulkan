@@ -15,6 +15,7 @@ std::unique_ptr<HmlWindow> HmlWindow::create(uint32_t width, uint32_t height, co
     // glfwSetWindowOpacity(hmlWindow->window, 0.7f);
     glfwSetWindowUserPointer(hmlWindow->window, hmlWindow); // to be used inside resizeCallback
     glfwSetFramebufferSizeCallback(hmlWindow->window, resizeCallback);
+    glfwSetScrollCallback(hmlWindow->window, scrollCallback);
     // glfwSetInputMode(hmlWindow->window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
     glfwSetInputMode(hmlWindow->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -40,6 +41,13 @@ void HmlWindow::resizeCallback(GLFWwindow* window, int width, int height) noexce
     std::cout << ":> Resize request triggered through GLFW callback.\n";
     auto app = reinterpret_cast<HmlWindow*>(glfwGetWindowUserPointer(window));
     app->framebufferResizeRequested = true;
+}
+
+
+void HmlWindow::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) noexcept {
+    auto app = reinterpret_cast<HmlWindow*>(glfwGetWindowUserPointer(window));
+    app->scrollDiff.first  += xoffset;
+    app->scrollDiff.second += yoffset;
 }
 
 

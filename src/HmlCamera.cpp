@@ -142,16 +142,19 @@ glm::mat4 HmlCameraFollow::view() noexcept {
 void HmlCameraFollow::handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, float dt, bool ignore) noexcept {
     // Keyboard
     if (!ignore) {
-        constexpr float movementSpeed = 16.0f;
-        constexpr float boostUp       = 10.0f;
+        constexpr float movementSpeed = 700.0f;
+        constexpr float boostUp       = 5.0f;
         constexpr float boostDown     = 0.2f;
 
         float length = movementSpeed * dt;
         if      (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) length *= boostUp;
         else if (glfwGetKey(hmlWindow->window, GLFW_KEY_LEFT_ALT)   == GLFW_PRESS) length *= boostDown;
 
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS) distance += length;
-        if (glfwGetKey(hmlWindow->window, GLFW_KEY_C)     == GLFW_PRESS) distance -= length;
+        constexpr float minDistance = 0.1f;
+        constexpr float maxDistance = 2000.0f;
+        distance += -length * hmlWindow->scrollDiff.second;
+        if (distance < minDistance) distance = minDistance;
+        if (distance > maxDistance) distance = maxDistance;
     }
 
     // Mouse

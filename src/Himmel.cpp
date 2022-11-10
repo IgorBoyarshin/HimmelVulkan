@@ -625,6 +625,8 @@ bool Himmel::run() noexcept {
 #endif // WITH_IMGUI
 
         hmlContext->currentFrame++;
+
+        hmlContext->hmlWindow->resetScrollState();
     }
     vkDeviceWaitIdle(hmlContext->hmlDevice->device);
     return true;

@@ -17,9 +17,30 @@
 
 
 struct HmlRenderPass {
+    struct LoadColor {
+        enum class Type {
+            Clear, Load, DontCare
+        } type;
+
+        std::optional<VkClearColorValue> clearColor;
+
+        inline static LoadColor Clear(VkClearColorValue clearColor) noexcept {
+            return LoadColor(Type::Clear, { clearColor });
+        }
+        inline static LoadColor Load() noexcept {
+            return LoadColor(Type::Load, std::nullopt);
+        }
+        inline static LoadColor DontCare() noexcept {
+            return LoadColor(Type::DontCare, std::nullopt);
+        }
+
+        private:
+        inline LoadColor(Type type, std::optional<VkClearColorValue> clearColor) noexcept : type(type), clearColor(std::move(clearColor)) {}
+    };
+
     struct ColorAttachment {
         std::vector<std::shared_ptr<HmlImageResource>> imageResources;
-        std::optional<VkClearColorValue> clearColor;
+        LoadColor loadColor;
         VkImageLayout preLayout;
         VkImageLayout postLayout;
     };

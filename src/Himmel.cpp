@@ -1003,25 +1003,25 @@ bool Himmel::prepareResources() noexcept {
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferPositions,
-                .clearColor = {{ VERY_FAR, VERY_FAR, VERY_FAR, 1.0f }},
+                .loadColor = HmlRenderPass::LoadColor::Clear({ VERY_FAR, VERY_FAR, VERY_FAR, 1.0f }),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferNormals,
-                .clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }},
+                .loadColor = HmlRenderPass::LoadColor::Clear({ 0.0f, 0.0f, 0.0f, 1.0f }),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferColors,
-                .clearColor = {{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }},
+                .loadColor = HmlRenderPass::LoadColor::Clear({ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferLightSpacePositions,
-                .clearColor = {{ 2.0f, 2.0f, 2.0f, 2.0f }}, // TODO i dunno!!!
+                .loadColor = HmlRenderPass::LoadColor::Clear({ 2.0f, 2.0f, 2.0f, 2.0f }), // TODO i dunno!
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
@@ -1047,7 +1047,7 @@ bool Himmel::prepareResources() noexcept {
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = mainTextures,
-                .clearColor = {{ 1.0f, 0.0f, 0.0f, 1.0f }},
+                .loadColor = HmlRenderPass::LoadColor::DontCare(),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             },
@@ -1093,13 +1093,13 @@ bool Himmel::prepareResources() noexcept {
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = mainTextures,
-                .clearColor = std::nullopt,
+                .loadColor = HmlRenderPass::LoadColor::Load(),
                 .preLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = brightness1Textures,
-                .clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }},
+                .loadColor = HmlRenderPass::LoadColor::Clear({ 0.0f, 0.0f, 0.0f, 1.0f }),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
@@ -1142,7 +1142,7 @@ bool Himmel::prepareResources() noexcept {
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = hmlContext->hmlSwapchain->imageResources,
-                .clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }}, // TODO confirm that validation complains otherwise
+                .loadColor = HmlRenderPass::LoadColor::DontCare(),
                 .preLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                 .postLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             },
@@ -1176,7 +1176,7 @@ bool Himmel::prepareResources() noexcept {
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = hmlContext->hmlSwapchain->imageResources,
-                .clearColor = std::nullopt,
+                .loadColor = HmlRenderPass::LoadColor::Load(),
                 .preLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             },

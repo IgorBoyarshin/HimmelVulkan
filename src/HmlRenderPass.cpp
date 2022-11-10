@@ -46,11 +46,18 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
 
         assert(!attachment.imageResources.empty() && "::> ColorAttachment with no imageResources.");
         const auto imageFormat = attachment.imageResources[0]->format;
+        VkAttachmentLoadOp loadOp;
+        switch (attachment.loadColor.type) {
+            case LoadColor::Type::Clear:    loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; break;
+            case LoadColor::Type::Load:     loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; break;
+            case LoadColor::Type::DontCare: loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; break;
+            default: assert(false && "::> Unexpected loadColor type.");
+        }
         attachments.push_back({
             .flags = 0,
             .format = imageFormat,
             .samples = VK_SAMPLE_COUNT_1_BIT, // multisampling
-            .loadOp = attachment.clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
+            .loadOp = loadOp,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -170,7 +177,7 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
     // Prepare and store clearValues for beginRenderPass
     for (const auto& attachment : config.colorAttachments) {
         VkClearValue value;
-        value.color = attachment.clearColor.value_or(VkClearColorValue{}),
+        value.color = attachment.loadColor.clearColor.value_or(VkClearColorValue{}),
         hmlRenderPass->clearValues.push_back(value); // will be ignored if not used
     }
     if (config.depthStencilAttachment) {

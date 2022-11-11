@@ -2,8 +2,8 @@
 
 
 void HmlCameraFreeFly::rotateDir(float dPitch, float dYaw) noexcept {
-    static const float MIN_PITCH = -89.0f;
-    static const float MAX_PITCH = +89.0f;
+    static const float MIN_PITCH = -89.9f;
+    static const float MAX_PITCH = +89.9f;
     static const float YAW_PERIOD = 360.0f;
 
     pitch += dPitch;
@@ -117,8 +117,8 @@ glm::mat4 HmlCameraFreeFly::view() noexcept {
 
 
 void HmlCameraFollow::rotateDir(float dPitch, float dYaw) noexcept {
-    static const float MIN_PITCH = -89.0f;
-    static const float MAX_PITCH = +89.0f;
+    static const float MIN_PITCH = -89.9f;
+    static const float MAX_PITCH = +89.9f;
     static const float YAW_PERIOD = 360.0f;
 
     pitch += dPitch;

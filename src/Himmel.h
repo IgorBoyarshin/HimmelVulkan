@@ -221,6 +221,7 @@ struct Himmel {
 
     struct FrameStats {
         HmlDispatcher::FrameResult::Stats cpu;
+        float elapsedMicrosPhysics = 0;
         float elapsedMicrosGpu = 0;
     } frameStats;
 

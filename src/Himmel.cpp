@@ -186,7 +186,7 @@ bool Himmel::init() noexcept {
         const auto color = glm::vec3(1.0, 1.0, 1.0);
         pointLightsStatic.push_back(HmlLightRenderer::PointLight{
             .color = color,
-            .intensity = 100.0f,
+            .intensity = 10.0f,
             .position = pos,
             .radius = LIGHT_RADIUS,
         });
@@ -217,12 +217,12 @@ bool Himmel::init() noexcept {
     hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
 
-    // hmlCamera = std::make_unique<HmlCameraFreeFly>();
-    // hmlCamera->pos = { 205.0f, 135.0f, 215.0f };
-    // dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
-    hmlCamera = std::make_unique<HmlCameraFollow>(100);
-    dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
-    dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->target(car);
+    // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 205.0f, 135.0f, 215.0f });
+    hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 27.0f, 100.0f, 18.0f });
+    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-65.0f, 310.0f);
+    // hmlCamera = std::make_unique<HmlCameraFollow>(100);
+    // dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
+    // dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->target(car);
 
     proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
 
@@ -338,6 +338,16 @@ bool Himmel::init() noexcept {
             models.push_back(model);
         }
 
+        { // Sphere
+            std::vector<HmlSimpleModel::Vertex> vertices;
+            std::vector<uint32_t> indices;
+            if (!HmlSimpleModel::load("../models/sphere.obj", vertices, indices)) return false;
+
+            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+            models.push_back(model);
+        }
+
         const auto& phonyModel = models[0];
         const auto& flatModel = models[1];
         const auto& vikingModel = models[2];
@@ -345,9 +355,51 @@ bool Himmel::init() noexcept {
         const auto& carModel = models[4];
         const auto& treeModel = models[5];
         const auto& treeModel2 = models[6];
+        const auto& sphereModel = models[7];
 
 
         // Add Entities
+
+        { // Physics Entities
+            hmlPhysics = std::make_unique<HmlPhysics>();
+            // {
+            //     auto object = HmlPhysics::Object::createBox({0,0,0}, {100,100,100});
+            //     const auto id = hmlPhysics->registerObject(std::move(object));
+            //     physicsIdToEntity[id] = entities.back(); // TODO
+            // }
+            {
+                const float m = 1.0f;
+                auto object = HmlPhysics::Object::createSphere({0,50,0}, m);
+                object.mass = m;
+                object.v = { glm::vec3{4, 0.0f, 4} };
+                const auto s = object.asSphere();
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, s.center);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
+                entities.back()->modelMatrix = modelMatrix;
+
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
+            {
+                const float m = 2.0f;
+                auto object = HmlPhysics::Object::createSphere({10,50,10}, m);
+                object.mass = m;
+                object.v = { glm::vec3{-2,0,-2} };
+                const auto s = object.asSphere();
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, s.center);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
+                entities.back()->modelMatrix = modelMatrix;
+
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
+        }
 
         { // Arbitrary Entities
             // PHONY with a texture
@@ -380,7 +432,7 @@ bool Himmel::init() noexcept {
 
             // Flat surface with a tree
             { // #1
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 0.0f, 0.0f, 0.0f }));
                 auto modelMatrix = glm::mat4(1.0f);
                 modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f, 0.0f });
                 modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
@@ -388,7 +440,7 @@ bool Himmel::init() noexcept {
                 entities.back()->modelMatrix = modelMatrix;
             }
             { // #1 back side
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 0.0f, 0.0f, 0.0f }));
                 auto modelMatrix = glm::mat4(1.0f);
                 modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f - 0.001f, 0.0f });
                 modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
@@ -448,7 +500,7 @@ bool Himmel::init() noexcept {
 
             // XXX We rely on it being last in update() XXX
             entities.push_back(std::make_shared<HmlRenderer::Entity>(carModel, glm::vec3{ 0.2f, 0.7f, 0.4f }));
-            entities.back()->modelMatrix = car->getView();
+            entities.back()->modelMatrix = car->getModelMatrix();
 
 
             hmlRenderer->specifyEntitiesToRender(entities);
@@ -473,22 +525,6 @@ bool Himmel::init() noexcept {
             }
 
             hmlRenderer->specifyStaticEntitiesToRender(staticEntities);
-        }
-
-        { // Physics Entities
-            hmlPhysics = std::make_unique<HmlPhysics>();
-            {
-                const auto id = hmlPhysics->registerObject(HmlPhysics::Object::createBox({0,0,0}, {100,100,100}));
-                physicsIdToEntity[id] = entities.back(); // TODO
-            }
-            {
-                const auto id = hmlPhysics->registerObject(HmlPhysics::Object::createSphere({0,10,0}, 5));
-                physicsIdToEntity[id] = entities.back(); // TODO
-            }
-            {
-                const auto id = hmlPhysics->registerObject(HmlPhysics::Object::createSphere({10,10,20}, 8));
-                physicsIdToEntity[id] = entities.back(); // TODO
-            }
         }
     }
 
@@ -715,7 +751,8 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     const bool cameraIgnoreInput = uiInFocus;
     hmlCamera->handleInput(hmlContext->hmlWindow, dt, cameraIgnoreInput);
 
-    if (!uiInFocus) { // Car movement
+    // Car movement
+    if (!uiInFocus) {
         constexpr float carSpeed = 10.0f;
         constexpr float boostUp = 10.0f;
         constexpr float boostDown = 0.2f;
@@ -734,11 +771,27 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         car->setHeight(worldHeight);
 
         // XXX We rely on the Car to be the last Entity here XXX
-        entities.back()->modelMatrix = car->getView();
+        entities.back()->modelMatrix = car->getModelMatrix();
         // NOTE no need to call hmlRenderer->specifyEntitiesToRender(entities)
         // because the Entities are stored as shared_ptr there, which we have
         // just updated.
     }
+
+
+    for (auto& [id, entity] : physicsIdToEntity) {
+        auto& object = hmlPhysics->getObject(id);
+        if (object.isSphere()) {
+            // std::cout << (object.v)->x << " " << (object.v)->y << "    ";
+            const auto s = object.asSphere();
+            auto modelMatrix = glm::mat4(1.0f);
+            modelMatrix = glm::translate(modelMatrix, s.center);
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
+            entity->modelMatrix = modelMatrix;
+        } else {
+            // TODO
+        }
+    }
+    std::cout << "\n";
 
 
 #ifdef WITH_IMGUI
@@ -812,6 +865,8 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 
     hmlContext->hmlImgui->updateForDt(dt);
+
+    hmlPhysics->updateForDt(dt);
 
 
 #if SNOW_IS_ON

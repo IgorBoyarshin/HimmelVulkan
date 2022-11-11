@@ -133,7 +133,7 @@ struct Himmel {
         Car(const glm::vec3& posCenter, float sizeScaler) : posCenter(posCenter), sizeScaler(sizeScaler) {}
 
         bool cachedViewValid = false;
-        glm::mat4 cachedView;
+        glm::mat4 cachedModelMatrix;
 
         glm::vec3 posCenter;
         glm::vec3 dirForward;
@@ -166,20 +166,20 @@ struct Himmel {
             posCenter.y = height;
         }
 
-        const glm::mat4& getView() noexcept {
+        const glm::mat4& getModelMatrix() noexcept {
             if (!cachedViewValid) [[unlikely]] {
                 cachedViewValid = true;
 
-                cachedView = glm::mat4(1.0f);
-                cachedView = glm::translate(cachedView, posCenter);
-                cachedView = glm::scale(cachedView, glm::vec3{sizeScaler, sizeScaler, sizeScaler});
+                cachedModelMatrix = glm::mat4(1.0f);
+                cachedModelMatrix = glm::translate(cachedModelMatrix, posCenter);
+                cachedModelMatrix = glm::scale(cachedModelMatrix, glm::vec3{sizeScaler, sizeScaler, sizeScaler});
                 // NOTE fix model 90-degree rotation
-                cachedView = glm::rotate(cachedView, glm::radians(-90.0f), glm::vec3{0, 1, 0});
+                cachedModelMatrix = glm::rotate(cachedModelMatrix, glm::radians(-90.0f), glm::vec3{0, 1, 0});
                 // NOTE fix move up
-                cachedView = glm::translate(cachedView, glm::vec3{0.0f, 1.0f, 0.0f});
+                cachedModelMatrix = glm::translate(cachedModelMatrix, glm::vec3{0.0f, 1.0f, 0.0f});
             }
 
-            return cachedView;
+            return cachedModelMatrix;
         }
 
         // void place(float yLeftBack, float yRightBack, float yLeftFront, float yRightFront) {

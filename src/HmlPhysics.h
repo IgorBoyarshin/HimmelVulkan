@@ -21,6 +21,37 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::vec3& v) {
     return stream;
 }
 
+namespace std {
+    inline glm::vec3 abs(const glm::vec3& v) {
+        return glm::vec3{ std::abs(v.x), std::abs(v.y), std::abs(v.z) };
+    }
+
+    // inline glm::vec3 copysign(const glm::vec3& v, const glm::vec3& sign) {
+    //     return glm::vec3{
+    //         std::copysign(v.x, sign.x),
+    //         std::copysign(v.y, sign.y),
+    //         std::copysign(v.z, sign.z)
+    //     };
+    // }
+
+    inline float absmax(const glm::vec3& v) {
+        const auto absV = std::abs(v);
+        float max = v.x;
+        float absMax = absV.x;
+        bool foundNew;
+
+        foundNew = absV.y > absMax;
+        absMax = absMax * (1 - foundNew) + absV.y * foundNew;
+        max    = max    * (1 - foundNew) + v.y    * foundNew;
+
+        foundNew = absV.z > absMax;
+        absMax = absMax * (1 - foundNew) + absV.z * foundNew;
+        max    = max    * (1 - foundNew) + v.z    * foundNew;
+
+        return max;
+    }
+}
+
 
 struct HmlPhysics {
     struct Object {
@@ -37,8 +68,11 @@ struct HmlPhysics {
 
 
         struct DynamicProperties {
-            float mass;
-            glm::vec3 velocity;
+            float mass = std::numeric_limits<float>::max();
+            float invMass = 0.0f; // used in most math
+            glm::vec3 velocity = glm::vec3{};
+            inline DynamicProperties(float m, const glm::vec3& v) noexcept : mass(m), invMass(1.0f / m), velocity(v) {}
+            inline DynamicProperties() noexcept {}
         };
         // std::nullopt means the object is permanently stationary
         std::optional<DynamicProperties> dynamicProperties;
@@ -54,7 +88,6 @@ struct HmlPhysics {
             glm::vec3 halfDimensions;
 
             inline glm::vec3 dimensions() const noexcept { return halfDimensions * 2.0f; }
-            // inline glm::vec3 center() const noexcept { return (finish - start) * 0.5f; }
         };
 
         inline Sphere& asSphere() noexcept {
@@ -89,15 +122,115 @@ struct HmlPhysics {
     };
 
 
-    // Positive means no interaction
-    // abs(Negative) denotes intersection length
-    // NOTE optimization: calc sqrt only when there for sure is an intersection
-    static float interact(const Object::Sphere& s1, const Object::Sphere& s2) noexcept {
+    struct Detection {
+        glm::vec3 dir;
+        float extent;
+    };
+
+    // Returns dir from s1 towards s2
+    static std::optional<Detection> detect(const Object::Sphere& s1, const Object::Sphere& s2) noexcept {
+        const auto c = s2.center - s1.center;
+        const auto lengthC = glm::length(c);
+        const float extent = (s1.radius + s2.radius) - lengthC;
+        if (extent <= 0.0f) return std::nullopt;
+        const auto normC = c / lengthC;
+        return { Detection {
+            .dir = normC,
+            .extent = extent,
+        }};
+    }
+
+
+    // Returns dir from b towards s
+    static std::optional<Detection> detect(const Object::Box& b, const Object::Sphere& s) noexcept {
+        const auto start  = b.center - b.halfDimensions - s.radius;
+        const auto finish = b.center + b.halfDimensions + s.radius;
+        if (start.x < s.center.x && s.center.x < finish.x &&
+            start.y < s.center.y && s.center.y < finish.y &&
+            start.z < s.center.z && s.center.z < finish.z) {
+            // NOTE we care only about the predominant direction, and in terms of math the
+            // radius component has no effect, no we omit it to simplify calculations.
+            const auto centers = s.center - b.center;
+            const auto n = centers / b.halfDimensions;
+            const float max = std::absmax(n);
+            const auto dir = glm::vec3{
+                std::copysign(max == n.x, n.x),
+                std::copysign(max == n.y, n.y),
+                std::copysign(max == n.z, n.z),
+            };
+            const float extent = std::abs(glm::dot(b.halfDimensions, dir)) + s.radius - std::abs(glm::dot(centers, dir)); // NOTE second abs is actually redundant
+            return { Detection{
+                .dir = dir,
+                .extent = extent,
+            }};
+        }
+
+        return std::nullopt;
+    }
+
+
+    static void resolveVelocities(Object& obj1, Object& obj2, const Detection& detection) noexcept {
+        const auto& [dir, extent] = detection;
+
+        const auto obj1DP = obj1.dynamicProperties.value_or(Object::DynamicProperties{});
+        const auto obj2DP = obj2.dynamicProperties.value_or(Object::DynamicProperties{});
+        const auto relativeV = obj2DP.velocity - obj1DP.velocity;
+        if (glm::dot(relativeV, dir) > 0.0f) {
+            // Objects are already moving apart
+            return;
+        }
+        // e == 0 --- perfectly inelastic collision
+        // e == 1 --- perfectly elastic collision, no kinetic energy is dissipated
+        // const float e = std::min(obj1.restitution, obj2.restitution);
+        const float e = 1.0f; // restitution
+        const float j = -(1.0f + e) * glm::dot(relativeV, dir) / (obj1DP.invMass + obj2DP.invMass);
+        const auto impulse = j * dir;
+        if (!obj1.isStationary()) obj1.dynamicProperties->velocity -= impulse * obj1DP.invMass;
+        if (!obj2.isStationary()) obj2.dynamicProperties->velocity += impulse * obj2DP.invMass;
+    }
+
+
+    static void processHardSphereSphere(Object& obj1, Object& obj2, float dt) noexcept {
+        assert(obj1.isSphere() && obj2.isSphere() && "::> Expected to process Sphere and Sphere.");
+
+        auto& s1 = obj1.asSphere();
+        auto& s2 = obj2.asSphere();
+
+        const auto detectionOpt = detect(s1, s2);
+        if (!detectionOpt) return;
+        const auto& [dir, extent] = *detectionOpt;
+
+        if (!obj1.isStationary()) s1.center -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
+        if (!obj2.isStationary()) s2.center += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
+
+        resolveVelocities(obj1, obj2, *detectionOpt);
+    }
+
+
+    static void processHardBoxSphere(Object& obj1, Object& obj2, float dt) noexcept {
+        assert(obj1.isBox() && obj2.isSphere() && "::> Expected to process Box and Sphere.");
+
+        auto& b = obj1.asBox();
+        auto& s = obj2.asSphere();
+
+        const auto detectionOpt = detect(b, s);
+        if (!detectionOpt) return;
+        const auto& [dir, extent] = *detectionOpt;
+
+        if (!obj1.isStationary()) b.center -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
+        if (!obj2.isStationary()) s.center += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
+
+        resolveVelocities(obj1, obj2, *detectionOpt);
+    }
+    // ========================================================================
+    // ========================================================================
+    // ========================================================================
+    static float _interact(const Object::Sphere& s1, const Object::Sphere& s2) noexcept {
         return glm::distance(s1.center, s2.center) - (s1.radius + s2.radius);
     }
 
 
-    static std::optional<glm::vec3> interact(const Object::Sphere& s, const Object::Box& b) noexcept {
+    static std::optional<glm::vec3> _interact(const Object::Sphere& s, const Object::Box& b) noexcept {
         const auto start  = b.center - b.halfDimensions - s.radius;
         const auto finish = b.center + b.halfDimensions + s.radius;
         if (start.x < s.center.x && s.center.x < finish.x &&
@@ -105,15 +238,8 @@ struct HmlPhysics {
             start.z < s.center.z && s.center.z < finish.z) {
             const auto n = s.center - b.center;
             const auto n2 = glm::vec3{std::abs(n.x), std::abs(n.y), std::abs(n.z)};
-            // const auto dimensions = b.halfDimensions * 2.0f;
             const auto norm = n2 / b.halfDimensions;
             const auto max = std::max(std::max(norm.x, norm.y), norm.z);
-
-            // Find penetration dst
-            // float maxPen = std::numeric_limits<float>::min();
-            // maxPen = std::max(maxPen, std::min(s.center.x - start.x, finish.x - s.center.x));
-            // maxPen = std::max(maxPen, std::min(s.center.y - start.y, finish.y - s.center.y));
-            // maxPen = std::max(maxPen, std::min(s.center.z - start.z, finish.z - s.center.z));
 
             return { glm::vec3{ // normalize to correctly output normal for equal directions
                 // (magnitude, sign)
@@ -124,33 +250,16 @@ struct HmlPhysics {
         }
 
         return std::nullopt;
-
-        // const bool posX = s.center.x > b.center.x;
-        // const bool posY = s.center.y > b.center.y;
-        // const bool posZ = s.center.z > b.center.z;
-        // const glm::vec3 start = b.center + b.halfDimensions * (glm::vec3{ posX, posY, posZ } - glm::vec3{ 1 });
-        // const glm::vec3 finish = start + b.halfDimensions;
-        //
-        // const float penX = (finish.x + s.radius) - s.center.x;
-        // // if (penX < 0 && s.center.y < finish.y && s.center.z < finish.z) {
-        // if (s.center.x < (finish.x + s.radius) && s.center.y < finish.y && s.center.z < finish.z) {
-        //     return penX;
-        // }
-
-        // const float right = b.center.x + b.halfDimensions.x;
-        // const bool good = (right < (s.center - s.radius)) || ((s.center + s.radius) < right);
-        //
-        // return glm::distance(s1.center, s2.center) - (s1.radius + s2.radius);
     }
 
 
-    static void processSphereSphere(Object& obj1, Object& obj2, float dt) noexcept {
+    static void _processSoftSphereSphere(Object& obj1, Object& obj2, float dt) noexcept {
         assert(obj1.isSphere() && obj2.isSphere() && "::> Expected to process Sphere and Sphere.");
 
         const auto& s1 = obj1.asSphere();
         const auto& s2 = obj2.asSphere();
 
-        const float d = interact(s1, s2);
+        const float d = _interact(s1, s2);
         if (d >= 0.0f) return; // no interaction
         const float penetration = -d; // positive
 
@@ -164,62 +273,38 @@ struct HmlPhysics {
         const auto forceOn1From2 = forceFunc(extent1) * forceFunc(extent2) * glm::normalize(s1.center - s2.center);
         const auto forceOn2From1 = -forceOn1From2;
 
-        if (!obj1.isStationary()) obj1.dynamicProperties->velocity += forceOn1From2 / obj1.dynamicProperties->mass * dt;
-        if (!obj2.isStationary()) obj2.dynamicProperties->velocity += forceOn2From1 / obj2.dynamicProperties->mass * dt;
+        if (!obj1.isStationary()) obj1.dynamicProperties->velocity += forceOn1From2 * obj1.dynamicProperties->invMass * dt;
+        if (!obj2.isStationary()) obj2.dynamicProperties->velocity += forceOn2From1 * obj2.dynamicProperties->invMass * dt;
     }
 
 
-    static void processSphereBox(Object& obj1, Object& obj2, float dt) noexcept {
+    static void _processSoftSphereBox(Object& obj1, Object& obj2, float dt) noexcept {
         assert(obj1.isSphere() && obj2.isBox() && "::> Expected to process Sphere and Box.");
 
         const auto& s = obj1.asSphere();
         const auto& b = obj2.asBox();
 
-        const auto penOpt = interact(s, b);
+        const auto penOpt = _interact(s, b);
         if (!penOpt) return;
         const auto dir = *penOpt;
-        // std::cout << "dir=" << dir.x << " " << dir.y << " " << dir.z << '\n';
 
-        // const float extent1 = dir / s.radius;
-        // const float extent2 = dir / b.halfDimensions;
         static const auto forceFunc = [](const glm::vec3& arg){
             const float mult = 10000.0f;
             return mult * glm::vec3{
-                std::copysign(arg.x *arg.x * arg.x, arg.x),
-                std::copysign(arg.y *arg.y * arg.y, arg.y),
-                std::copysign(arg.z *arg.z * arg.z, arg.z)
+                std::copysign(arg.x * arg.x * arg.x, arg.x),
+                std::copysign(arg.y * arg.y * arg.y, arg.y),
+                std::copysign(arg.z * arg.z * arg.z, arg.z)
             };
         };
 
         const auto forceOnSFromB = forceFunc(dir) / s.radius / b.halfDimensions;
-        // std::cout << "F=" << forceOnSFromB << '\n';
-        // std::cout << "S=" << s.center << '\n';
-        // std::cout << "V=" << obj1.dynamicProperties->velocity << '\n';
         const auto forceOnBFromS = -forceOnSFromB;
 
-        if (!obj1.isStationary()) obj1.dynamicProperties->velocity += forceOnSFromB / obj1.dynamicProperties->mass * dt;
-        if (!obj2.isStationary()) obj2.dynamicProperties->velocity += forceOnBFromS / obj2.dynamicProperties->mass * dt;
+        if (!obj1.isStationary()) obj1.dynamicProperties->velocity += forceOnSFromB * obj1.dynamicProperties->invMass * dt;
+        if (!obj2.isStationary()) obj2.dynamicProperties->velocity += forceOnBFromS * obj2.dynamicProperties->invMass * dt;
     }
-
-
+    // ========================================================================
     inline void updateForDt(float dt) noexcept {
-        // Apply interaction onto velocity change
-        for (size_t i = 0; i < objects.size(); i++) {
-            auto& obj1 = objects[i];
-            for (size_t j = i + 1; j < objects.size(); j++) {
-                auto& obj2 = objects[j];
-
-                if (obj1.isStationary() && obj2.isStationary()) continue;
-
-                if      (obj1.isSphere() && obj2.isSphere()) processSphereSphere(obj1, obj2, dt);
-                else if (obj1.isSphere() && obj2.isBox())    processSphereBox(obj1, obj2, dt);
-                else if (obj1.isBox()    && obj2.isSphere()) processSphereBox(obj2, obj1, dt);
-                else {
-                    // TODO
-                }
-            }
-        }
-
         // Apply velocity onto position change
         for (auto& obj : objects) {
             if (obj.isStationary()) continue;
@@ -232,8 +317,25 @@ struct HmlPhysics {
                 // TODO
             }
         }
-    }
 
+        // Check for and handle collisions
+        for (size_t i = 0; i < objects.size(); i++) {
+            auto& obj1 = objects[i];
+            for (size_t j = i + 1; j < objects.size(); j++) {
+                auto& obj2 = objects[j];
+
+                if (obj1.isStationary() && obj2.isStationary()) continue;
+
+                if      (obj1.isSphere() && obj2.isSphere()) processHardSphereSphere(obj1, obj2, dt);
+                else if (obj1.isBox()    && obj2.isSphere()) processHardBoxSphere(obj1, obj2, dt);
+                else if (obj1.isSphere() && obj2.isBox())    processHardBoxSphere(obj2, obj1, dt);
+                else {
+                    // TODO
+                }
+            }
+        }
+    }
+    // ========================================================================
     using Id = uint32_t;
     static constexpr Id INVALID_ID = 0;
 
@@ -254,8 +356,9 @@ struct HmlPhysics {
 
     std::vector<Object> objects;
     std::vector<Id> ids;
-
-
+    // ========================================================================
+    // ========================================================================
+    // ========================================================================
     struct LineIntersectsTriangleResult {
         float t;
         float u;
@@ -288,8 +391,7 @@ struct HmlPhysics {
             }};
         } else return std::nullopt;
     }
-
-
+    // ========================================================================
     static float pointToLineDstSqr(const glm::vec3& point, const glm::vec3& l1, const glm::vec3& l2) noexcept {
         const auto nom = glm::cross(l1 - l2, l2 - point);
         const float nomSqr = glm::dot(nom, nom);

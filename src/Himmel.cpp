@@ -341,7 +341,7 @@ bool Himmel::init() noexcept {
         { // Sphere
             std::vector<HmlSimpleModel::Vertex> vertices;
             std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/sphere.obj", vertices, indices)) return false;
+            if (!HmlSimpleModel::load("../models/isosphere.obj", vertices, indices)) return false;
 
             const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
             const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
@@ -383,7 +383,7 @@ bool Himmel::init() noexcept {
             // }
 
             hmlPhysics = std::make_unique<HmlPhysics>();
-            const float wallThickness = 5.0f;
+            const float wallThickness = 2.0f;
             const float halfSide = 50.0f;
             const float halfHeight = 10.0f;
             { // Bottom
@@ -458,7 +458,7 @@ bool Himmel::init() noexcept {
             }
 
 
-            const size_t spheresCount = 100;
+            const size_t spheresCount = 20;
             for (size_t i = 0; i < spheresCount; i++) {
                 const auto pos = glm::vec3{
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
@@ -467,9 +467,9 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
                 };
                 const auto v = glm::vec3{
-                    hml::getRandomUniformFloat(0.0f, 10.0f),
+                    hml::getRandomUniformFloat(-10.0f, 10.0f),
                     0.0f,
-                    hml::getRandomUniformFloat(0.0f, 10.0f)
+                    hml::getRandomUniformFloat(-10.0f, 10.0f)
                 };
                 const auto color = glm::vec3{
                     hml::getRandomUniformFloat(0.0f, 1.0f),
@@ -479,10 +479,7 @@ bool Himmel::init() noexcept {
 
                 const float m = hml::getRandomUniformFloat(1.0f, 5.0f);
                 auto object = HmlPhysics::Object::createSphere(pos, m);
-                object.dynamicProperties = { HmlPhysics::Object::DynamicProperties{
-                    .mass = m,
-                    .velocity = v,
-                }};
+                object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, v) };
                 const auto& s = object.asSphere();
 
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, color));
@@ -494,37 +491,50 @@ bool Himmel::init() noexcept {
                 const auto id = hmlPhysics->registerObject(std::move(object));
                 physicsIdToEntity[id] = entities.back();
             }
-            // {
-            //     const float m = 5.0f;
-            //     auto object = HmlPhysics::Object::createSphere({35,60,10}, m);
+            {
+                const float m = 6.0f;
+                auto object = HmlPhysics::Object::createSphere({20,60,10}, m);
+                object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, { 1, 0, 0 }) };
+                const auto& s = object.asSphere();
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, glm::vec3{ 0.8f, 0.8f, 0.3f}));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, s.center);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
+                entities.back()->modelMatrix = modelMatrix;
+
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
+            {
+                const float m = 1.0f;
+                auto object = HmlPhysics::Object::createSphere({40,60,10}, m);
+                object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, { -11, 0, 0 }) };
+                const auto& s = object.asSphere();
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, glm::vec3{ 0.8f, 0.2f, 0.5f}));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, s.center);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
+                entities.back()->modelMatrix = modelMatrix;
+
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
+            // { // Dyn wall
+            //     const float halfSide = 10.0f;
+            //     const float halfHeight = 5.0f;
+            //     auto object = HmlPhysics::Object::createBox({ +halfSide, 50 + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
             //     object.dynamicProperties = { HmlPhysics::Object::DynamicProperties{
-            //         .mass = m,
-            //         .velocity = {-3, 0, 17},
+            //         .mass = 10.0f,
+            //         .velocity = {0, 0, 0},
             //     }};
-            //     const auto& s = object.asSphere();
+            //     const auto& b = object.asBox();
             //
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, glm::vec3{ 0.8f, 0.8f, 0.3f}));
+            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.2f, 0.2f, 0.2f}));
             //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, s.center);
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
-            //     entities.back()->modelMatrix = modelMatrix;
-            //
-            //     const auto id = hmlPhysics->registerObject(std::move(object));
-            //     physicsIdToEntity[id] = entities.back();
-            // }
-            // {
-            //     const float m = 2.0f;
-            //     auto object = HmlPhysics::Object::createSphere({30,60,40}, m);
-            //     object.dynamicProperties = { HmlPhysics::Object::DynamicProperties{
-            //         .mass = m,
-            //         .velocity = {-9, 0, -7},
-            //     }};
-            //     const auto& s = object.asSphere();
-            //
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, glm::vec3{ 0.8f, 0.2f, 0.5f}));
-            //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, s.center);
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
+            //     modelMatrix = glm::translate(modelMatrix, b.center);
+            //     modelMatrix = glm::scale(modelMatrix, b.halfDimensions);
             //     entities.back()->modelMatrix = modelMatrix;
             //
             //     const auto id = hmlPhysics->registerObject(std::move(object));

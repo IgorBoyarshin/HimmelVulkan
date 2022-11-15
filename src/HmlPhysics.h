@@ -60,6 +60,15 @@ struct HmlPhysics {
         struct AABB {
             glm::vec3 begin;
             glm::vec3 end;
+
+            inline bool intersects(const AABB& other) const noexcept {
+                return (begin.x       < other.end.x &&
+                        other.begin.x < end.x       &&
+                        begin.y       < other.end.y &&
+                        other.begin.y < end.y       &&
+                        begin.z       < other.end.z &&
+                        other.begin.z < end.z);
+            }
         };
         inline AABB aabb() const noexcept {
             switch (type) {

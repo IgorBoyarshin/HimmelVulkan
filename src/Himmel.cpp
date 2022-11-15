@@ -458,7 +458,45 @@ bool Himmel::init() noexcept {
             }
 
 
-            const size_t spheresCount = 20;
+            const size_t boxesCount = 20;
+            const size_t spheresCount = 100;
+            for (size_t i = 0; i < boxesCount; i++) {
+                const auto pos = glm::vec3{
+                    hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
+                    60,
+                    // hml::getRandomUniformFloat(55, 65),
+                    hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
+                };
+                const auto v = glm::vec3{
+                    hml::getRandomUniformFloat(-10.0f, 10.0f),
+                    0.0f,
+                    hml::getRandomUniformFloat(-10.0f, 10.0f)
+                };
+                const auto color = glm::vec3{
+                    hml::getRandomUniformFloat(0.0f, 1.0f),
+                    hml::getRandomUniformFloat(0.0f, 1.0f),
+                    hml::getRandomUniformFloat(0.0f, 1.0f)
+                };
+                const auto halfDimensions = glm::vec3{
+                    hml::getRandomUniformFloat(1.0f, 4.0f),
+                    hml::getRandomUniformFloat(1.0f, 4.0f),
+                    hml::getRandomUniformFloat(1.0f, 4.0f)
+                };
+
+                const float m = std::max(halfDimensions.x, std::max(halfDimensions.y, halfDimensions.z));
+                auto object = HmlPhysics::Object::createBox(pos, halfDimensions);
+                object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, v) };
+                const auto& b = object.asBox();
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, color));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, b.center);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(b.halfDimensions));
+                entities.back()->modelMatrix = modelMatrix;
+
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
             for (size_t i = 0; i < spheresCount; i++) {
                 const auto pos = glm::vec3{
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
@@ -477,7 +515,7 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.0f, 1.0f)
                 };
 
-                const float m = hml::getRandomUniformFloat(1.0f, 5.0f);
+                const float m = hml::getRandomUniformFloat(1.0f, 4.0f);
                 auto object = HmlPhysics::Object::createSphere(pos, m);
                 object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, v) };
                 const auto& s = object.asSphere();

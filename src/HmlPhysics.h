@@ -149,7 +149,8 @@ struct HmlPhysics {
             start.y < s.center.y && s.center.y < finish.y &&
             start.z < s.center.z && s.center.z < finish.z) {
             // NOTE we care only about the predominant direction, and in terms of math the
-            // radius component has no effect, no we omit it to simplify calculations.
+            // radius component has no effect because it is the same in all directions, so
+            // we omit it to simplify calculations.
             const auto centers = s.center - b.center;
             const auto n = centers / b.halfDimensions;
             const float max = std::absmax(n);
@@ -158,7 +159,35 @@ struct HmlPhysics {
                 std::copysign(max == n.y, n.y),
                 std::copysign(max == n.z, n.z),
             };
-            const float extent = std::abs(glm::dot(b.halfDimensions, dir)) + s.radius - std::abs(glm::dot(centers, dir)); // NOTE second abs is actually redundant
+            // NOTE second abs is actually redundant because "dir" has the same sign as "centers"
+            const float extent = std::abs(glm::dot(b.halfDimensions, dir)) + s.radius - std::abs(glm::dot(centers, dir));
+            return { Detection{
+                .dir = dir,
+                .extent = extent,
+            }};
+        }
+
+        return std::nullopt;
+    }
+
+
+    // Returns dir from b1 towards b2
+    static std::optional<Detection> detect(const Object::Box& b1, const Object::Box& b2) noexcept {
+        const auto start  = b1.center - b1.halfDimensions - b2.halfDimensions;
+        const auto finish = b1.center + b1.halfDimensions + b2.halfDimensions;
+        if (start.x < b2.center.x && b2.center.x < finish.x &&
+            start.y < b2.center.y && b2.center.y < finish.y &&
+            start.z < b2.center.z && b2.center.z < finish.z) {
+            const auto centers = b2.center - b1.center;
+            const auto n = centers / (b1.halfDimensions + b2.halfDimensions);
+            const float max = std::absmax(n);
+            const auto dir = glm::vec3{
+                std::copysign(max == n.x, n.x),
+                std::copysign(max == n.y, n.y),
+                std::copysign(max == n.z, n.z),
+            };
+            // NOTE second abs is actually redundant because dir has the same sign as centers
+            const float extent = std::abs(glm::dot(b1.halfDimensions + b2.halfDimensions, dir)) - std::abs(glm::dot(centers, dir));
             return { Detection{
                 .dir = dir,
                 .extent = extent,
@@ -190,7 +219,7 @@ struct HmlPhysics {
     }
 
 
-    static void processHardSphereSphere(Object& obj1, Object& obj2, float dt) noexcept {
+    static void processSphereSphere(Object& obj1, Object& obj2) noexcept {
         assert(obj1.isSphere() && obj2.isSphere() && "::> Expected to process Sphere and Sphere.");
 
         auto& s1 = obj1.asSphere();
@@ -207,7 +236,7 @@ struct HmlPhysics {
     }
 
 
-    static void processHardBoxSphere(Object& obj1, Object& obj2, float dt) noexcept {
+    static void processBoxSphere(Object& obj1, Object& obj2) noexcept {
         assert(obj1.isBox() && obj2.isSphere() && "::> Expected to process Box and Sphere.");
 
         auto& b = obj1.asBox();
@@ -222,115 +251,48 @@ struct HmlPhysics {
 
         resolveVelocities(obj1, obj2, *detectionOpt);
     }
-    // ========================================================================
-    // ========================================================================
-    // ========================================================================
-    static float _interact(const Object::Sphere& s1, const Object::Sphere& s2) noexcept {
-        return glm::distance(s1.center, s2.center) - (s1.radius + s2.radius);
-    }
 
 
-    static std::optional<glm::vec3> _interact(const Object::Sphere& s, const Object::Box& b) noexcept {
-        const auto start  = b.center - b.halfDimensions - s.radius;
-        const auto finish = b.center + b.halfDimensions + s.radius;
-        if (start.x < s.center.x && s.center.x < finish.x &&
-            start.y < s.center.y && s.center.y < finish.y &&
-            start.z < s.center.z && s.center.z < finish.z) {
-            const auto n = s.center - b.center;
-            const auto n2 = glm::vec3{std::abs(n.x), std::abs(n.y), std::abs(n.z)};
-            const auto norm = n2 / b.halfDimensions;
-            const auto max = std::max(std::max(norm.x, norm.y), norm.z);
+    static void processBoxBox(Object& obj1, Object& obj2) noexcept {
+        assert(obj1.isBox() && obj2.isBox() && "::> Expected to process Box and Box.");
 
-            return { glm::vec3{ // normalize to correctly output normal for equal directions
-                // (magnitude, sign)
-                std::copysign((max == norm.x) * (b.halfDimensions.x + s.radius - n2.x), n.x),
-                std::copysign((max == norm.y) * (b.halfDimensions.y + s.radius - n2.y), n.y),
-                std::copysign((max == norm.z) * (b.halfDimensions.z + s.radius - n2.z), n.z)
-            }};
-        }
+        auto& b1 = obj1.asBox();
+        auto& b2 = obj2.asBox();
 
-        return std::nullopt;
-    }
+        const auto detectionOpt = detect(b1, b2);
+        if (!detectionOpt) return;
+        const auto& [dir, extent] = *detectionOpt;
 
+        if (!obj1.isStationary()) b1.center -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
+        if (!obj2.isStationary()) b2.center += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
 
-    static void _processSoftSphereSphere(Object& obj1, Object& obj2, float dt) noexcept {
-        assert(obj1.isSphere() && obj2.isSphere() && "::> Expected to process Sphere and Sphere.");
-
-        const auto& s1 = obj1.asSphere();
-        const auto& s2 = obj2.asSphere();
-
-        const float d = _interact(s1, s2);
-        if (d >= 0.0f) return; // no interaction
-        const float penetration = -d; // positive
-
-        const float extent1 = penetration / s1.radius;
-        const float extent2 = penetration / s2.radius;
-        static const auto forceFunc = [](float arg){
-            const float mult = 100.0f;
-            return mult * arg * arg;
-        };
-
-        const auto forceOn1From2 = forceFunc(extent1) * forceFunc(extent2) * glm::normalize(s1.center - s2.center);
-        const auto forceOn2From1 = -forceOn1From2;
-
-        if (!obj1.isStationary()) obj1.dynamicProperties->velocity += forceOn1From2 * obj1.dynamicProperties->invMass * dt;
-        if (!obj2.isStationary()) obj2.dynamicProperties->velocity += forceOn2From1 * obj2.dynamicProperties->invMass * dt;
-    }
-
-
-    static void _processSoftSphereBox(Object& obj1, Object& obj2, float dt) noexcept {
-        assert(obj1.isSphere() && obj2.isBox() && "::> Expected to process Sphere and Box.");
-
-        const auto& s = obj1.asSphere();
-        const auto& b = obj2.asBox();
-
-        const auto penOpt = _interact(s, b);
-        if (!penOpt) return;
-        const auto dir = *penOpt;
-
-        static const auto forceFunc = [](const glm::vec3& arg){
-            const float mult = 10000.0f;
-            return mult * glm::vec3{
-                std::copysign(arg.x * arg.x * arg.x, arg.x),
-                std::copysign(arg.y * arg.y * arg.y, arg.y),
-                std::copysign(arg.z * arg.z * arg.z, arg.z)
-            };
-        };
-
-        const auto forceOnSFromB = forceFunc(dir) / s.radius / b.halfDimensions;
-        const auto forceOnBFromS = -forceOnSFromB;
-
-        if (!obj1.isStationary()) obj1.dynamicProperties->velocity += forceOnSFromB * obj1.dynamicProperties->invMass * dt;
-        if (!obj2.isStationary()) obj2.dynamicProperties->velocity += forceOnBFromS * obj2.dynamicProperties->invMass * dt;
+        resolveVelocities(obj1, obj2, *detectionOpt);
     }
     // ========================================================================
     inline void updateForDt(float dt) noexcept {
-        // Apply velocity onto position change
-        for (auto& obj : objects) {
-            if (obj.isStationary()) continue;
+        const uint8_t SUBSTEPS = 1;
+        const float subDt = dt / SUBSTEPS;
+        for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
+            // Apply velocity onto position change
+            for (auto& obj : objects) {
+                if (obj.isStationary()) continue;
 
-            if (obj.isSphere()) {
-                obj.asSphere().center += obj.dynamicProperties->velocity * dt;
-            } else if (obj.isBox()) {
-                obj.asBox().center += obj.dynamicProperties->velocity * dt;
-            } else {
-                // TODO
+                if      (obj.isSphere()) obj.asSphere().center += obj.dynamicProperties->velocity * subDt;
+                else if (obj.isBox())    obj.asBox().center    += obj.dynamicProperties->velocity * subDt;
             }
-        }
 
-        // Check for and handle collisions
-        for (size_t i = 0; i < objects.size(); i++) {
-            auto& obj1 = objects[i];
-            for (size_t j = i + 1; j < objects.size(); j++) {
-                auto& obj2 = objects[j];
+            // Check for and handle collisions
+            for (size_t i = 0; i < objects.size(); i++) {
+                auto& obj1 = objects[i];
+                for (size_t j = i + 1; j < objects.size(); j++) {
+                    auto& obj2 = objects[j];
 
-                if (obj1.isStationary() && obj2.isStationary()) continue;
+                    if (obj1.isStationary() && obj2.isStationary()) continue;
 
-                if      (obj1.isSphere() && obj2.isSphere()) processHardSphereSphere(obj1, obj2, dt);
-                else if (obj1.isBox()    && obj2.isSphere()) processHardBoxSphere(obj1, obj2, dt);
-                else if (obj1.isSphere() && obj2.isBox())    processHardBoxSphere(obj2, obj1, dt);
-                else {
-                    // TODO
+                    if      (obj1.isSphere() && obj2.isSphere()) processSphereSphere(obj1, obj2);
+                    else if (obj1.isBox()    && obj2.isSphere()) processBoxSphere(obj1, obj2);
+                    else if (obj1.isSphere() && obj2.isBox())    processBoxSphere(obj2, obj1);
+                    else if (obj1.isBox()    && obj2.isBox())    processBoxBox(obj1, obj2);
                 }
             }
         }

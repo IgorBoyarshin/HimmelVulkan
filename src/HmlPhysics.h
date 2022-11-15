@@ -7,6 +7,9 @@
 #include <optional>
 #include <iostream>
 #include <limits>
+#include <unordered_map>
+#include <memory>
+#include <bitset>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -41,8 +44,21 @@ struct HmlPhysics {
             Sphere, Box
         } type;
 
+        using Id = uint32_t;
+        inline static constexpr Id INVALID_ID = 0;
+        Id id;
+        inline static Id generateId() noexcept {
+            static Id nextIdToUse = 1;
+            return nextIdToUse++;
+        }
+
+        enum UpdateStep {
+            None, First, Second, Third, Fourth, Last // TODO rename
+        };
+        UpdateStep visitedByStep = UpdateStep::None;
+
         inline bool isSphere() const noexcept { return type == Type::Sphere; }
-        inline bool isBox()  const noexcept { return type == Type::Box; }
+        inline bool isBox()    const noexcept { return type == Type::Box; }
 
 
         struct DynamicProperties {
@@ -128,6 +144,7 @@ struct HmlPhysics {
             object.type = Type::Sphere;
             object.position = { center.x, center.y, center.z };
             object.data = { radius };
+            object.id = Object::generateId();
             return object;
         }
         inline static Object createBox(const glm::vec3& center, const glm::vec3& halfDimensions) noexcept {
@@ -135,6 +152,7 @@ struct HmlPhysics {
             object.type = Type::Box;
             object.position = { center.x, center.y, center.z };
             object.data = { halfDimensions.x, halfDimensions.y, halfDimensions.z };
+            object.id = Object::generateId();
             return object;
         }
     };
@@ -154,14 +172,113 @@ struct HmlPhysics {
     // ========================================================================
     void updateForDt(float dt) noexcept;
     // ========================================================================
-    using Id = uint32_t;
-    inline static constexpr Id INVALID_ID = 0;
+    Object::Id registerObject(Object&& object) noexcept;
+    // Object& getObject(Object::Id id) noexcept;
 
-    Id registerObject(Object&& object) noexcept;
-    Object& getObject(Id id) noexcept;
+    // std::vector<Object> objects;
+    // std::vector<Id> ids;
+    // ========================================================================
+    struct Bucket {
+        inline static constexpr float SIZE = 8.0f;
 
-    std::vector<Object> objects;
-    std::vector<Id> ids;
+        using Coord = int16_t;
+        using Hash = uint64_t;
+        using Bounding = std::pair<Bucket, Bucket>;
+
+        Coord x;
+        Coord y;
+        Coord z;
+        friend auto operator<=>(const Bucket&, const Bucket&) = default;
+
+        inline Bucket nextX() const noexcept { return Bucket{.x = static_cast<Coord>(x + 1), .y = y, .z = z }; }
+        inline Bucket nextY() const noexcept { return Bucket{.x = x, .y = static_cast<Coord>(y + 1), .z = z }; }
+        inline Bucket nextZ() const noexcept { return Bucket{.x = x, .y = y, .z = static_cast<Coord>(z + 1) }; }
+
+        inline static Bucket fromPos(const glm::vec3& pos) noexcept {
+            return Bucket{
+                .x = toCoord(pos.x),
+                .y = toCoord(pos.y),
+                .z = toCoord(pos.z),
+            };
+        }
+
+        inline static Coord toCoord(float x) noexcept {
+            return static_cast<Coord>(std::floor(x / SIZE));
+        }
+
+        // inline Hash hash() const noexcept {
+        //     return x + "." + y + "." + z;
+        // }
+
+        inline bool isInsideBoundingBuckets(const Bounding& bounding) const noexcept {
+            return (bounding.first.x <= x && x <= bounding.second.x &&
+                    bounding.first.y <= y && y <= bounding.second.y &&
+                    bounding.first.z <= z && z <= bounding.second.z);
+        }
+    };
+
+    struct BucketHasher {
+        inline size_t operator()(const Bucket& bucket) const {
+            const HmlPhysics::Bucket::Hash comb =
+                (static_cast<uint64_t>(static_cast<uint16_t>(bucket.x)) << 32) |
+                (static_cast<uint64_t>(static_cast<uint16_t>(bucket.y)) << 16) |
+                 static_cast<uint64_t>(static_cast<uint16_t>(bucket.z));
+            return std::hash<HmlPhysics::Bucket::Hash>{}(comb);
+        }
+    };
+
+    // NOTE can contain Buckets not present in any of the inputs
+    inline static Bucket::Bounding boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept {
+        return std::make_pair(
+            Bucket{
+                .x = std::min(bb1.first.x, bb2.first.x),
+                .y = std::min(bb1.first.y, bb2.first.y),
+                .z = std::min(bb1.first.z, bb2.first.z),
+            },
+            Bucket{
+                .x = std::max(bb1.second.x, bb2.second.x),
+                .y = std::max(bb1.second.y, bb2.second.y),
+                .z = std::max(bb1.second.z, bb2.second.z),
+            });
+    }
+
+    inline static Bucket::Bounding boundingBucketsForObject(const Object& object) noexcept {
+        const auto aabb = object.aabb();
+        const auto begin = Bucket::fromPos(aabb.begin);
+        const auto end = Bucket::fromPos(aabb.end);
+        return std::make_pair(begin, end);
+    }
+
+
+bool reassign(std::shared_ptr<Object> object, const Bucket& bucket, const Bucket::Bounding& boundingBucketsBefore, const Bucket::Bounding& boundingBucketsAfter) noexcept;
+
+    // inline std::vector<Bucket> bucketsForObject(const Object& object) noexcept {
+    //     const auto aabb = object.aabb();
+    //     const auto bucketStart = Bucket::fromPos(aabb.start);
+    //     const auto bucketEnd = Bucket::fromPos(aabb.end);
+    //     auto bucket = bucketStart;
+    //
+    //     for (Bucket::Coord x = bucketStart.x; x <= bucketEnd.x; x++) {
+    //         for (Bucket::Coord y = bucketStart.y; y <= bucketEnd.y; y++) {
+    //             for (Bucket::Coord z = bucketStart.z; z <= bucketEnd.z; z++) {
+    //                 buckets.push_back(bucket);
+    //             }
+    //         }
+    //     }
+    //
+    //     std::vector<Bucket> buckets;
+    //     return buckets;
+    // }
+
+    void removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept;
+
+    // inline static std::vector<Bucket> nearBucketsForPos() noexcept {
+    //     std::vector<Bucket> buckets;
+    //     bucket.reserve(4);
+    //     return buckets;
+    // }
+
+    std::unordered_map<Bucket, std::vector<std::shared_ptr<Object>>, BucketHasher> objectsInBuckets;
     // ========================================================================
     struct LineIntersectsTriangleResult {
         float t;

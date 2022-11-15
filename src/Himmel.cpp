@@ -458,8 +458,8 @@ bool Himmel::init() noexcept {
             }
 
 
-            const size_t boxesCount = 100;
-            const size_t spheresCount = 100;
+            const size_t boxesCount = 200;
+            const size_t spheresCount = 200;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
@@ -478,9 +478,9 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.0f, 1.0f)
                 };
                 const auto halfDimensions = glm::vec3{
-                    hml::getRandomUniformFloat(1.0f, 3.0f),
-                    hml::getRandomUniformFloat(1.0f, 3.0f),
-                    hml::getRandomUniformFloat(1.0f, 3.0f)
+                    hml::getRandomUniformFloat(0.2f, 2.0f),
+                    hml::getRandomUniformFloat(0.2f, 2.0f),
+                    hml::getRandomUniformFloat(0.2f, 2.0f)
                 };
 
                 const float m = std::max(halfDimensions.x, std::max(halfDimensions.y, halfDimensions.z));
@@ -515,7 +515,7 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.0f, 1.0f)
                 };
 
-                const float m = hml::getRandomUniformFloat(1.0f, 3.0f);
+                const float m = hml::getRandomUniformFloat(0.2f, 2.0f);
                 auto object = HmlPhysics::Object::createSphere(pos, m);
                 object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, v) };
                 const auto& s = object.asSphere();
@@ -578,6 +578,33 @@ bool Himmel::init() noexcept {
             //     const auto id = hmlPhysics->registerObject(std::move(object));
             //     physicsIdToEntity[id] = entities.back();
             // }
+
+            for (const auto& [bucket, objects] : hmlPhysics->objectsInBuckets) {
+                std::cout << "In bucket " << std::bitset<64>(HmlPhysics::BucketHasher{}(bucket)) << '\n';
+                for (const auto& object : objects) {
+                    const auto id = object->id;
+                    std::cout << id << " ";
+                    auto& entity = physicsIdToEntity[id];
+
+                    if (object->isSphere()) {
+                        const auto s = object->asSphere();
+                        auto modelMatrix = glm::mat4(1.0f);
+                        modelMatrix = glm::translate(modelMatrix, s.center);
+                        modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
+                        entity->modelMatrix = modelMatrix;
+                    } else if (object->isBox()) {
+                        const auto b = object->asBox();
+                        auto modelMatrix = glm::mat4(1.0f);
+                        modelMatrix = glm::translate(modelMatrix, b.center);
+                        modelMatrix = glm::scale(modelMatrix, b.halfDimensions);
+                        entity->modelMatrix = modelMatrix;
+                    } else {
+                        // TODO
+                    }
+                }
+                std::cout << '\n';
+                std::cout << '\n';
+            }
         }
 
         { // Arbitrary Entities
@@ -963,6 +990,31 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     // Upload data from physics to entities
     {
         // const auto startTime = std::chrono::high_resolution_clock::now();
+        for (const auto& [_bucket, objects] : hmlPhysics->objectsInBuckets) {
+            for (const auto& object : objects) {
+                const auto id = object->id;
+                auto& entity = physicsIdToEntity[id];
+
+                if (object->isSphere()) {
+                    const auto s = object->asSphere();
+                    auto modelMatrix = glm::mat4(1.0f);
+                    modelMatrix = glm::translate(modelMatrix, s.center);
+                    modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
+                    entity->modelMatrix = modelMatrix;
+                } else if (object->isBox()) {
+                    const auto b = object->asBox();
+                    auto modelMatrix = glm::mat4(1.0f);
+                    modelMatrix = glm::translate(modelMatrix, b.center);
+                    modelMatrix = glm::scale(modelMatrix, b.halfDimensions);
+                    entity->modelMatrix = modelMatrix;
+                } else {
+                    // TODO
+                }
+            }
+        }
+
+
+#if 0
         for (auto& [id, entity] : physicsIdToEntity) {
             auto& object = hmlPhysics->getObject(id);
             if (object.isSphere()) {
@@ -981,6 +1033,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
                 // TODO
             }
         }
+#endif
         // const auto newMark = std::chrono::high_resolution_clock::now();
         // const auto sinceStart = std::chrono::duration_cast<std::chrono::microseconds>(newMark - startTime).count();
         // const float sinceStartMks = static_cast<float>(sinceStart);

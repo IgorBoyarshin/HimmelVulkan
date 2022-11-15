@@ -252,7 +252,7 @@ struct Himmel {
 
     // Physics
     std::unique_ptr<HmlPhysics> hmlPhysics;
-    std::unordered_map<HmlPhysics::Id, std::shared_ptr<HmlRenderer::Entity>> physicsIdToEntity;
+    std::unordered_map<HmlPhysics::Object::Id, std::shared_ptr<HmlRenderer::Entity>> physicsIdToEntity;
 
 
     std::unique_ptr<World> world;

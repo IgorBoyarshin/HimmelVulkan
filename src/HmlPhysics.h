@@ -115,6 +115,8 @@ struct HmlPhysics {
                 };
             }
         };
+        static_assert(sizeof(Sphere) <= sizeof(position) + sizeof(data) && "Allocate larger data[] in Object, because Sphere doesn't fit.");
+
         struct Box {
             glm::vec3 center;
             glm::vec3 halfDimensions;
@@ -127,6 +129,7 @@ struct HmlPhysics {
                 };
             }
         };
+        static_assert(sizeof(Box) <= sizeof(position) + sizeof(data) && "Allocate larger data[] in Object, because Box doesn't fit.");
 
         inline Sphere& asSphere() noexcept {
             assert(isSphere() && "::> Trying to convert Object to Sphere but it is not one!");

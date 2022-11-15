@@ -53,11 +53,11 @@ namespace std {
 }
 
 namespace glm {
-    inline bool operator<(const glm::vec3& v1, cons glm::vec3& v2) {
+    inline bool operator<(const glm::vec3& v1, const glm::vec3& v2) {
         return v1.x < v2.x && v1.y < v2.y && v1.z < v2.z;
     }
 
-    inline bool operator>(const glm::vec3& v1, cons glm::vec3& v2) {
+    inline bool operator>(const glm::vec3& v1, const glm::vec3& v2) {
         return v1.x > v2.x && v1.y > v2.y && v1.z > v2.z;
     }
 }
@@ -65,9 +65,11 @@ namespace glm {
 
 struct HmlPhysics {
     struct Object {
-        // XXX this must be the first object data to allow reinterpret_cast to work properly
+        // XXX this must be the first object data to allow reinterpret_cast to work properly.
         // Possibly stores redundant data, but this way we can generalize across all shapes
-        std::array<float, 6> data;
+        glm::vec3 position;
+        std::array<float, 3> data;
+        // Is present for all object types
 
         enum class Type {
             Sphere, Box
@@ -146,13 +148,15 @@ struct HmlPhysics {
         inline static Object createSphere(const glm::vec3& center, float radius) noexcept {
             Object object;
             object.type = Type::Sphere;
-            object.data = { center.x, center.y, center.z, radius };
+            object.position = { center.x, center.y, center.z };
+            object.data = { radius };
             return object;
         }
         inline static Object createBox(const glm::vec3& center, const glm::vec3& halfDimensions) noexcept {
             Object object;
             object.type = Type::Box;
-            object.data = { center.x, center.y, center.z, halfDimensions.x, halfDimensions.y, halfDimensions.z };
+            object.position = { center.x, center.y, center.z };
+            object.data = { halfDimensions.x, halfDimensions.y, halfDimensions.z };
             return object;
         }
     };
@@ -181,9 +185,7 @@ struct HmlPhysics {
     static std::optional<Detection> detect(const Object::Box& b, const Object::Sphere& s) noexcept {
         const auto start  = b.center - b.halfDimensions - s.radius;
         const auto finish = b.center + b.halfDimensions + s.radius;
-        if (start.x < s.center.x && s.center.x < finish.x &&
-            start.y < s.center.y && s.center.y < finish.y &&
-            start.z < s.center.z && s.center.z < finish.z) {
+        if (start < s.center && s.center < finish) {
             // NOTE we care only about the predominant direction, and in terms of math the
             // radius component has no effect because it is the same in all directions, so
             // we omit it to simplify calculations.
@@ -211,7 +213,7 @@ struct HmlPhysics {
     static std::optional<Detection> detect(const Object::Box& b1, const Object::Box& b2) noexcept {
         const auto start  = b1.center - b1.halfDimensions - b2.halfDimensions;
         const auto finish = b1.center + b1.halfDimensions + b2.halfDimensions;
-        if (start < b2 && b2 < finish) {
+        if (start < b2.center && b2.center < finish) {
             const auto centers = b2.center - b1.center;
             const auto n = centers / (b1.halfDimensions + b2.halfDimensions);
             const float max = std::absmax(n);
@@ -263,8 +265,8 @@ struct HmlPhysics {
         if (!detectionOpt) return;
         const auto& [dir, extent] = *detectionOpt;
 
-        if (!obj1.isStationary()) s1.center -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
-        if (!obj2.isStationary()) s2.center += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
+        if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
+        if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
 
         resolveVelocities(obj1, obj2, *detectionOpt);
     }
@@ -280,8 +282,8 @@ struct HmlPhysics {
         if (!detectionOpt) return;
         const auto& [dir, extent] = *detectionOpt;
 
-        if (!obj1.isStationary()) b.center -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
-        if (!obj2.isStationary()) s.center += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
+        if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
+        if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
 
         resolveVelocities(obj1, obj2, *detectionOpt);
     }
@@ -297,8 +299,8 @@ struct HmlPhysics {
         if (!detectionOpt) return;
         const auto& [dir, extent] = *detectionOpt;
 
-        if (!obj1.isStationary()) b1.center -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
-        if (!obj2.isStationary()) b2.center += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
+        if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
+        if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
 
         resolveVelocities(obj1, obj2, *detectionOpt);
     }

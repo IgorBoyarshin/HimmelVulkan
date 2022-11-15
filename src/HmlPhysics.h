@@ -5,7 +5,7 @@
 #include <array>
 #include <cmath>
 #include <optional>
-#include <iostream> // TODO remove
+#include <iostream>
 #include <limits>
 
 #define GLM_FORCE_RADIANS
@@ -16,50 +16,17 @@
 #include <glm/gtx/hash.hpp>
 
 
-inline std::ostream& operator<<(std::ostream& stream, const glm::vec3& v) {
-    stream << "[" << v.x << ";" << v.y << ";" << v.z << "]";
-    return stream;
-}
+std::ostream& operator<<(std::ostream& stream, const glm::vec3& v);
 
 namespace std {
-    inline glm::vec3 abs(const glm::vec3& v) {
-        return glm::vec3{ std::abs(v.x), std::abs(v.y), std::abs(v.z) };
-    }
-
-    // inline glm::vec3 copysign(const glm::vec3& v, const glm::vec3& sign) {
-    //     return glm::vec3{
-    //         std::copysign(v.x, sign.x),
-    //         std::copysign(v.y, sign.y),
-    //         std::copysign(v.z, sign.z)
-    //     };
-    // }
-
-    inline float absmax(const glm::vec3& v) {
-        const auto absV = std::abs(v);
-        float max = v.x;
-        float absMax = absV.x;
-        bool foundNew;
-
-        foundNew = absV.y > absMax;
-        absMax = absMax * (1 - foundNew) + absV.y * foundNew;
-        max    = max    * (1 - foundNew) + v.y    * foundNew;
-
-        foundNew = absV.z > absMax;
-        absMax = absMax * (1 - foundNew) + absV.z * foundNew;
-        max    = max    * (1 - foundNew) + v.z    * foundNew;
-
-        return max;
-    }
+    glm::vec3 abs(const glm::vec3& v);
+    // glm::vec3 copysign(const glm::vec3& v, const glm::vec3& sign);
+    float absmax(const glm::vec3& v);
 }
 
 namespace glm {
-    inline bool operator<(const glm::vec3& v1, const glm::vec3& v2) {
-        return v1.x < v2.x && v1.y < v2.y && v1.z < v2.z;
-    }
-
-    inline bool operator>(const glm::vec3& v1, const glm::vec3& v2) {
-        return v1.x > v2.x && v1.y > v2.y && v1.z > v2.z;
-    }
+    bool operator<(const glm::vec3& v1, const glm::vec3& v2);
+    bool operator>(const glm::vec3& v1, const glm::vec3& v2);
 }
 
 
@@ -69,7 +36,6 @@ struct HmlPhysics {
         // Possibly stores redundant data, but this way we can generalize across all shapes
         glm::vec3 position;
         std::array<float, 3> data;
-        // Is present for all object types
 
         enum class Type {
             Sphere, Box
@@ -86,7 +52,7 @@ struct HmlPhysics {
             inline DynamicProperties(float m, const glm::vec3& v) noexcept : mass(m), invMass(1.0f / m), velocity(v) {}
             inline DynamicProperties() noexcept {}
         };
-        // std::nullopt means the object is permanently stationary
+
         std::optional<DynamicProperties> dynamicProperties;
         inline bool isStationary() const noexcept  { return !dynamicProperties.has_value(); }
 
@@ -115,7 +81,7 @@ struct HmlPhysics {
                 };
             }
         };
-        static_assert(sizeof(Sphere) <= sizeof(position) + sizeof(data) && "Allocate larger data[] in Object, because Sphere doesn't fit.");
+        static_assert(sizeof(Sphere) <= sizeof(position) + sizeof(data) && "Please allocate larger data[] in Object because Sphere doesn't fit.");
 
         struct Box {
             glm::vec3 center;
@@ -129,7 +95,7 @@ struct HmlPhysics {
                 };
             }
         };
-        static_assert(sizeof(Box) <= sizeof(position) + sizeof(data) && "Allocate larger data[] in Object, because Box doesn't fit.");
+        static_assert(sizeof(Box) <= sizeof(position) + sizeof(data) && "Please allocate larger data[] in Object because Box doesn't fit.");
 
         inline Sphere& asSphere() noexcept {
             assert(isSphere() && "::> Trying to convert Object to Sphere but it is not one!");
@@ -170,195 +136,23 @@ struct HmlPhysics {
         float extent;
     };
 
-    // Returns dir from s1 towards s2
-    static std::optional<Detection> detect(const Object::Sphere& s1, const Object::Sphere& s2) noexcept {
-        const auto c = s2.center - s1.center;
-        const auto lengthC = glm::length(c);
-        const float extent = (s1.radius + s2.radius) - lengthC;
-        if (extent <= 0.0f) return std::nullopt;
-        const auto normC = c / lengthC;
-        return { Detection {
-            .dir = normC,
-            .extent = extent,
-        }};
-    }
+    // Returns dir from arg1 towards arg2
+    template<typename Arg1, typename Arg2>
+    static std::optional<Detection> detect(const Arg1& arg1, const Arg2& arg2) noexcept;
 
-
-    // Returns dir from b towards s
-    static std::optional<Detection> detect(const Object::Box& b, const Object::Sphere& s) noexcept {
-        const auto start  = b.center - b.halfDimensions - s.radius;
-        const auto finish = b.center + b.halfDimensions + s.radius;
-        if (start < s.center && s.center < finish) {
-            // NOTE we care only about the predominant direction, and in terms of math the
-            // radius component has no effect because it is the same in all directions, so
-            // we omit it to simplify calculations.
-            const auto centers = s.center - b.center;
-            const auto n = centers / b.halfDimensions;
-            const float max = std::absmax(n);
-            const auto dir = glm::vec3{
-                std::copysign(max == n.x, n.x),
-                std::copysign(max == n.y, n.y),
-                std::copysign(max == n.z, n.z),
-            };
-            // NOTE second abs is actually redundant because "dir" has the same sign as "centers"
-            const float extent = std::abs(glm::dot(b.halfDimensions, dir)) + s.radius - std::abs(glm::dot(centers, dir));
-            return { Detection{
-                .dir = dir,
-                .extent = extent,
-            }};
-        }
-
-        return std::nullopt;
-    }
-
-
-    // Returns dir from b1 towards b2
-    static std::optional<Detection> detect(const Object::Box& b1, const Object::Box& b2) noexcept {
-        const auto start  = b1.center - b1.halfDimensions - b2.halfDimensions;
-        const auto finish = b1.center + b1.halfDimensions + b2.halfDimensions;
-        if (start < b2.center && b2.center < finish) {
-            const auto centers = b2.center - b1.center;
-            const auto n = centers / (b1.halfDimensions + b2.halfDimensions);
-            const float max = std::absmax(n);
-            const auto dir = glm::vec3{
-                std::copysign(max == n.x, n.x),
-                std::copysign(max == n.y, n.y),
-                std::copysign(max == n.z, n.z),
-            };
-            // NOTE second abs is actually redundant because dir has the same sign as centers
-            const float extent = std::abs(glm::dot(b1.halfDimensions + b2.halfDimensions, dir)) - std::abs(glm::dot(centers, dir));
-            return { Detection{
-                .dir = dir,
-                .extent = extent,
-            }};
-        }
-
-        return std::nullopt;
-    }
-
-
-    static void resolveVelocities(Object& obj1, Object& obj2, const Detection& detection) noexcept {
-        const auto& [dir, extent] = detection;
-
-        const auto obj1DP = obj1.dynamicProperties.value_or(Object::DynamicProperties{});
-        const auto obj2DP = obj2.dynamicProperties.value_or(Object::DynamicProperties{});
-        const auto relativeV = obj2DP.velocity - obj1DP.velocity;
-        if (glm::dot(relativeV, dir) > 0.0f) {
-            // Objects are already moving apart
-            return;
-        }
-        // e == 0 --- perfectly inelastic collision
-        // e == 1 --- perfectly elastic collision, no kinetic energy is dissipated
-        // const float e = std::min(obj1.restitution, obj2.restitution);
-        const float e = 1.0f; // restitution
-        const float j = -(1.0f + e) * glm::dot(relativeV, dir) / (obj1DP.invMass + obj2DP.invMass);
-        const auto impulse = j * dir;
-        if (!obj1.isStationary()) obj1.dynamicProperties->velocity -= impulse * obj1DP.invMass;
-        if (!obj2.isStationary()) obj2.dynamicProperties->velocity += impulse * obj2DP.invMass;
-    }
-
-
-    static void processSphereSphere(Object& obj1, Object& obj2) noexcept {
-        assert(obj1.isSphere() && obj2.isSphere() && "::> Expected to process Sphere and Sphere.");
-
-        auto& s1 = obj1.asSphere();
-        auto& s2 = obj2.asSphere();
-
-        const auto detectionOpt = detect(s1, s2);
-        if (!detectionOpt) return;
-        const auto& [dir, extent] = *detectionOpt;
-
-        if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
-        if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
-
-        resolveVelocities(obj1, obj2, *detectionOpt);
-    }
-
-
-    static void processBoxSphere(Object& obj1, Object& obj2) noexcept {
-        assert(obj1.isBox() && obj2.isSphere() && "::> Expected to process Box and Sphere.");
-
-        auto& b = obj1.asBox();
-        auto& s = obj2.asSphere();
-
-        const auto detectionOpt = detect(b, s);
-        if (!detectionOpt) return;
-        const auto& [dir, extent] = *detectionOpt;
-
-        if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
-        if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
-
-        resolveVelocities(obj1, obj2, *detectionOpt);
-    }
-
-
-    static void processBoxBox(Object& obj1, Object& obj2) noexcept {
-        assert(obj1.isBox() && obj2.isBox() && "::> Expected to process Box and Box.");
-
-        auto& b1 = obj1.asBox();
-        auto& b2 = obj2.asBox();
-
-        const auto detectionOpt = detect(b1, b2);
-        if (!detectionOpt) return;
-        const auto& [dir, extent] = *detectionOpt;
-
-        if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
-        if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
-
-        resolveVelocities(obj1, obj2, *detectionOpt);
-    }
+    static void resolveVelocities(Object& obj1, Object& obj2, const Detection& detection) noexcept;
+    static void process(Object& obj1, Object& obj2) noexcept;
     // ========================================================================
-    inline void updateForDt(float dt) noexcept {
-        const uint8_t SUBSTEPS = 1;
-        const float subDt = dt / SUBSTEPS;
-        for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
-            // Apply velocity onto position change
-            for (auto& obj : objects) {
-                if (obj.isStationary()) continue;
-
-                if      (obj.isSphere()) obj.asSphere().center += obj.dynamicProperties->velocity * subDt;
-                else if (obj.isBox())    obj.asBox().center    += obj.dynamicProperties->velocity * subDt;
-            }
-
-            // Check for and handle collisions
-            for (size_t i = 0; i < objects.size(); i++) {
-                auto& obj1 = objects[i];
-                for (size_t j = i + 1; j < objects.size(); j++) {
-                    auto& obj2 = objects[j];
-
-                    if (obj1.isStationary() && obj2.isStationary()) continue;
-
-                    if      (obj1.isSphere() && obj2.isSphere()) processSphereSphere(obj1, obj2);
-                    else if (obj1.isBox()    && obj2.isSphere()) processBoxSphere(obj1, obj2);
-                    else if (obj1.isSphere() && obj2.isBox())    processBoxSphere(obj2, obj1);
-                    else if (obj1.isBox()    && obj2.isBox())    processBoxBox(obj1, obj2);
-                }
-            }
-        }
-    }
+    void updateForDt(float dt) noexcept;
     // ========================================================================
     using Id = uint32_t;
-    static constexpr Id INVALID_ID = 0;
+    inline static constexpr Id INVALID_ID = 0;
 
-    inline Id registerObject(Object&& object) noexcept {
-        objects.push_back(std::move(object));
-        const auto id = objects.size();
-        ids.push_back(id);
-        return id;
-    }
-
-    inline Object& getObject(Id id) noexcept {
-        for (size_t i = 0; i < objects.size(); i++) {
-            if (ids[i] == id) return objects[i];
-        }
-        assert(false && "::> No Object with provided Id found.");
-        return objects[0]; // stub
-    }
+    Id registerObject(Object&& object) noexcept;
+    Object& getObject(Id id) noexcept;
 
     std::vector<Object> objects;
     std::vector<Id> ids;
-    // ========================================================================
-    // ========================================================================
     // ========================================================================
     struct LineIntersectsTriangleResult {
         float t;
@@ -366,40 +160,11 @@ struct HmlPhysics {
         float v;
         glm::vec3 N;
     };
-    inline static std::optional<LineIntersectsTriangleResult> lineIntersectsTriangle(
-            const glm::vec3& start, const glm::vec3& finish,
-            const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept {
-        const float eps = 1e-5;
-        const auto dir = finish - start;
-
-        const glm::vec3 E1 = B - A;
-        const glm::vec3 E2 = C - A;
-        const glm::vec3 N = glm::cross(E1, E2);
-        const float det = -glm::dot(dir, N);
-        const float invdet = 1.0f / det;
-        const glm::vec3 AO  = start - A;
-        const glm::vec3 DAO = glm::cross(AO, dir);
-        const float u =  glm::dot(E2, DAO) * invdet;
-        const float v = -glm::dot(E1, DAO) * invdet;
-        const float t =  glm::dot(AO, N)  * invdet;
-
-        if (std::abs(det) >= eps && 1.0f >= t && t >= 0.0f && u >= 0.0f && v >= 0.0f && 1.0f >= (u + v)) {
-            return { LineIntersectsTriangleResult{
-                .t = t,
-                .u = u,
-                .v = v,
-                .N = N,
-            }};
-        } else return std::nullopt;
-    }
+    static std::optional<LineIntersectsTriangleResult> lineIntersectsTriangle(
+        const glm::vec3& start, const glm::vec3& finish,
+        const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept;
     // ========================================================================
-    static float pointToLineDstSqr(const glm::vec3& point, const glm::vec3& l1, const glm::vec3& l2) noexcept {
-        const auto nom = glm::cross(l1 - l2, l2 - point);
-        const float nomSqr = glm::dot(nom, nom);
-        const auto denom = (l1 - l2);
-        const float denomSqr = glm::dot(denom, denom);
-        return nomSqr / denomSqr;
-    }
+    static float pointToLineDstSqr(const glm::vec3& point, const glm::vec3& l1, const glm::vec3& l2) noexcept;
 };
 
 

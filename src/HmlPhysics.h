@@ -52,6 +52,16 @@ namespace std {
     }
 }
 
+namespace glm {
+    inline bool operator<(const glm::vec3& v1, cons glm::vec3& v2) {
+        return v1.x < v2.x && v1.y < v2.y && v1.z < v2.z;
+    }
+
+    inline bool operator>(const glm::vec3& v1, cons glm::vec3& v2) {
+        return v1.x > v2.x && v1.y > v2.y && v1.z > v2.z;
+    }
+}
+
 
 struct HmlPhysics {
     struct Object {
@@ -79,15 +89,41 @@ struct HmlPhysics {
         inline bool isStationary() const noexcept  { return !dynamicProperties.has_value(); }
 
 
+        struct AABB {
+            glm::vec3 begin;
+            glm::vec3 end;
+        };
+        inline AABB aabb() const noexcept {
+            switch (type) {
+                case Type::Box:    return asBox().aabb();
+                case Type::Sphere: return asSphere().aabb();
+                default: assert(false && "Unimplemented Object type."); return AABB{}; // stub
+            }
+        }
+
+
         struct Sphere {
             glm::vec3 center;
             float radius;
+
+            inline AABB aabb() const noexcept {
+                return AABB{
+                    .begin = center - glm::vec3{radius},
+                    .end   = center + glm::vec3{radius},
+                };
+            }
         };
         struct Box {
             glm::vec3 center;
             glm::vec3 halfDimensions;
 
             inline glm::vec3 dimensions() const noexcept { return halfDimensions * 2.0f; }
+            inline AABB aabb() const noexcept {
+                return AABB{
+                    .begin = center - halfDimensions,
+                    .end   = center + halfDimensions,
+                };
+            }
         };
 
         inline Sphere& asSphere() noexcept {
@@ -175,9 +211,7 @@ struct HmlPhysics {
     static std::optional<Detection> detect(const Object::Box& b1, const Object::Box& b2) noexcept {
         const auto start  = b1.center - b1.halfDimensions - b2.halfDimensions;
         const auto finish = b1.center + b1.halfDimensions + b2.halfDimensions;
-        if (start.x < b2.center.x && b2.center.x < finish.x &&
-            start.y < b2.center.y && b2.center.y < finish.y &&
-            start.z < b2.center.z && b2.center.z < finish.z) {
+        if (start < b2 && b2 < finish) {
             const auto centers = b2.center - b1.center;
             const auto n = centers / (b1.halfDimensions + b2.halfDimensions);
             const float max = std::absmax(n);

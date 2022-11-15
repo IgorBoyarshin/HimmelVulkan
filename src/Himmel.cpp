@@ -458,7 +458,7 @@ bool Himmel::init() noexcept {
             }
 
 
-            const size_t boxesCount = 20;
+            const size_t boxesCount = 100;
             const size_t spheresCount = 100;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{
@@ -478,9 +478,9 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.0f, 1.0f)
                 };
                 const auto halfDimensions = glm::vec3{
-                    hml::getRandomUniformFloat(1.0f, 4.0f),
-                    hml::getRandomUniformFloat(1.0f, 4.0f),
-                    hml::getRandomUniformFloat(1.0f, 4.0f)
+                    hml::getRandomUniformFloat(1.0f, 3.0f),
+                    hml::getRandomUniformFloat(1.0f, 3.0f),
+                    hml::getRandomUniformFloat(1.0f, 3.0f)
                 };
 
                 const float m = std::max(halfDimensions.x, std::max(halfDimensions.y, halfDimensions.z));
@@ -515,7 +515,7 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.0f, 1.0f)
                 };
 
-                const float m = hml::getRandomUniformFloat(1.0f, 4.0f);
+                const float m = hml::getRandomUniformFloat(1.0f, 3.0f);
                 auto object = HmlPhysics::Object::createSphere(pos, m);
                 object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, v) };
                 const auto& s = object.asSphere();

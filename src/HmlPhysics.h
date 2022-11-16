@@ -53,8 +53,6 @@ struct HmlPhysics {
             return nextIdToUse++;
         }
 
-        bool visitedInThisStep = false;
-
         inline bool isSphere() const noexcept { return type == Type::Sphere; }
         inline bool isBox()    const noexcept { return type == Type::Box; }
 
@@ -215,13 +213,14 @@ struct HmlPhysics {
     // NOTE can contain Buckets not present in any of the inputs
     static Bucket::Bounding boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept;
     static Bucket::Bounding boundingBucketsForObject(const Object& object) noexcept;
-    void reassign(const std::vector<Bucket::Bounding>& boundingBucketsBefore) noexcept;
+    void reassign() noexcept;
     void removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept;
     void printStats() const noexcept;
 
     Object::Id registerObject(Object&& object) noexcept;
     // Object& getObject(Object::Id id) noexcept;
 
+    bool firstUpdateAfterLastRegister = true;
     std::unordered_map<Bucket, std::vector<std::shared_ptr<Object>>, BucketHasher> objectsInBuckets;
     std::vector<std::shared_ptr<Object>> objects;
     // Not to allocate every frame

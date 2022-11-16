@@ -179,32 +179,27 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
 
 
 void HmlPhysics::updateForDt(float dt) noexcept {
+    if (firstUpdateAfterLastRegister) {
+        firstUpdateAfterLastRegister = false;
+
+        allBoundingBucketsBefore.clear();
+        for (auto& object : objects) {
+            if (object->isStationary()) continue;
+            allBoundingBucketsBefore.push_back(boundingBucketsForObject(*object));
+        }
+    }
+
     const uint8_t SUBSTEPS = 1;
     const float subDt = dt / SUBSTEPS;
     for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
-        // Prepare
-        allBoundingBucketsBefore.clear();
-        for (const auto& object : objects) {
-            allBoundingBucketsBefore.push_back(boundingBucketsForObject(*object));
-            object->visitedInThisStep = false;
-        }
-
         // Apply velocity onto position change
-        for (const auto& [bucket, objects] : objectsInBuckets) {
-            for (auto& object : objects) {
-                if (object->isStationary()) continue;
-
-                // Because an object can be in multiple buckets, so do this not to apply velocity multiple times
-                if (object->visitedInThisStep) continue;
-                object->visitedInThisStep = true;
-
-                object->position += object->dynamicProperties->velocity * subDt;
-                object->position += object->dynamicProperties->velocity * subDt;
-            }
+        for (auto& object : objects) {
+            if (object->isStationary()) continue;
+            object->position += object->dynamicProperties->velocity * subDt;
         }
 
         // Check for and handle collisions
-        for (const auto& [bucket, objects] : objectsInBuckets) {
+        for (const auto& [_bucket, objects] : objectsInBuckets) {
             for (size_t i = 0; i < objects.size(); i++) {
                 auto& obj1 = objects[i];
 
@@ -218,11 +213,12 @@ void HmlPhysics::updateForDt(float dt) noexcept {
         }
 
         // Put objects into proper buckets after they have finished being moved
-        reassign(allBoundingBucketsBefore);
+        reassign();
     }
 }
 // ============================================================================
 HmlPhysics::Object::Id HmlPhysics::registerObject(Object&& object) noexcept {
+    firstUpdateAfterLastRegister = true;
     const auto id = object.id;
     const auto bounds = boundingBucketsForObject(object);
     const auto shared = std::make_shared<Object>(std::move(object));
@@ -292,15 +288,16 @@ void HmlPhysics::printStats() const noexcept {
 }
 
 
-void HmlPhysics::reassign(const std::vector<Bucket::Bounding>& boundingBucketsBefore) noexcept {
-    auto boundingBoundsBeforeIt = allBoundingBucketsBefore.cbegin();
+// NOTE arg does not store BB for stationary objects
+void HmlPhysics::reassign() noexcept {
+    auto boundingBoundsBeforeIt = allBoundingBucketsBefore.begin();
     for (const auto& object : objects) {
-        const auto& boundingBucketsBefore = *boundingBoundsBeforeIt;
-        ++boundingBoundsBeforeIt;
-
         if (object->isStationary()) continue;
 
+        const auto boundingBucketsBefore = *boundingBoundsBeforeIt;
         const auto boundingBucketsAfter = boundingBucketsForObject(*object);
+        *boundingBoundsBeforeIt = boundingBucketsAfter; // for use during next iteration
+        ++boundingBoundsBeforeIt;
         if (boundingBucketsBefore == boundingBucketsAfter) continue;
 
         const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);

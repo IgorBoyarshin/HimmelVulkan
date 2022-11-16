@@ -52,10 +52,7 @@ struct HmlPhysics {
             return nextIdToUse++;
         }
 
-        enum UpdateStep {
-            None, First, Second, Third, Fourth, Last // TODO rename
-        };
-        UpdateStep visitedByStep = UpdateStep::None;
+        bool visitedInThisStep = false;
 
         inline bool isSphere() const noexcept { return type == Type::Sphere; }
         inline bool isBox()    const noexcept { return type == Type::Box; }
@@ -172,12 +169,6 @@ struct HmlPhysics {
     // ========================================================================
     void updateForDt(float dt) noexcept;
     // ========================================================================
-    Object::Id registerObject(Object&& object) noexcept;
-    // Object& getObject(Object::Id id) noexcept;
-
-    // std::vector<Object> objects;
-    // std::vector<Id> ids;
-    // ========================================================================
     struct Bucket {
         inline static constexpr float SIZE = 8.0f;
 
@@ -188,11 +179,8 @@ struct HmlPhysics {
         Coord x;
         Coord y;
         Coord z;
-        friend auto operator<=>(const Bucket&, const Bucket&) = default;
 
-        inline Bucket nextX() const noexcept { return Bucket{.x = static_cast<Coord>(x + 1), .y = y, .z = z }; }
-        inline Bucket nextY() const noexcept { return Bucket{.x = x, .y = static_cast<Coord>(y + 1), .z = z }; }
-        inline Bucket nextZ() const noexcept { return Bucket{.x = x, .y = y, .z = static_cast<Coord>(z + 1) }; }
+        friend auto operator<=>(const Bucket&, const Bucket&) = default;
 
         inline static Bucket fromPos(const glm::vec3& pos) noexcept {
             return Bucket{
@@ -205,10 +193,6 @@ struct HmlPhysics {
         inline static Coord toCoord(float x) noexcept {
             return static_cast<Coord>(std::floor(x / SIZE));
         }
-
-        // inline Hash hash() const noexcept {
-        //     return x + "." + y + "." + z;
-        // }
 
         inline bool isInsideBoundingBuckets(const Bounding& bounding) const noexcept {
             return (bounding.first.x <= x && x <= bounding.second.x &&
@@ -228,57 +212,18 @@ struct HmlPhysics {
     };
 
     // NOTE can contain Buckets not present in any of the inputs
-    inline static Bucket::Bounding boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept {
-        return std::make_pair(
-            Bucket{
-                .x = std::min(bb1.first.x, bb2.first.x),
-                .y = std::min(bb1.first.y, bb2.first.y),
-                .z = std::min(bb1.first.z, bb2.first.z),
-            },
-            Bucket{
-                .x = std::max(bb1.second.x, bb2.second.x),
-                .y = std::max(bb1.second.y, bb2.second.y),
-                .z = std::max(bb1.second.z, bb2.second.z),
-            });
-    }
-
-    inline static Bucket::Bounding boundingBucketsForObject(const Object& object) noexcept {
-        const auto aabb = object.aabb();
-        const auto begin = Bucket::fromPos(aabb.begin);
-        const auto end = Bucket::fromPos(aabb.end);
-        return std::make_pair(begin, end);
-    }
-
-
-bool reassign(std::shared_ptr<Object> object, const Bucket& bucket, const Bucket::Bounding& boundingBucketsBefore, const Bucket::Bounding& boundingBucketsAfter) noexcept;
-
-    // inline std::vector<Bucket> bucketsForObject(const Object& object) noexcept {
-    //     const auto aabb = object.aabb();
-    //     const auto bucketStart = Bucket::fromPos(aabb.start);
-    //     const auto bucketEnd = Bucket::fromPos(aabb.end);
-    //     auto bucket = bucketStart;
-    //
-    //     for (Bucket::Coord x = bucketStart.x; x <= bucketEnd.x; x++) {
-    //         for (Bucket::Coord y = bucketStart.y; y <= bucketEnd.y; y++) {
-    //             for (Bucket::Coord z = bucketStart.z; z <= bucketEnd.z; z++) {
-    //                 buckets.push_back(bucket);
-    //             }
-    //         }
-    //     }
-    //
-    //     std::vector<Bucket> buckets;
-    //     return buckets;
-    // }
-
+    static Bucket::Bounding boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept;
+    static Bucket::Bounding boundingBucketsForObject(const Object& object) noexcept;
+    void reassign(const std::vector<Bucket::Bounding>& boundingBucketsBefore) noexcept;
     void removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept;
 
-    // inline static std::vector<Bucket> nearBucketsForPos() noexcept {
-    //     std::vector<Bucket> buckets;
-    //     bucket.reserve(4);
-    //     return buckets;
-    // }
+    Object::Id registerObject(Object&& object) noexcept;
+    // Object& getObject(Object::Id id) noexcept;
 
     std::unordered_map<Bucket, std::vector<std::shared_ptr<Object>>, BucketHasher> objectsInBuckets;
+    std::vector<std::shared_ptr<Object>> objects;
+    // Not to allocate every frame
+    std::vector<Bucket::Bounding> allBoundingBucketsBefore;
     // ========================================================================
     struct LineIntersectsTriangleResult {
         float t;

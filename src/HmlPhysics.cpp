@@ -178,140 +178,89 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
 }
 
 
-bool HmlPhysics::reassign(std::shared_ptr<Object> object, const Bucket& bucket, const Bucket::Bounding& boundingBucketsBefore, const Bucket::Bounding& boundingBucketsAfter) noexcept {
-    bool removedFromCurrentBucket = false;
+void HmlPhysics::reassign(const std::vector<Bucket::Bounding>& boundingBucketsBefore) noexcept {
+    auto boundingBoundsBeforeIt = allBoundingBucketsBefore.cbegin();
+    for (const auto& object : objects) {
+        const auto& boundingBucketsBefore = *boundingBoundsBeforeIt;
+        ++boundingBoundsBeforeIt;
 
-    const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);
-    // std::shared_ptr<Object> objCopy = object;
-    for (Bucket::Coord x = superset.first.x; x <= superset.second.x; x++) {
-        for (Bucket::Coord y = superset.first.y; y <= superset.second.y; y++) {
-            for (Bucket::Coord z = superset.first.z; z <= superset.second.z; z++) {
-                const Bucket b{ .x = x, .y = y, .z = z };
-                const bool before = b.isInsideBoundingBuckets(boundingBucketsBefore);
-                const bool after = b.isInsideBoundingBuckets(boundingBucketsAfter);
-        // std::cout << "Check " << x << " " << y << " " << z << "--" << std::endl;
-                if (before && !after) {
-                    const auto bef = objectsInBuckets[b].size();
-                    removeObjectWithIdFromBucket(object->id, b);
-                    const auto af = objectsInBuckets[b].size();
-                    // assert(af + 1 == bef);
-                    // assert(object.use_count() > 1);
-                    // NOTE don't i++ if the current bucket got changed (removed from)
-                    // because the newly-current object is taken from the end and thus
-                    // has not been visited yet.
-                    if (b == bucket) removedFromCurrentBucket = true;
-                    // if (b == bucket) std::cout << "SELF" << std::endl;
-                    // std::cout << "yes1" << '\n';
-                } else if (!before && after) {
-                    objectsInBuckets[b].push_back(object);
-                    // std::cout << "yes2" << '\n';
+        if (object->isStationary()) continue;
+
+        const auto boundingBucketsAfter = boundingBucketsForObject(*object);
+        if (boundingBucketsBefore == boundingBucketsAfter) continue;
+
+        const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);
+        for (Bucket::Coord x = superset.first.x; x <= superset.second.x; x++) {
+            for (Bucket::Coord y = superset.first.y; y <= superset.second.y; y++) {
+                for (Bucket::Coord z = superset.first.z; z <= superset.second.z; z++) {
+                    const Bucket b{ .x = x, .y = y, .z = z };
+                    const bool before = b.isInsideBoundingBuckets(boundingBucketsBefore);
+                    const bool after  = b.isInsideBoundingBuckets(boundingBucketsAfter);
+                    if (before && !after) { // remove from this bucket
+                        removeObjectWithIdFromBucket(object->id, b);
+                    } else if (!before && after) { // add to this bucket
+                        objectsInBuckets[b].push_back(object);
+                    }
                 }
-                // std::cout << std::endl;
             }
         }
     }
-    // std::cout << "done " << '\n';
-
-    return removedFromCurrentBucket;
 }
 
 
 void HmlPhysics::updateForDt(float dt) noexcept {
-    // std::cout << "CALL-------------------" << '\n';
     const uint8_t SUBSTEPS = 1;
     const float subDt = dt / SUBSTEPS;
     for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
-        // Apply velocity onto position change and possibly move Objects between Buckets
+        // Prepare
+        allBoundingBucketsBefore.clear();
+        for (const auto& object : objects) {
+            allBoundingBucketsBefore.push_back(boundingBucketsForObject(*object));
+            object->visitedInThisStep = false;
+        }
+
+        // Apply velocity onto position change
         for (const auto& [bucket, objects] : objectsInBuckets) {
-            for (int i = 0; i < objects.size(); i++) {
-                const auto object = objects[i];
+            for (auto& object : objects) {
                 if (object->isStationary()) continue;
 
-                if (object->visitedByStep == Object::UpdateStep::First) continue;
-                object->visitedByStep = Object::UpdateStep::First;
+                // Because an object can be in multiple buckets, so do this not to apply velocity multiple times
+                if (object->visitedInThisStep) continue;
+                object->visitedInThisStep = true;
 
-                const auto boundingBucketsBefore = boundingBucketsForObject(*object);
                 object->position += object->dynamicProperties->velocity * subDt;
                 object->position += object->dynamicProperties->velocity * subDt;
-                const auto boundingBucketsAfter = boundingBucketsForObject(*object);
-
-                if (boundingBucketsBefore == boundingBucketsAfter) continue;
-
-                // std::cout << "For index " << i << '\n';
-                // std::cout << object->id << " Moving from ";
-                // {
-                //     const auto& [x,y,z] = boundingBucketsBefore.first;
-                //     std::cout << x << " " << y << " " << z << ";;";
-                // }
-                // {
-                //     const auto& [x,y,z] = boundingBucketsBefore.second;
-                //     std::cout << x << " " << y << " " << z << ";;";
-                // }
-                // std::cout << " to ";
-                // {
-                //     const auto& [x,y,z] = boundingBucketsAfter.first;
-                //     std::cout << x << " " << y << " " << z << ";;";
-                // }
-                // {
-                //     const auto& [x,y,z] = boundingBucketsAfter.second;
-                //     std::cout << x << " " << y << " " << z << ";;";
-                // }
-                // std::cout << '\n';
-
-                // Remove the Object from old Buckets and add to new Buckets
-                reassign(object, bucket, boundingBucketsBefore, boundingBucketsAfter);
             }
         }
 
         // Check for and handle collisions
-        // NOTE Ignore miniscule corrections here with regards to Objects movement between Buckets:
-        // they will get sorted out during the next iteration in the previous section.
         for (const auto& [bucket, objects] : objectsInBuckets) {
-            for (int i = 0; i < objects.size(); i++) {
+            for (size_t i = 0; i < objects.size(); i++) {
                 auto& obj1 = objects[i];
-                // if (obj1->id == 6) std::cout << obj1->position << '\n';
-                obj1->visitedByStep = Object::UpdateStep::None;
 
                 // For each object, check test it against all other objects in current bucket...
                 for (size_t j = i + 1; j < objects.size(); j++) {
                     auto& obj2 = objects[j];
                     if (obj1->isStationary() && obj2->isStationary()) continue;
-                const auto boundingBucketsBefore1 = boundingBucketsForObject(*obj1);
-                const auto boundingBucketsBefore2 = boundingBucketsForObject(*obj2);
                     process(*obj1, *obj2);
-                const auto boundingBucketsAfter1 = boundingBucketsForObject(*obj1);
-                const auto boundingBucketsAfter2 = boundingBucketsForObject(*obj2);
-                if (boundingBucketsBefore2 != boundingBucketsAfter2) {
-                    if (reassign(obj2, bucket, boundingBucketsBefore2, boundingBucketsAfter2)) j--;
-                }
-                if (boundingBucketsBefore1 != boundingBucketsAfter1) {
-                    if (reassign(obj1, bucket, boundingBucketsBefore1, boundingBucketsAfter1)) {
-                        i--;
-                        break; // from inner loop
-                    }
-                }
                 }
             }
         }
+
+        // Put objects into proper buckets after they have finished being moved
+        reassign(allBoundingBucketsBefore);
     }
 }
 // ============================================================================
 HmlPhysics::Object::Id HmlPhysics::registerObject(Object&& object) noexcept {
     const auto id = object.id;
-    std::cout << "Register " << id << " as " << '\n';
     const auto bounds = boundingBucketsForObject(object);
     const auto shared = std::make_shared<Object>(std::move(object));
+    objects.push_back(shared);
     for (Bucket::Coord x = bounds.first.x; x <= bounds.second.x; x++) {
         for (Bucket::Coord y = bounds.first.y; y <= bounds.second.y; y++) {
             for (Bucket::Coord z = bounds.first.z; z <= bounds.second.z; z++) {
-                std::cout << x << " " << y << " " << z <<'\n';
                 const Bucket bucket{ .x = x, .y = y, .z = z };
-                std::cout << std::bitset<64>(BucketHasher{}(bucket)) <<'\n';
-            // const HmlPhysics::Bucket::Hash comb =
-            //     (static_cast<uint64_t>(static_cast<uint16_t>(bucket.x)) << 32) |
-            //     (static_cast<uint64_t>(static_cast<uint16_t>(bucket.y)) << 16) |
-            //      static_cast<uint64_t>(static_cast<uint16_t>(bucket.z));
-                // std::cout << std::bitset<64>(comb) <<'\n';
                 objectsInBuckets[bucket].push_back(shared);
             }
         }
@@ -322,18 +271,20 @@ HmlPhysics::Object::Id HmlPhysics::registerObject(Object&& object) noexcept {
 
 
 void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept {
-    // std::cout << "For " << id << std::endl;
     auto& objects = objectsInBuckets[bucket];
-    for (auto it = objects.begin(); it != objects.end(); ++it) {
-        // std::cout << (*it)->id << std::endl;
-        if ((*it)->id == id) {
-            objects.erase(it);
-            // std::swap((*it), (*objects.end()));
-            // objects.pop_back();
+    const auto size = objects.size();
+    for (size_t i = 0; i < size; i++) {
+        const auto& object = objects[i];
+        if (object->id == id) {
+            const bool notLast = i < size - 1;
+            if (notLast) {
+                // NOTE swap, but with fewer steps because we'll remove the current object anyway
+                objects[i] = objects[size - 1];
+            }
+            objects.pop_back();
             return;
         }
     }
-    // std::cout << "No " << id << std::endl;
     assert(false && "::> There was no such Object in the Bucket");
 }
 
@@ -349,6 +300,28 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
 //     assert(false && "::> No Object with provided Id found.");
 //     return objects[Bucket()][0]; // stub
 // }
+// ============================================================================
+inline HmlPhysics::Bucket::Bounding HmlPhysics::boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept {
+    return std::make_pair(
+        Bucket{
+            .x = std::min(bb1.first.x, bb2.first.x),
+            .y = std::min(bb1.first.y, bb2.first.y),
+            .z = std::min(bb1.first.z, bb2.first.z),
+        },
+        Bucket{
+            .x = std::max(bb1.second.x, bb2.second.x),
+            .y = std::max(bb1.second.y, bb2.second.y),
+            .z = std::max(bb1.second.z, bb2.second.z),
+        }
+    );
+}
+
+inline HmlPhysics::Bucket::Bounding HmlPhysics::boundingBucketsForObject(const Object& object) noexcept {
+    const auto aabb = object.aabb();
+    const auto begin = Bucket::fromPos(aabb.begin);
+    const auto end = Bucket::fromPos(aabb.end);
+    return std::make_pair(begin, end);
+}
 // ============================================================================
 // ============================================================================
 // ============================================================================

@@ -580,10 +580,8 @@ bool Himmel::init() noexcept {
             // }
 
             for (const auto& [bucket, objects] : hmlPhysics->objectsInBuckets) {
-                std::cout << "In bucket " << std::bitset<64>(HmlPhysics::BucketHasher{}(bucket)) << '\n';
                 for (const auto& object : objects) {
                     const auto id = object->id;
-                    std::cout << id << " ";
                     auto& entity = physicsIdToEntity[id];
 
                     if (object->isSphere()) {
@@ -602,8 +600,6 @@ bool Himmel::init() noexcept {
                         // TODO
                     }
                 }
-                std::cout << '\n';
-                std::cout << '\n';
             }
         }
 

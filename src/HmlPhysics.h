@@ -11,6 +11,7 @@
 #include <map>
 #include <memory>
 #include <bitset>
+#include <chrono>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE

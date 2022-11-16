@@ -191,12 +191,15 @@ void HmlPhysics::updateForDt(float dt) noexcept {
 
     const uint8_t SUBSTEPS = 1;
     const float subDt = dt / SUBSTEPS;
+    static int stepTimer = 0;
     for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
         // Apply velocity onto position change
+        const auto mark1 = std::chrono::high_resolution_clock::now();
         for (auto& object : objects) {
             if (object->isStationary()) continue;
             object->position += object->dynamicProperties->velocity * subDt;
         }
+        const auto mark2 = std::chrono::high_resolution_clock::now();
 
         // Check for and handle collisions
         for (const auto& [_bucket, objects] : objectsInBuckets) {
@@ -211,9 +214,22 @@ void HmlPhysics::updateForDt(float dt) noexcept {
                 }
             }
         }
+        const auto mark3 = std::chrono::high_resolution_clock::now();
 
         // Put objects into proper buckets after they have finished being moved
         reassign();
+        const auto mark4 = std::chrono::high_resolution_clock::now();
+
+        stepTimer++;
+        if (false && stepTimer == 100) {
+            stepTimer = 0;
+            const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
+            const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
+            const auto step3Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark4 - mark3).count();
+            std::cout << "Step 1 = " << static_cast<float>(step1Mks) << " mks\n";
+            std::cout << "Step 2 = " << static_cast<float>(step2Mks) << " mks\n";
+            std::cout << "Step 3 = " << static_cast<float>(step3Mks) << " mks\n";
+        }
     }
 }
 // ============================================================================
@@ -242,11 +258,9 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
     for (size_t i = 0; i < size; i++) {
         const auto& object = objects[i];
         if (object->id == id) {
-            const bool notLast = i < size - 1;
-            if (notLast) {
-                // NOTE swap, but with fewer steps because we'll remove the current object anyway
-                objects[i] = objects[size - 1];
-            }
+            // NOTE we don't check if this is the same object to remove the unnesessary if 
+            // NOTE swap, but with fewer steps because we'll remove the current object anyway
+            objects[i] = objects[size - 1];
             objects.pop_back();
             return;
         }

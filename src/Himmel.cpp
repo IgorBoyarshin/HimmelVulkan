@@ -950,6 +950,17 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
     }
 
+    { // Print HmlPhysics stats
+        static bool f3Pressed = false;
+        if (!f3Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F3) == GLFW_PRESS) {
+            f3Pressed = true;
+
+            hmlPhysics->printStats();
+        } else if (f3Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F3) == GLFW_RELEASE) {
+            f3Pressed = false;
+        }
+    }
+
     // NOTE allow cursor position update and only disable camera rotation reaction
     // in order not to have the camera jump on re-acquiring control from the ui
     // due to the cursor (pointer) position change that will have happened.

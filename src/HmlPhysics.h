@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <unordered_map>
+#include <map>
 #include <memory>
 #include <bitset>
 
@@ -170,7 +171,7 @@ struct HmlPhysics {
     void updateForDt(float dt) noexcept;
     // ========================================================================
     struct Bucket {
-        inline static constexpr float SIZE = 8.0f;
+        inline static constexpr float SIZE = 7.0f;
 
         using Coord = int16_t;
         using Hash = uint64_t;
@@ -216,6 +217,7 @@ struct HmlPhysics {
     static Bucket::Bounding boundingBucketsForObject(const Object& object) noexcept;
     void reassign(const std::vector<Bucket::Bounding>& boundingBucketsBefore) noexcept;
     void removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept;
+    void printStats() const noexcept;
 
     Object::Id registerObject(Object&& object) noexcept;
     // Object& getObject(Object::Id id) noexcept;

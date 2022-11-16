@@ -178,36 +178,6 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
 }
 
 
-void HmlPhysics::reassign(const std::vector<Bucket::Bounding>& boundingBucketsBefore) noexcept {
-    auto boundingBoundsBeforeIt = allBoundingBucketsBefore.cbegin();
-    for (const auto& object : objects) {
-        const auto& boundingBucketsBefore = *boundingBoundsBeforeIt;
-        ++boundingBoundsBeforeIt;
-
-        if (object->isStationary()) continue;
-
-        const auto boundingBucketsAfter = boundingBucketsForObject(*object);
-        if (boundingBucketsBefore == boundingBucketsAfter) continue;
-
-        const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);
-        for (Bucket::Coord x = superset.first.x; x <= superset.second.x; x++) {
-            for (Bucket::Coord y = superset.first.y; y <= superset.second.y; y++) {
-                for (Bucket::Coord z = superset.first.z; z <= superset.second.z; z++) {
-                    const Bucket b{ .x = x, .y = y, .z = z };
-                    const bool before = b.isInsideBoundingBuckets(boundingBucketsBefore);
-                    const bool after  = b.isInsideBoundingBuckets(boundingBucketsAfter);
-                    if (before && !after) { // remove from this bucket
-                        removeObjectWithIdFromBucket(object->id, b);
-                    } else if (!before && after) { // add to this bucket
-                        objectsInBuckets[b].push_back(object);
-                    }
-                }
-            }
-        }
-    }
-}
-
-
 void HmlPhysics::updateForDt(float dt) noexcept {
     const uint8_t SUBSTEPS = 1;
     const float subDt = dt / SUBSTEPS;
@@ -301,6 +271,57 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
 //     return objects[Bucket()][0]; // stub
 // }
 // ============================================================================
+void HmlPhysics::printStats() const noexcept {
+    std::map<uint32_t, uint32_t> countOfBucketsWithSize;
+    for (const auto& [bucket, objects] : objectsInBuckets) {
+        const auto size = objects.size();
+        countOfBucketsWithSize[size]++;
+    }
+
+    uint32_t min = objects.size();
+    uint32_t max = 0;
+    uint32_t avg = 0;
+    for (const auto& [size, count] : countOfBucketsWithSize) {
+        std::cout << "With size [" << size << "] there are " << count << " buckets\n";
+        if (size < min) min = size;
+        if (size > max) max = size;
+        avg += size * count;
+    }
+
+    std::cout << "Min size=" << min << "; Max size=" << max << "; Avg in bucket=" << (avg / countOfBucketsWithSize.size()) << "\n";
+}
+
+
+void HmlPhysics::reassign(const std::vector<Bucket::Bounding>& boundingBucketsBefore) noexcept {
+    auto boundingBoundsBeforeIt = allBoundingBucketsBefore.cbegin();
+    for (const auto& object : objects) {
+        const auto& boundingBucketsBefore = *boundingBoundsBeforeIt;
+        ++boundingBoundsBeforeIt;
+
+        if (object->isStationary()) continue;
+
+        const auto boundingBucketsAfter = boundingBucketsForObject(*object);
+        if (boundingBucketsBefore == boundingBucketsAfter) continue;
+
+        const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);
+        for (Bucket::Coord x = superset.first.x; x <= superset.second.x; x++) {
+            for (Bucket::Coord y = superset.first.y; y <= superset.second.y; y++) {
+                for (Bucket::Coord z = superset.first.z; z <= superset.second.z; z++) {
+                    const Bucket b{ .x = x, .y = y, .z = z };
+                    const bool before = b.isInsideBoundingBuckets(boundingBucketsBefore);
+                    const bool after  = b.isInsideBoundingBuckets(boundingBucketsAfter);
+                    if (before && !after) { // remove from this bucket
+                        removeObjectWithIdFromBucket(object->id, b);
+                    } else if (!before && after) { // add to this bucket
+                        objectsInBuckets[b].push_back(object);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 inline HmlPhysics::Bucket::Bounding HmlPhysics::boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept {
     return std::make_pair(
         Bucket{

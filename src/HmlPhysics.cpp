@@ -203,11 +203,16 @@ void HmlPhysics::updateForDt(float dt) noexcept {
         const auto mark2 = std::chrono::high_resolution_clock::now();
 
         // Check for and handle collisions
-        for (const auto& [_bucket, objects] : objectsInBuckets) {
+        for (const auto& [bucket, objects] : objectsInBuckets) {
+            if (objects.empty()) {
+                objectsInBuckets.erase(bucket);
+                continue;
+            }
+
             for (size_t i = 0; i < objects.size(); i++) {
                 auto& obj1 = objects[i];
 
-                // For each object, check test it against all other objects in current bucket...
+                // For each object, test it against all other objects in current bucket...
                 for (size_t j = i + 1; j < objects.size(); j++) {
                     auto& obj2 = objects[j];
                     if (obj1->isStationary() && obj2->isStationary()) continue;

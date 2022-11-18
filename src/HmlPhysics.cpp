@@ -88,7 +88,7 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b, co
         const auto centers = s.center - b.center;
         const auto extent = b.halfDimensions + s.radius - std::abs(centers); // all non-negative
         // NOTE disable y-axis collision resolution for now
-        const float minExtent = std::min(extent.x, extent.z); 
+        const float minExtent = std::min(extent.x, extent.z);
         const auto dir = glm::vec3{
             std::copysign(minExtent == extent.x, centers.x),
             0.0f,
@@ -124,7 +124,7 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b1, c
         const auto centers = b2.center - b1.center;
         const auto extent = b1.halfDimensions + b2.halfDimensions - std::abs(centers); // all non-negative
         // NOTE disable y-axis collision resolution for now
-        const float minExtent = std::min(extent.x, extent.z); 
+        const float minExtent = std::min(extent.x, extent.z);
         const auto dir = glm::vec3{
             std::copysign(minExtent == extent.x, centers.x),
             0.0f,
@@ -203,9 +203,10 @@ void HmlPhysics::updateForDt(float dt) noexcept {
         const auto mark2 = std::chrono::high_resolution_clock::now();
 
         // Check for and handle collisions
-        for (const auto& [bucket, objects] : objectsInBuckets) {
+        for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
+            const auto& [_bucket, objects] = *it;
             if (objects.empty()) {
-                objectsInBuckets.erase(bucket);
+                it = objectsInBuckets.erase(it);
                 continue;
             }
 
@@ -219,6 +220,8 @@ void HmlPhysics::updateForDt(float dt) noexcept {
                     process(*obj1, *obj2);
                 }
             }
+
+            ++it;
         }
         const auto mark3 = std::chrono::high_resolution_clock::now();
 
@@ -264,7 +267,7 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
     for (size_t i = 0; i < size; i++) {
         const auto& object = objects[i];
         if (object->id == id) {
-            // NOTE we don't check if this is the same object to remove the unnesessary if 
+            // NOTE we don't check if this is the same object to remove the unnesessary if
             // NOTE swap, but with fewer steps because we'll remove the current object anyway
             objects[i] = objects[size - 1];
             objects.pop_back();

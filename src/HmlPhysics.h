@@ -25,8 +25,8 @@ std::ostream& operator<<(std::ostream& stream, const glm::vec3& v);
 
 namespace std {
     glm::vec3 abs(const glm::vec3& v);
-    // glm::vec3 copysign(const glm::vec3& v, const glm::vec3& sign);
     float absmax(const glm::vec3& v);
+    float min(const glm::vec3& v);
 }
 
 namespace glm {

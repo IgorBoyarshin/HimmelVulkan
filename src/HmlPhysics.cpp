@@ -11,14 +11,6 @@ namespace std {
         return glm::vec3{ std::abs(v.x), std::abs(v.y), std::abs(v.z) };
     }
 
-    // glm::vec3 copysign(const glm::vec3& v, const glm::vec3& sign) {
-    //     return glm::vec3{
-    //         std::copysign(v.x, sign.x),
-    //         std::copysign(v.y, sign.y),
-    //         std::copysign(v.z, sign.z)
-    //     };
-    // }
-
     float absmax(const glm::vec3& v) {
         const auto absV = std::abs(v);
         float max = v.x;
@@ -34,6 +26,18 @@ namespace std {
         max    = max    * (1 - foundNew) + v.z    * foundNew;
 
         return max;
+    }
+
+    float min(const glm::vec3& v) {
+        float min = v.x;
+        bool foundNew;
+
+        foundNew = v.y < min;
+        min = min * (1 - foundNew) + v.y * foundNew;
+        foundNew = v.z < min;
+        min = min * (1 - foundNew) + v.z * foundNew;
+
+        return min;
     }
 }
 
@@ -81,22 +85,19 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b, co
     const auto start  = b.center - b.halfDimensions - s.radius;
     const auto finish = b.center + b.halfDimensions + s.radius;
     if (start < s.center && s.center < finish) {
-        // NOTE we care only about the predominant direction, and in terms of math the
-        // radius component has no effect because it is the same in all directions, so
-        // we omit it to simplify calculations.
         const auto centers = s.center - b.center;
-        const auto n = centers / b.halfDimensions;
-        const float max = std::absmax(n);
+        const auto extent = b.halfDimensions + s.radius - std::abs(centers); // all non-negative
+        // NOTE disable y-axis collision resolution for now
+        const float minExtent = std::min(extent.x, extent.z); 
         const auto dir = glm::vec3{
-            std::copysign(max == n.x, n.x),
-            std::copysign(max == n.y, n.y),
-            std::copysign(max == n.z, n.z),
+            std::copysign(minExtent == extent.x, centers.x),
+            0.0f,
+            std::copysign(minExtent == extent.z, centers.z),
         };
-        // NOTE second abs is actually redundant because "dir" has the same sign as "centers"
-        const float extent = std::abs(glm::dot(b.halfDimensions, dir)) + s.radius - std::abs(glm::dot(centers, dir));
+
         return { Detection{
             .dir = dir,
-            .extent = extent,
+            .extent = minExtent,
         }};
     }
 
@@ -121,18 +122,18 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b1, c
     const auto finish = b1.center + b1.halfDimensions + b2.halfDimensions;
     if (start < b2.center && b2.center < finish) {
         const auto centers = b2.center - b1.center;
-        const auto n = centers / (b1.halfDimensions + b2.halfDimensions);
-        const float max = std::absmax(n);
+        const auto extent = b1.halfDimensions + b2.halfDimensions - std::abs(centers); // all non-negative
+        // NOTE disable y-axis collision resolution for now
+        const float minExtent = std::min(extent.x, extent.z); 
         const auto dir = glm::vec3{
-            std::copysign(max == n.x, n.x),
-            std::copysign(max == n.y, n.y),
-            std::copysign(max == n.z, n.z),
+            std::copysign(minExtent == extent.x, centers.x),
+            0.0f,
+            std::copysign(minExtent == extent.z, centers.z),
         };
-        // NOTE second abs is actually redundant because dir has the same sign as centers
-        const float extent = std::abs(glm::dot(b1.halfDimensions + b2.halfDimensions, dir)) - std::abs(glm::dot(centers, dir));
+
         return { Detection{
             .dir = dir,
-            .extent = extent,
+            .extent = minExtent,
         }};
     }
 

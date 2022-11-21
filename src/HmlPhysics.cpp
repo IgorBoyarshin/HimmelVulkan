@@ -80,6 +80,150 @@ namespace glm {
 }
 
 
+std::optional<HmlPhysics::Detection> HmlPhysics::gjk(const Object::Box& b1, const Object::Box& b2) noexcept {
+    static const auto furthestPointInDir = [](const glm::vec3& dir, std::span<const glm::vec3> ps){
+        float max = std::numeric_limits<float>::lowest();
+        glm::vec3 furthest;
+        for (const auto& p : ps) {
+            const auto proj = glm::dot(dir, p);
+            const float foundNew = static_cast<float>(proj > max);
+            max      = max      * (1 - foundNew) + proj * foundNew;
+            furthest = furthest * (1 - foundNew) + p    * foundNew;
+        }
+        return furthest;
+    };
+    static const auto calcSupport = [](const glm::vec3& dir, std::span<const glm::vec3> ps1, std::span<const glm::vec3> ps2){
+        return furthestPointInDir(dir, ps1) - furthestPointInDir(-dir, ps2);
+    };
+    static const auto pointsFor = [](const Object::Box& b){
+        assert(b.modelMatrixCached);
+        const auto& modelMatrix = *(b.modelMatrixCached);
+        glm::vec3 i1{ modelMatrix[0][0], modelMatrix[0][1], modelMatrix[0][2] };
+        glm::vec3 j1{ modelMatrix[1][0], modelMatrix[1][1], modelMatrix[1][2] };
+        glm::vec3 k1{ modelMatrix[2][0], modelMatrix[2][1], modelMatrix[2][2] };
+
+        int index = 0;
+        const glm::vec3 center{ modelMatrix [3][0], modelMatrix[3][1], modelMatrix[3][2] };
+        std::array<glm::vec3, 8> ps;
+        for (float i = -1; i <= 1; i += 2) {
+            for (float j = -1; j <= 1; j += 2) {
+                for (float k = -1; k <= 1; k += 2) {
+                    ps[index++] = (i * i1 + j * j1 + k * k1) + center;
+                }
+            }
+        }
+        assert(index == 8);
+
+        return ps;
+    };
+    static const auto sameDir = [](const glm::vec3& a, const glm::vec3& b){
+        return glm::dot(a, b) >= 0.0f;
+    };
+    static const auto forLine = [](Simplex& simplex, glm::vec3& dir){
+        const auto& a = simplex[0];
+        const auto& b = simplex[1];
+        const auto ab = b - a;
+        const auto ao =   - a;
+        if (sameDir(ab, ao)) {
+            dir = glm::cross(glm::cross(ab, ao), ab);
+        } else {
+            simplex = { a };
+            dir = ao;
+        }
+        return false;
+    };
+    static const auto forTriangle = [](Simplex& simplex, glm::vec3& dir){
+        const auto& a = simplex[0];
+        const auto& b = simplex[1];
+        const auto& c = simplex[2];
+        const auto ab = b - a;
+        const auto ac = c - a;
+        const auto ao =   - a;
+        const auto abc = glm::cross(ab, ac);
+        if (sameDir(glm::cross(abc, ac), ao)) {
+            if (sameDir(ac, ao)) {
+                simplex = { a, c };
+                dir = glm::cross(glm::cross(ac, ao), ac);
+            } else {
+                simplex = { a, b };
+                return forLine(simplex, dir);
+            }
+        } else {
+            if (sameDir(glm::cross(ab, abc), ao)) {
+                simplex = { a, b };
+                return forLine(simplex, dir);
+            } else {
+                if (sameDir(abc, ao)) {
+                    dir = abc;
+                } else {
+                    simplex = { a, c, b };
+                    dir = -abc;
+                }
+                return false;
+            }
+        }
+        return false;
+    };
+    static const auto forTetrahedron = [](Simplex& simplex, glm::vec3& dir){
+        const auto& a = simplex[0];
+        const auto& b = simplex[1];
+        const auto& c = simplex[2];
+        const auto& d = simplex[3];
+        const auto ab = b - a;
+        const auto ac = c - a;
+        const auto ad = d - a;
+        const auto ao =   - a;
+        const auto abc = glm::cross(ab, ac);
+        const auto acd = glm::cross(ac, ad);
+        const auto adb = glm::cross(ad, ab);
+        if (sameDir(abc, ao)) {
+            simplex = { a, b, c };
+            return forTriangle(simplex, dir);
+        }
+        if (sameDir(acd, ao)) {
+            simplex = { a, c, d };
+            return forTriangle(simplex, dir);
+        }
+        if (sameDir(adb, ao)) {
+            simplex = { a, d, b };
+            return forTriangle(simplex, dir);
+        }
+        return true;
+    };
+    static const auto nextSimplex = [](Simplex& simplex, glm::vec3& dir){
+        switch (simplex.size()) {
+            case 2: return forLine       (simplex, dir);
+            case 3: return forTriangle   (simplex, dir);
+            case 4: return forTetrahedron(simplex, dir);
+        }
+        assert(false && "Unexpected Simplex size in nextSimplex()");
+        return false;
+    };
+
+    const glm::vec3 initialDir{1, 0, 0};
+    const auto ps1 = pointsFor(b1);
+    const auto ps2 = pointsFor(b2);
+    auto support = calcSupport(initialDir, ps1, ps2);
+
+    Simplex simplex;
+    simplex.push_front(support);
+
+    glm::vec3 dir = -support;
+    while (true) {
+        support = calcSupport(dir, ps1, ps2);
+        if (glm::dot(support, dir) <= 0.0f) return std::nullopt; // no collision
+        simplex.push_front(support);
+        if (nextSimplex(simplex, dir)) return { Detection{
+            .dir = dir,
+            .extent = 0.0f,
+            .contactPoints = {},
+        }};
+    }
+
+    return std::nullopt;
+}
+
+
 template<typename Arg1, typename Arg2>
 std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Arg1& arg1, const Arg2& arg2) noexcept {
     static bool alreadyAsserted = false;
@@ -92,32 +236,6 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Arg1& arg1, const 
 }
 
 
-// Returns dir from b1 towards b2
-std::optional<HmlPhysics::Detection> HmlPhysics::detectAxisAlignedBoxes(const Object::Box& b1, const Object::Box& b2) noexcept {
-    const auto start  = b1.center - b1.halfDimensions - b2.halfDimensions;
-    const auto finish = b1.center + b1.halfDimensions + b2.halfDimensions;
-    if (start < b2.center && b2.center < finish) {
-        const auto centers = b2.center - b1.center;
-        const auto extent = b1.halfDimensions + b2.halfDimensions - std::abs(centers); // all non-negative
-        // NOTE disable y-axis collision resolution for now
-        const float minExtent = std::min(extent.x, extent.z);
-        const auto dir = glm::vec3{
-            std::copysign(minExtent == extent.x, centers.x),
-            0.0f,
-            std::copysign(minExtent == extent.z, centers.z),
-        };
-
-        return { Detection{
-            .dir = dir,
-            .extent = minExtent,
-            .contactPoints = {},
-        }};
-    }
-
-    return std::nullopt;
-}
-
-
 // Returns dir from s1 towards s2
 template<>
 std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Sphere& s1, const Object::Sphere& s2) noexcept {
@@ -126,10 +244,11 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Sphere& s1
     const float extent = (s1.radius + s2.radius) - lengthC;
     if (extent <= 0.0f) return std::nullopt;
     const auto normC = c / lengthC;
+    const auto middlePoint = s1.center + normC * (s1.radius + extent * 0.5f);
     return { Detection {
         .dir = normC,
         .extent = extent,
-        .contactPoints = {},
+        .contactPoints = { middlePoint },
     }};
 }
 
@@ -149,11 +268,12 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b, co
             0.0f,
             std::copysign(minExtent == extent.z, centers.z),
         };
+        const auto contactPoint = s.center - dir * (s.radius + minExtent * 0.5f);
 
         return { Detection{
             .dir = dir,
             .extent = minExtent,
-            .contactPoints = {},
+            .contactPoints = { contactPoint },
         }};
     }
 
@@ -174,142 +294,9 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Sphere& s,
 // Returns dir from b1 towards b2
 template<>
 std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b1, const Object::Box& b2) noexcept {
-    assert(b1.modelMatrixCached);
-    assert(b2.modelMatrixCached);
-    const auto& modelMatrix1 = *(b1.modelMatrixCached);
-    const auto& modelMatrix2 = *(b2.modelMatrixCached);
-    glm::vec3 i1{ modelMatrix1[0][0], modelMatrix1[0][1], modelMatrix1[0][2] };
-    glm::vec3 j1{ modelMatrix1[1][0], modelMatrix1[1][1], modelMatrix1[1][2] };
-    glm::vec3 k1{ modelMatrix1[2][0], modelMatrix1[2][1], modelMatrix1[2][2] };
-    glm::vec3 i2{ modelMatrix2[0][0], modelMatrix2[0][1], modelMatrix2[0][2] };
-    glm::vec3 j2{ modelMatrix2[1][0], modelMatrix2[1][1], modelMatrix2[1][2] };
-    glm::vec3 k2{ modelMatrix2[2][0], modelMatrix2[2][1], modelMatrix2[2][2] };
-    // i1 = glm::normalize(i1);
-    // j1 = glm::normalize(j1);
-    // k1 = glm::normalize(k1);
-    // i2 = glm::normalize(i2);
-    // j2 = glm::normalize(j2);
-    // k2 = glm::normalize(k2);
-
-    int index;
-    const glm::vec3 center1{ modelMatrix1[3][0], modelMatrix1[3][1], modelMatrix1[3][2] };
-    std::array<glm::vec3, 8> p1;
-    index = 0;
-    for (float i = -1; i <= 1; i += 2) {
-        for (float j = -1; j <= 1; j += 2) {
-            for (float k = -1; k <= 1; k += 2) {
-                // p1[index++] = (i * i1 + j * j1 + k * k1) * b1.halfDimensions + center1;
-                p1[index++] = (i * i1 + j * j1 + k * k1) + center1;
-            }
-        }
-    }
-    assert(index == 8);
-
-    const glm::vec3 center2{ modelMatrix2[3][0], modelMatrix2[3][1], modelMatrix2[3][2] };
-    std::array<glm::vec3, 8> p2;
-    index = 0;
-    for (float i = -1; i <= 1; i += 2) {
-        for (float j = -1; j <= 1; j += 2) {
-            for (float k = -1; k <= 1; k += 2) {
-                // p2[index++] = (i * i2 + j * j2 + k * k2) * b2.halfDimensions + center2;
-                p2[index++] = (i * i2 + j * j2 + k * k2) + center2;
-            }
-        }
-    }
-    assert(index == 8);
-
-    std::vector<glm::vec3> axes = { i1, j1, k1, i2, j2, k2 };
-    for (auto& a : axes) a = glm::normalize(a);
-    glm::vec3 dir;
-    float minExtent = std::numeric_limits<float>::max();
-    // float min;
-    // float max;
-    std::vector<std::pair<float, float>> minMaxPerAxis;
-    for (const auto& axis : axes) {
-        float min1 = std::numeric_limits<float>::max();
-        float max1 = std::numeric_limits<float>::lowest();
-        for (const auto& p : p1) {
-            const auto proj = glm::dot(p, axis);
-            if (proj < min1) min1 = proj;
-            if (proj > max1) max1 = proj;
-        }
-
-        float min2 = std::numeric_limits<float>::max();
-        float max2 = std::numeric_limits<float>::lowest();
-        for (const auto& p : p2) {
-            const auto proj = glm::dot(p, axis);
-            if (proj < min2) min2 = proj;
-            if (proj > max2) max2 = proj;
-        }
-
-        if (!(min1 < max2 && min2 < max1)) return std::nullopt;
-
-        const auto extent = std::min(max1 - min2, max2 - min1);
-        if (extent < minExtent) {
-            minExtent = extent;
-            dir = axis;
-        }
-        const float max = std::min(max1, max2);
-        const float min = std::max(min1, min2);
-        minMaxPerAxis.push_back(std::make_pair(min, max));
-    }
-
-    // Find contact points
-    std::vector<glm::vec3> contactPoints;
-    for (const auto& p : p1) {
-        int index = 0;
-        bool all = true;
-        for (const auto& axis : axes) {
-            const auto proj = glm::dot(p, axis);
-            const auto& [min, max] = minMaxPerAxis[index++];
-            if (min <= proj && proj <= max) {} else { all = false; break; }
-        }
-        if (all) contactPoints.push_back(p);
-    }
-    for (const auto& p : p2) {
-        int index = 0;
-        bool all = true;
-        for (const auto& axis : axes) {
-            const auto proj = glm::dot(p, axis);
-            const auto& [min, max] = minMaxPerAxis[index++];
-            if (min <= proj && proj <= max) {} else { all = false; break; }
-        }
-        if (all) contactPoints.push_back(p);
-    }
-
-    const auto centers = center2 - center1;
-    const bool aligned = glm::dot(centers, dir) >= 0.0f;
-    if (!aligned) dir *= -1;
-
-std::cout << "======================" << '\n';
-std::cout << "DETECT" << '\n';
-std::cout << "=========" << '\n';
-std::cout << "C1 = " << center1 << " C2= " << center2 << "\n";
-std::cout << "=========" << '\n';
-std::cout << "P1:" << '\n';
-for (const auto& p : p1) {
-    std::cout << p << '\n';
-}
-std::cout << "P2:" << '\n';
-for (const auto& p : p2) {
-    std::cout << p << '\n';
-}
-std::cout << "=========" << '\n';
-std::cout << "Dir = " << dir << "  MinEx=" << minExtent << '\n';
-std::cout << "B1=" << i1 << " " << j1 << " " << k1 << '\n';
-std::cout << "B2=" << i2 << " " << j2 << " " << k2 << '\n';
-std::cout << "====CP=====" << '\n';
-for (const auto& cp : contactPoints) std::cout << cp << ";";
-assert(!contactPoints.empty() && "No contact points");
-std::cout << "=========" << '\n';
-std::cout << std::endl;
-
-
-    return { Detection{
-        .dir = dir,
-        .extent = minExtent,
-        .contactPoints = contactPoints,
-    }};
+    // return detectAxisAlignedBoxes(b1, b2);
+    // return detectOrientedBoxesWithSat(b1, b2);
+    return gjk(b1, b2);
 }
 
 
@@ -341,17 +328,14 @@ void HmlPhysics::resolveVelocities(Object& obj1, Object& obj2, const Detection& 
     const glm::vec3 center2{ obj2.modelMatrix()[3][0], obj2.modelMatrix()[3][1], obj2.modelMatrix()[3][2] };
     const auto rap = avg(contactPoints) - center1;
     const auto rbp = avg(contactPoints) - center2;
-    std::cout << "Avg=" << avg(contactPoints) << '\n';
-    std::cout << "RAP=" << rap << '\n';
-    std::cout << "RBP=" << rbp << '\n';
-    std::cout << "dir=" << dir << '\n';
+    // std::cout << "Avg=" << avg(contactPoints) << '\n';
+    // std::cout << "RAP=" << rap << '\n';
+    // std::cout << "RBP=" << rbp << '\n';
+    // std::cout << "dir=" << dir << '\n';
     const auto a = glm::cross(obj1DP.invRotationalInertiaTensor * glm::cross(rap, dir), dir);
     const auto b = glm::cross(obj2DP.invRotationalInertiaTensor * glm::cross(rbp, dir), dir);
     denom += glm::dot(a + b, dir);
-    std::cout << "+denom=" << glm::dot(a + b, dir) << '\n';
-    // std::cout << dir << '\n';
-    // std::cout << glm::cross(rap, dir) << "   " << glm::cross(rbp, dir) << '\n';
-    // std::cout <<aa << "   " << b << '\n';
+    // std::cout << "+denom=" << glm::dot(a + b, dir) << '\n';
     const float j = nom / denom;
     // const float j = -(1.0f + e) * glm::dot(relativeV, dir) / (obj1DP.invMass + obj2DP.invMass);
     const auto impulse = j * dir;
@@ -376,6 +360,11 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
     else if (obj1.isBox()    && obj2.isSphere()) detectionOpt = detect(obj1.asBox(),    obj2.asSphere());
     else if (obj1.isSphere() && obj2.isBox())    detectionOpt = detect(obj1.asSphere(), obj2.asBox());
     else if (obj1.isBox()    && obj2.isBox())    detectionOpt = detect(obj1.asBox(),    obj2.asBox());
+
+    // if (obj1.isBox()    && obj2.isBox()) {
+    //     if (gjk(obj1.asBox(), obj2.asBox())) std::cout << "---- DETECT ----\n";
+    //     else std::cout << "-- NOTHING --\n";
+    // }
 
     if (!detectionOpt) return;
     const auto& [dir, extent, _contactPoints] = *detectionOpt;
@@ -592,6 +581,164 @@ inline HmlPhysics::Bucket::Bounding HmlPhysics::boundingBucketsForObject(const O
     const auto begin = Bucket::fromPos(aabb.begin);
     const auto end = Bucket::fromPos(aabb.end);
     return std::make_pair(begin, end);
+}
+// ============================================================================
+// ============================================================================
+// ============================================================================
+// Returns dir from b1 towards b2
+std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept {
+    assert(b1.modelMatrixCached);
+    assert(b2.modelMatrixCached);
+    const auto& modelMatrix1 = *(b1.modelMatrixCached);
+    const auto& modelMatrix2 = *(b2.modelMatrixCached);
+    glm::vec3 i1{ modelMatrix1[0][0], modelMatrix1[0][1], modelMatrix1[0][2] };
+    glm::vec3 j1{ modelMatrix1[1][0], modelMatrix1[1][1], modelMatrix1[1][2] };
+    glm::vec3 k1{ modelMatrix1[2][0], modelMatrix1[2][1], modelMatrix1[2][2] };
+    glm::vec3 i2{ modelMatrix2[0][0], modelMatrix2[0][1], modelMatrix2[0][2] };
+    glm::vec3 j2{ modelMatrix2[1][0], modelMatrix2[1][1], modelMatrix2[1][2] };
+    glm::vec3 k2{ modelMatrix2[2][0], modelMatrix2[2][1], modelMatrix2[2][2] };
+
+    int index;
+    const glm::vec3 center1{ modelMatrix1[3][0], modelMatrix1[3][1], modelMatrix1[3][2] };
+    std::array<glm::vec3, 8> p1;
+    index = 0;
+    for (float i = -1; i <= 1; i += 2) {
+        for (float j = -1; j <= 1; j += 2) {
+            for (float k = -1; k <= 1; k += 2) {
+                p1[index++] = (i * i1 + j * j1 + k * k1) + center1;
+            }
+        }
+    }
+    assert(index == 8);
+
+    const glm::vec3 center2{ modelMatrix2[3][0], modelMatrix2[3][1], modelMatrix2[3][2] };
+    std::array<glm::vec3, 8> p2;
+    index = 0;
+    for (float i = -1; i <= 1; i += 2) {
+        for (float j = -1; j <= 1; j += 2) {
+            for (float k = -1; k <= 1; k += 2) {
+                p2[index++] = (i * i2 + j * j2 + k * k2) + center2;
+            }
+        }
+    }
+    assert(index == 8);
+
+    std::vector<glm::vec3> axes = { i1, j1, k1, i2, j2, k2 };
+    for (auto& a : axes) a = glm::normalize(a);
+    glm::vec3 dir;
+    float minExtent = std::numeric_limits<float>::max();
+    std::vector<std::pair<float, float>> minMaxPerAxis;
+    for (const auto& axis : axes) {
+        float min1 = std::numeric_limits<float>::max();
+        float max1 = std::numeric_limits<float>::lowest();
+        for (const auto& p : p1) {
+            const auto proj = glm::dot(p, axis);
+            if (proj < min1) min1 = proj;
+            if (proj > max1) max1 = proj;
+        }
+
+        float min2 = std::numeric_limits<float>::max();
+        float max2 = std::numeric_limits<float>::lowest();
+        for (const auto& p : p2) {
+            const auto proj = glm::dot(p, axis);
+            if (proj < min2) min2 = proj;
+            if (proj > max2) max2 = proj;
+        }
+
+        if (!(min1 < max2 && min2 < max1)) return std::nullopt;
+
+        const auto extent = std::min(max1 - min2, max2 - min1);
+        if (extent < minExtent) {
+            minExtent = extent;
+            dir = axis;
+        }
+        const float max = std::min(max1, max2);
+        const float min = std::max(min1, min2);
+        minMaxPerAxis.push_back(std::make_pair(min, max));
+    }
+
+    // Find contact points
+    std::vector<glm::vec3> contactPoints;
+    for (const auto& p : p1) {
+        int index = 0;
+        bool all = true;
+        for (const auto& axis : axes) {
+            const auto proj = glm::dot(p, axis);
+            const auto& [min, max] = minMaxPerAxis[index++];
+            if (min <= proj && proj <= max) {} else { all = false; break; }
+        }
+        if (all) contactPoints.push_back(p);
+    }
+    for (const auto& p : p2) {
+        int index = 0;
+        bool all = true;
+        for (const auto& axis : axes) {
+            const auto proj = glm::dot(p, axis);
+            const auto& [min, max] = minMaxPerAxis[index++];
+            if (min <= proj && proj <= max) {} else { all = false; break; }
+        }
+        if (all) contactPoints.push_back(p);
+    }
+
+    const auto centers = center2 - center1;
+    const bool aligned = glm::dot(centers, dir) >= 0.0f;
+    if (!aligned) dir *= -1;
+
+std::cout << "======================" << '\n';
+std::cout << "DETECT" << '\n';
+std::cout << "=========" << '\n';
+std::cout << "C1 = " << center1 << " C2= " << center2 << "\n";
+std::cout << "=========" << '\n';
+std::cout << "P1:" << '\n';
+for (const auto& p : p1) {
+    std::cout << p << '\n';
+}
+std::cout << "P2:" << '\n';
+for (const auto& p : p2) {
+    std::cout << p << '\n';
+}
+std::cout << "=========" << '\n';
+std::cout << "Dir = " << dir << "  MinEx=" << minExtent << '\n';
+std::cout << "B1=" << i1 << " " << j1 << " " << k1 << '\n';
+std::cout << "B2=" << i2 << " " << j2 << " " << k2 << '\n';
+std::cout << "====CP=====" << '\n';
+for (const auto& cp : contactPoints) std::cout << cp << ";";
+assert(!contactPoints.empty() && "No contact points");
+std::cout << "=========" << '\n';
+std::cout << std::endl;
+
+
+    return { Detection{
+        .dir = dir,
+        .extent = minExtent,
+        .contactPoints = contactPoints,
+    }};
+}
+
+
+// Returns dir from b1 towards b2
+std::optional<HmlPhysics::Detection> HmlPhysics::detectAxisAlignedBoxes(const Object::Box& b1, const Object::Box& b2) noexcept {
+    const auto start  = b1.center - b1.halfDimensions - b2.halfDimensions;
+    const auto finish = b1.center + b1.halfDimensions + b2.halfDimensions;
+    if (start < b2.center && b2.center < finish) {
+        const auto centers = b2.center - b1.center;
+        const auto extent = b1.halfDimensions + b2.halfDimensions - std::abs(centers); // all non-negative
+        // NOTE disable y-axis collision resolution for now
+        const float minExtent = std::min(extent.x, extent.z);
+        const auto dir = glm::vec3{
+            std::copysign(minExtent == extent.x, centers.x),
+            0.0f,
+            std::copysign(minExtent == extent.z, centers.z),
+        };
+
+        return { Detection{
+            .dir = dir,
+            .extent = minExtent,
+            .contactPoints = {},
+        }};
+    }
+
+    return std::nullopt;
 }
 // ============================================================================
 // ============================================================================

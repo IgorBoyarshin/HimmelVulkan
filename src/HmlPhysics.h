@@ -12,6 +12,7 @@
 #include <memory>
 #include <bitset>
 #include <chrono>
+#include <span>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -320,6 +321,7 @@ struct HmlPhysics {
     };
 
     std::optional<Detection> detectAxisAlignedBoxes(const Object::Box& b1, const Object::Box& b2) noexcept;
+    std::optional<Detection> detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept;
 
     // Returns dir from arg1 towards arg2
     template<typename Arg1, typename Arg2>
@@ -327,6 +329,31 @@ struct HmlPhysics {
 
     static void resolveVelocities(Object& obj1, Object& obj2, const Detection& detection) noexcept;
     static void process(Object& obj1, Object& obj2) noexcept;
+    // ========================================================================
+    struct Simplex {
+        inline Simplex() noexcept : points({ glm::vec3{0}, glm::vec3{0}, glm::vec3{0}, glm::vec3{0} }), count(0) {}
+        inline Simplex& operator=(std::initializer_list<glm::vec3> list) noexcept {
+            for (auto v = list.begin(); v != list.end(); ++v) {
+                points[std::distance(list.begin(), v)] = *v;
+            }
+            count = list.size();
+            return *this;
+        }
+
+        inline void push_front(const glm::vec3& p) noexcept {
+            points = { p, points[0], points[1], points[2] };
+            count = std::min(count + 1, static_cast<size_t>(4));
+        }
+
+        inline glm::vec3& operator[](size_t i) noexcept { return points[i]; }
+        inline const glm::vec3& operator[](size_t i) const noexcept { return points[i]; }
+        inline size_t size() const noexcept { return count; }
+
+        private:
+        std::array<glm::vec3, 4> points;
+        size_t count;
+    };
+    static std::optional<Detection> gjk(const Object::Box& b1, const Object::Box& b2) noexcept;
     // ========================================================================
     void updateForDt(float dt) noexcept;
     // ========================================================================

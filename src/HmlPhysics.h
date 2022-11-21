@@ -349,11 +349,18 @@ struct HmlPhysics {
         inline const glm::vec3& operator[](size_t i) const noexcept { return points[i]; }
         inline size_t size() const noexcept { return count; }
 
+        auto begin() const noexcept { return points.begin(); }
+        auto end()   const noexcept { return points.end() - (4 - count); }
+
         private:
         std::array<glm::vec3, 4> points;
         size_t count;
     };
+
+    static glm::vec3 furthestPointInDir(const glm::vec3& dir, std::span<const glm::vec3> ps) noexcept;
+    static glm::vec3 calcSupport(const glm::vec3& dir, std::span<const glm::vec3> ps1, std::span<const glm::vec3> ps2) noexcept;
     static std::optional<Detection> gjk(const Object::Box& b1, const Object::Box& b2) noexcept;
+    static std::optional<Detection> epa(const Simplex& simplex, const auto& ps1, const auto& ps2) noexcept;
     // ========================================================================
     void updateForDt(float dt) noexcept;
     // ========================================================================

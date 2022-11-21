@@ -80,21 +80,25 @@ namespace glm {
 }
 
 
+glm::vec3 HmlPhysics::furthestPointInDir(const glm::vec3& dir, std::span<const glm::vec3> ps) noexcept {
+    float max = std::numeric_limits<float>::lowest();
+    glm::vec3 furthest;
+    for (const auto& p : ps) {
+        const auto proj = glm::dot(dir, p);
+        const float foundNew = static_cast<float>(proj > max);
+        max      = max      * (1 - foundNew) + proj * foundNew;
+        furthest = furthest * (1 - foundNew) + p    * foundNew;
+    }
+    return furthest;
+}
+
+
+glm::vec3 HmlPhysics::calcSupport(const glm::vec3& dir, std::span<const glm::vec3> ps1, std::span<const glm::vec3> ps2) noexcept {
+    return furthestPointInDir(dir, ps1) - furthestPointInDir(-dir, ps2);
+}
+
+
 std::optional<HmlPhysics::Detection> HmlPhysics::gjk(const Object::Box& b1, const Object::Box& b2) noexcept {
-    static const auto furthestPointInDir = [](const glm::vec3& dir, std::span<const glm::vec3> ps){
-        float max = std::numeric_limits<float>::lowest();
-        glm::vec3 furthest;
-        for (const auto& p : ps) {
-            const auto proj = glm::dot(dir, p);
-            const float foundNew = static_cast<float>(proj > max);
-            max      = max      * (1 - foundNew) + proj * foundNew;
-            furthest = furthest * (1 - foundNew) + p    * foundNew;
-        }
-        return furthest;
-    };
-    static const auto calcSupport = [](const glm::vec3& dir, std::span<const glm::vec3> ps1, std::span<const glm::vec3> ps2){
-        return furthestPointInDir(dir, ps1) - furthestPointInDir(-dir, ps2);
-    };
     static const auto pointsFor = [](const Object::Box& b){
         assert(b.modelMatrixCached);
         const auto& modelMatrix = *(b.modelMatrixCached);
@@ -213,14 +217,144 @@ std::optional<HmlPhysics::Detection> HmlPhysics::gjk(const Object::Box& b1, cons
         support = calcSupport(dir, ps1, ps2);
         if (glm::dot(support, dir) <= 0.0f) return std::nullopt; // no collision
         simplex.push_front(support);
-        if (nextSimplex(simplex, dir)) return { Detection{
-            .dir = dir,
-            .extent = 0.0f,
-            .contactPoints = {},
-        }};
+        if (nextSimplex(simplex, dir)) {
+            auto detOpt = epa(simplex, ps1, ps2);
+            assert(detOpt && "EPA result differs from GJK");
+
+        const auto& modelMatrix = *(b1.modelMatrixCached);
+        // const glm::vec3 center{ modelMatrix [3][0], modelMatrix[3][1], modelMatrix[3][2] };
+        glm::vec3 i1{ modelMatrix[0][0], modelMatrix[0][1], modelMatrix[0][2] };
+        glm::vec3 j1{ modelMatrix[1][0], modelMatrix[1][1], modelMatrix[1][2] };
+        glm::vec3 k1{ modelMatrix[2][0], modelMatrix[2][1], modelMatrix[2][2] };
+        // const glm::vec3 halfDimensions{i1, j1, k1};
+            // const auto a = glm::dot(b1.halfDimensions, detOpt->dir);
+            const auto a = glm::dot(i1, detOpt->dir) + glm::dot(j1, detOpt->dir) + glm::dot(k1, detOpt->dir);
+
+            // detOpt->contactPoints = { b1.center + (a + detOpt->extent * 0.5f) * detOpt->dir};
+    static const auto avg = [](std::span<const glm::vec3> vs){
+        glm::vec3 sum{0};
+        for (const auto& v : vs) sum += v;
+        return sum / static_cast<float>(vs.size());
+    };
+            detOpt->contactPoints = { avg(std::span(simplex.begin(), simplex.end())) };
+            return detOpt;
+        }
     }
 
     return std::nullopt;
+}
+
+
+std::optional<HmlPhysics::Detection> HmlPhysics::epa(const Simplex& simplex, const auto& ps1, const auto& ps2) noexcept {
+    static const auto getFaceNormals = [](
+            const std::vector<glm::vec3>& polytope,
+            const std::vector<size_t>& faces){
+        std::vector<glm::vec4> normals;
+        size_t minTriangle = 0;
+        float minDst = std::numeric_limits<float>::max();
+
+        for (size_t i = 0; i < faces.size(); i += 3) {
+            const auto& a = polytope[faces[i + 0]];
+            const auto& b = polytope[faces[i + 1]];
+            const auto& c = polytope[faces[i + 2]];
+
+            auto normal = glm::normalize(glm::cross(b - a, c - a));
+            float dst = glm::dot(normal, a);
+            if (dst < 0) {
+                normal *= -1.0f;
+                dst    *= -1.0f;
+            }
+
+            normals.emplace_back(normal.x, normal.y, normal.z, dst);
+            if (dst < minDst) {
+                minTriangle = i / 3;
+                minDst = dst;
+            }
+        }
+
+        return std::make_pair<std::vector<glm::vec4>, size_t>(std::move(normals), std::move(minTriangle));
+    };
+    static const auto addIfUniqueEdge = [](std::vector<std::pair<size_t, size_t>>& edges, const std::vector<size_t>& faces, size_t a, size_t b){
+        //    0--<--3
+        //   / \ B /  A: 2-0
+        //  / A \ /   B: 0-2
+        // 1-->--2
+        const auto reverse = std::find(edges.begin(), edges.end(), std::make_pair(faces[b], faces[a]));
+        if (reverse != edges.end()) edges.erase(reverse);
+        else edges.emplace_back(faces[a], faces[b]);
+    };
+
+    std::vector<glm::vec3> polytope(simplex.begin(), simplex.end());
+    std::vector<size_t> faces = {
+        0, 1, 2,
+        0, 3, 1,
+        0, 2, 3,
+        1, 3, 2
+    };
+
+    auto [normals, minFace] = getFaceNormals(polytope, faces);
+
+    float minDst = std::numeric_limits<float>::max();
+    glm::vec3 minNormal;
+    while (minDst == std::numeric_limits<float>::max()) {
+        minNormal = glm::vec3(normals[minFace]);
+        minDst = normals[minFace].w;
+
+        const auto support = calcSupport(minNormal, ps1, ps2);
+        const float supportDst = glm::dot(minNormal, support);
+        if (std::abs(supportDst - minDst) > 0.001f) {
+            minDst = std::numeric_limits<float>::max();
+
+            std::vector<std::pair<size_t, size_t>> uniqueEdges;
+            for (size_t i = 0; i < normals.size(); i++) {
+                if (glm::dot(glm::vec3(normals[i]), support) < 0.0f) continue;
+
+                size_t f = i * 3;
+                addIfUniqueEdge(uniqueEdges, faces, f + 0, f + 1);
+                addIfUniqueEdge(uniqueEdges, faces, f + 1, f + 2);
+                addIfUniqueEdge(uniqueEdges, faces, f + 2, f + 0);
+
+                faces[f + 2] = faces.back(); faces.pop_back();
+                faces[f + 1] = faces.back(); faces.pop_back();
+                faces[f + 0] = faces.back(); faces.pop_back();
+                normals[i] = normals.back(); normals.pop_back();
+
+                i--;
+            }
+
+            std::vector<size_t> newFaces;
+            for (const auto& [edgeIndex1, edgeIndex2] : uniqueEdges) {
+                newFaces.push_back(edgeIndex1);
+                newFaces.push_back(edgeIndex2);
+                newFaces.push_back(polytope.size());
+            }
+
+            polytope.push_back(support);
+
+            const auto& [newNormals, newMinFace] = getFaceNormals(polytope, newFaces);
+
+            float oldMinDst = std::numeric_limits<float>::max();
+            for (size_t i = 0; i < normals.size(); i++) {
+                if (normals[i].w < oldMinDst) {
+                    oldMinDst = normals[i].w;
+                    minFace = i;
+                }
+            }
+
+            if (newNormals[newMinFace].w < oldMinDst) {
+                minFace = newMinFace + normals.size();
+            }
+
+            faces  .insert(faces  .end(), newFaces  .begin(), newFaces  .end());
+            normals.insert(normals.end(), newNormals.begin(), newNormals.end());
+        }
+    }
+
+    return Detection{
+        .dir = minNormal,
+        .extent = minDst + 0.001f,
+        .contactPoints = {},
+    };
 }
 
 
@@ -303,7 +437,7 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b1, c
 void HmlPhysics::resolveVelocities(Object& obj1, Object& obj2, const Detection& detection) noexcept {
     const auto& [dir, extent, contactPoints] = detection;
 
-    static const auto avg = [](const std::vector<glm::vec3>& vs){
+    static const auto avg = [](std::span<const glm::vec3> vs){
         glm::vec3 sum{0};
         for (const auto& v : vs) sum += v;
         return sum / static_cast<float>(vs.size());
@@ -343,13 +477,13 @@ void HmlPhysics::resolveVelocities(Object& obj1, Object& obj2, const Detection& 
         obj1.dynamicProperties->velocity -= impulse * obj1DP.invMass;
         // obj1.dynamicProperties->angularMomentum -= glm::cross(impulse, rap) * obj1DP.invRotationalInertiaTensor;
         obj1.dynamicProperties->angularMomentum -= glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor;
-        std::cout << "1=" << glm::cross(impulse, rap) * obj1DP.invRotationalInertiaTensor << '\n';
+        // std::cout << "1=" << glm::cross(impulse, rap) * obj1DP.invRotationalInertiaTensor << '\n';
     }
     if (!obj2.isStationary()) {
         obj2.dynamicProperties->velocity += impulse * obj2DP.invMass;
         // obj2.dynamicProperties->angularMomentum += glm::cross(impulse, rbp) * obj2DP.invRotationalInertiaTensor;
         obj2.dynamicProperties->angularMomentum += glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor;
-        std::cout << "2=" << glm::cross(impulse, rbp) * obj2DP.invRotationalInertiaTensor << '\n';
+        // std::cout << "2=" << glm::cross(impulse, rbp) * obj2DP.invRotationalInertiaTensor << '\n';
     }
 }
 
@@ -362,7 +496,17 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
     else if (obj1.isBox()    && obj2.isBox())    detectionOpt = detect(obj1.asBox(),    obj2.asBox());
 
     // if (obj1.isBox()    && obj2.isBox()) {
-    //     if (gjk(obj1.asBox(), obj2.asBox())) std::cout << "---- DETECT ----\n";
+    //     const auto resOpt = gjk(obj1.asBox(), obj2.asBox());
+    //     if (resOpt) {
+    //         std::cout << "---- DETECT ----\n";
+    //         std::cout << obj1.asBox().center << " " << obj2.asBox().center << '\n';
+    //         std::cout << "dir=" << resOpt->dir << '\n';
+    //         std::cout << "extent=" << resOpt->extent << '\n';
+    //         std::cout << "CP=" << '\n';
+    //         for (const auto& cp : resOpt->contactPoints) std::cout << cp << ";";
+    //         // assert(!contactPoints.empty() && "No contact points");
+    //         std::cout << "\n=========" << '\n';
+    //     }
     //     else std::cout << "-- NOTHING --\n";
     // }
 

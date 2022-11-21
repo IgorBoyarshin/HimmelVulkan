@@ -9,7 +9,7 @@ VULKAN_SDK_PATH_LAYER = /usr/share/vulkan/explicit_layer.d
 # The name of the main file and executable
 mainFileName = main
 # Files that have .h and .cpp versions
-classFiles = Himmel HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer HmlTerrainRenderer HmlRenderPass HmlUiRenderer HmlDeferredRenderer HmlLightRenderer HmlBloomRenderer util HmlQueries HmlImgui HmlImguiRenderer HmlDispatcher HmlPhysics
+classFiles = HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer HmlTerrainRenderer HmlRenderPass HmlUiRenderer HmlDeferredRenderer HmlLightRenderer HmlBloomRenderer util HmlQueries HmlImgui HmlImguiRenderer HmlDispatcher HmlPhysics Himmel
 # Files that only have the .h version
 # justHeaderFiles = renderer settings
 # Compilation flags

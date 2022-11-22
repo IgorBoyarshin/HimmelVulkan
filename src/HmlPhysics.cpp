@@ -429,8 +429,8 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Sphere& s,
 template<>
 std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b1, const Object::Box& b2) noexcept {
     // return detectAxisAlignedBoxes(b1, b2);
-    // return detectOrientedBoxesWithSat(b1, b2);
-    return gjk(b1, b2);
+    return detectOrientedBoxesWithSat(b1, b2);
+    // return gjk(b1, b2);
 }
 
 
@@ -767,7 +767,12 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
     }
     assert(index == 8);
 
-    std::vector<glm::vec3> axes = { i1, j1, k1, i2, j2, k2 };
+    std::vector<glm::vec3> axes = {
+        i1, j1, k1, i2, j2, k2,
+        // glm::cross(i1, i2), glm::cross(i1, j2), glm::cross(i1, k2),
+        // glm::cross(j1, i2), glm::cross(j1, j2), glm::cross(j1, k2),
+        // glm::cross(k1, i2), glm::cross(k1, j2), glm::cross(k1, k2)
+    };
     for (auto& a : axes) a = glm::normalize(a);
     glm::vec3 dir;
     float minExtent = std::numeric_limits<float>::max();

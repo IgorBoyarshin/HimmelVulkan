@@ -320,8 +320,8 @@ struct HmlPhysics {
         std::vector<glm::vec3> contactPoints;
     };
 
-    std::optional<Detection> detectAxisAlignedBoxes(const Object::Box& b1, const Object::Box& b2) noexcept;
-    std::optional<Detection> detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept;
+    static std::optional<Detection> detectAxisAlignedBoxes(const Object::Box& b1, const Object::Box& b2) noexcept;
+    static std::optional<Detection> detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept;
 
     // Returns dir from arg1 towards arg2
     template<typename Arg1, typename Arg2>
@@ -365,7 +365,7 @@ struct HmlPhysics {
     void updateForDt(float dt) noexcept;
     // ========================================================================
     struct Bucket {
-        inline static constexpr float SIZE = 100.0f;
+        inline static constexpr float SIZE = 8.0f;
 
         using Coord = int16_t;
         using Hash = uint64_t;

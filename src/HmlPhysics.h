@@ -351,6 +351,8 @@ struct HmlPhysics {
         std::vector<glm::vec3> contactPoints;
     };
 
+    static std::optional<Detection> detectAxisAlignedBoxSphere(const Object::Box& b, const Object::Sphere& s) noexcept;
+    static std::optional<Detection> detectOrientedBoxSphere(const Object::Box& b, const Object::Sphere& s) noexcept;
     static std::optional<Detection> detectAxisAlignedBoxes(const Object::Box& b1, const Object::Box& b2) noexcept;
     static std::optional<Detection> detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept;
 

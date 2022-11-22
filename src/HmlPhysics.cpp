@@ -390,28 +390,8 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Sphere& s1
 // Returns dir from b towards s
 template<>
 std::optional<HmlPhysics::Detection> HmlPhysics::detect(const Object::Box& b, const Object::Sphere& s) noexcept {
-    const auto start  = b.center - b.halfDimensions - s.radius;
-    const auto finish = b.center + b.halfDimensions + s.radius;
-    if (start < s.center && s.center < finish) {
-        const auto centers = s.center - b.center;
-        const auto extent = b.halfDimensions + s.radius - std::abs(centers); // all non-negative
-        // NOTE disable y-axis collision resolution for now
-        const float minExtent = std::min(extent.x, extent.z);
-        const auto dir = glm::vec3{
-            std::copysign(minExtent == extent.x, centers.x),
-            0.0f,
-            std::copysign(minExtent == extent.z, centers.z),
-        };
-        const auto contactPoint = s.center - dir * (s.radius + minExtent * 0.5f);
-
-        return { Detection{
-            .dir = dir,
-            .extent = minExtent,
-            .contactPoints = { contactPoint },
-        }};
-    }
-
-    return std::nullopt;
+    // return detectAxisAlignedBoxSphere(b, s);
+    return detectOrientedBoxSphere(b, s);
 }
 
 
@@ -731,6 +711,36 @@ inline HmlPhysics::Bucket::Bounding HmlPhysics::boundingBucketsForObject(const O
 // ============================================================================
 // ============================================================================
 // ============================================================================
+// Returns dir from b towards s
+std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxSphere(const Object::Box& b, const Object::Sphere& s) noexcept {
+    const auto& [i, j, k] = b.orientationDataUnnormalized();
+    const auto iNorm = glm::normalize(i);
+    const auto jNorm = glm::normalize(j);
+    const auto kNorm = glm::normalize(k);
+    const auto v = s.center - b.center;
+    const glm::vec3 proj{ glm::dot(v, iNorm), glm::dot(v, jNorm), glm::dot(v, kNorm) };
+    const auto dim = b.halfDimensions + glm::vec3{s.radius};
+    if (glm::vec3{-dim} < proj && proj < glm::vec3{dim}) {
+        const auto projAbs = std::abs(proj);
+        const auto extent = dim - projAbs;
+        const float minExtent = std::min(extent);
+        const auto dir =
+            std::copysign(static_cast<float>(minExtent == extent.x), proj.x) * iNorm +
+            std::copysign(static_cast<float>(minExtent == extent.y), proj.y) * jNorm +
+            std::copysign(static_cast<float>(minExtent == extent.z), proj.z) * kNorm;
+        const auto contactPoint = s.center - dir * (s.radius + minExtent * 0.5f);
+
+        return { Detection{
+            .dir = dir,
+            .extent = minExtent,
+            .contactPoints = { contactPoint },
+        }};
+    }
+
+    return std::nullopt;
+}
+
+
 // Returns dir from b1 towards b2
 std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept {
     const auto orientationData1 = b1.orientationDataUnnormalized();
@@ -870,6 +880,33 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
         .extent = minExtent,
         .contactPoints = contactPoints,
     }};
+}
+
+
+// Returns dir from b towards s
+std::optional<HmlPhysics::Detection> HmlPhysics::detectAxisAlignedBoxSphere(const Object::Box& b, const Object::Sphere& s) noexcept {
+    const auto start  = b.center - b.halfDimensions - s.radius;
+    const auto finish = b.center + b.halfDimensions + s.radius;
+    if (start < s.center && s.center < finish) {
+        const auto centers = s.center - b.center;
+        const auto extent = b.halfDimensions + s.radius - std::abs(centers); // all non-negative
+        // NOTE disable y-axis collision resolution for now
+        const float minExtent = std::min(extent.x, extent.z);
+        const auto dir = glm::vec3{
+            std::copysign(minExtent == extent.x, centers.x),
+            0.0f,
+            std::copysign(minExtent == extent.z, centers.z),
+        };
+        const auto contactPoint = s.center - dir * (s.radius + minExtent * 0.5f);
+
+        return { Detection{
+            .dir = dir,
+            .extent = minExtent,
+            .contactPoints = { contactPoint },
+        }};
+    }
+
+    return std::nullopt;
 }
 
 

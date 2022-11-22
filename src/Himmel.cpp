@@ -463,8 +463,9 @@ bool Himmel::init() noexcept {
 #endif
 
 
-            const size_t boxesCount = 10;
-            const size_t spheresCount = 10;
+            const size_t boxesCount = 30;
+            const size_t spheresCount = 30;
+            const float maxSpeed = 7.0f;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
@@ -473,9 +474,9 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
                 };
                 const auto v = glm::vec3{
-                    hml::getRandomUniformFloat(-10.0f, 10.0f),
+                    hml::getRandomUniformFloat(-maxSpeed, maxSpeed),
                     0.0f,
-                    hml::getRandomUniformFloat(-10.0f, 10.0f)
+                    hml::getRandomUniformFloat(-maxSpeed, maxSpeed)
                 };
                 const auto color = glm::vec3{
                     hml::getRandomUniformFloat(0.0f, 1.0f),
@@ -483,10 +484,10 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.0f, 1.0f)
                 };
                 const auto halfDimensions = glm::vec3{
-                    hml::getRandomUniformFloat(0.2f, 2.0f),
+                    hml::getRandomUniformFloat(0.4f, 3.0f),
                     // hml::getRandomUniformFloat(0.2f, 2.0f),
                     2.0f,
-                    hml::getRandomUniformFloat(0.2f, 2.0f)
+                    hml::getRandomUniformFloat(0.4f, 3.0f)
                 };
 
                 const float m = halfDimensions.x * halfDimensions.y * halfDimensions.z;
@@ -511,9 +512,9 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
                 };
                 const auto v = glm::vec3{
-                    hml::getRandomUniformFloat(-10.0f, 10.0f),
+                    hml::getRandomUniformFloat(-maxSpeed, maxSpeed),
                     0.0f,
-                    hml::getRandomUniformFloat(-10.0f, 10.0f)
+                    hml::getRandomUniformFloat(-maxSpeed, maxSpeed)
                 };
                 const auto color = glm::vec3{
                     hml::getRandomUniformFloat(0.0f, 1.0f),
@@ -567,32 +568,56 @@ bool Himmel::init() noexcept {
             //     const auto id = hmlPhysics->registerObject(std::move(object));
             //     physicsIdToEntity[id] = entities.back();
             // }
-            // { // Dyn wall 1
-            //     const float halfHeight = 6.0f;
-            //     auto object = HmlPhysics::Object::createBox({ -6.5f, 61, 20 }, { 1, halfHeight, 1 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
-            //     object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(1,0,0));
+#if 0
+            { // Dyn wall 1
+                const float halfHeight = 6.0f;
+                auto object = HmlPhysics::Object::createBox({ -6.5f, 61, 20 }, { 1, halfHeight, 1 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(1,0,0));
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.9f, 0.9f, 0.9f}));
+                entities.back()->modelMatrix = object.modelMatrix();
+
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+                debugId = id;
+            }
+            { // Dyn wall 2
+                const float halfHeight = 2.0f;
+                auto object = HmlPhysics::Object::createBox({ -10, 59, 25 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+                // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 0.3f, glm::vec3(1,0,0));
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.6f, 1.0f, 0.6f}));
+                entities.back()->modelMatrix = object.modelMatrix();
+
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
+#endif
+#if 0
+            // { // Dyn wall 3
+            //     const float halfHeight = 4.0f;
+            //     auto object = HmlPhysics::Object::createBox({ -6.5f, 61, 4.7f }, { 1, halfHeight, 1 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+            //     object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(0,1,0));
 
             //     entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.9f, 0.9f, 0.9f}));
-            //     // auto modelMatrix = glm::mat4(1.0f);
-            //     // modelMatrix = glm::translate(modelMatrix, b.center);
-            //     // modelMatrix = glm::scale(modelMatrix, b.halfDimensions);
-            //     // entities.back()->modelMatrix = modelMatrix;
             //     entities.back()->modelMatrix = object.modelMatrix();
 
             //     const auto id = hmlPhysics->registerObject(std::move(object));
             //     physicsIdToEntity[id] = entities.back();
             //     debugId = id;
             // }
-            // { // Dyn wall 2
-            //     const float halfHeight = 2.0f;
-            //     auto object = HmlPhysics::Object::createBox({ -10, 60, 25 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+            { // Dyn wall 4
+                const float halfHeight = 2.0f;
+                auto object = HmlPhysics::Object::createBox({ -10, 60, 10 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 8 }, glm::vec3{0,1,0});
+                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(1,0,0));
 
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.6f, 1.0f, 0.6f}));
-            //     entities.back()->modelMatrix = object.modelMatrix();
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.6f, 1.0f, 0.6f}));
+                entities.back()->modelMatrix = object.modelMatrix();
 
-            //     const auto id = hmlPhysics->registerObject(std::move(object));
-            //     physicsIdToEntity[id] = entities.back();
-            // }
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
+#endif
 
             for (const auto& [bucket, objects] : hmlPhysics->objectsInBuckets) {
                 for (const auto& object : objects) {
@@ -976,6 +1001,28 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
     }
 
+    { // Pause physics
+        static bool f4Pressed = false;
+        if (!f4Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F4) == GLFW_PRESS) {
+            f4Pressed = true;
+
+            physicsPaused = !physicsPaused;
+        } else if (f4Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F4) == GLFW_RELEASE) {
+            f4Pressed = false;
+        }
+    }
+
+    { // Step physics
+        static bool f5Pressed = false;
+        if (!f5Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F5) == GLFW_PRESS) {
+            f5Pressed = true;
+
+            if (physicsPaused) hmlPhysics->updateForDt(dt);
+        } else if (f5Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F5) == GLFW_RELEASE) {
+            f5Pressed = false;
+        }
+    }
+
     // NOTE allow cursor position update and only disable camera rotation reaction
     // in order not to have the camera jump on re-acquiring control from the ui
     // due to the cursor (pointer) position change that will have happened.
@@ -1126,7 +1173,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
     {
         const auto startTime = std::chrono::high_resolution_clock::now();
-        hmlPhysics->updateForDt(dt);
+        if (!physicsPaused) hmlPhysics->updateForDt(dt);
         const auto newMark = std::chrono::high_resolution_clock::now();
         const auto sinceStart = std::chrono::duration_cast<std::chrono::microseconds>(newMark - startTime).count();
         const float sinceStartMks = static_cast<float>(sinceStart);

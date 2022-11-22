@@ -228,7 +228,7 @@ std::optional<HmlPhysics::Detection> HmlPhysics::gjk(const Object::Box& b1, cons
         glm::vec3 k1{ modelMatrix[2][0], modelMatrix[2][1], modelMatrix[2][2] };
         // const glm::vec3 halfDimensions{i1, j1, k1};
             // const auto a = glm::dot(b1.halfDimensions, detOpt->dir);
-            const auto a = glm::dot(i1, detOpt->dir) + glm::dot(j1, detOpt->dir) + glm::dot(k1, detOpt->dir);
+            // const auto a = glm::dot(i1, detOpt->dir) + glm::dot(j1, detOpt->dir) + glm::dot(k1, detOpt->dir);
 
             // detOpt->contactPoints = { b1.center + (a + detOpt->extent * 0.5f) * detOpt->dir};
     static const auto avg = [](std::span<const glm::vec3> vs){
@@ -496,7 +496,7 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
     else if (obj1.isBox()    && obj2.isBox())    detectionOpt = detect(obj1.asBox(),    obj2.asBox());
 
     // if (obj1.isBox()    && obj2.isBox()) {
-    //     const auto resOpt = gjk(obj1.asBox(), obj2.asBox());
+    //     const auto resOpt = detectOrientedBoxesWithSat(obj1.asBox(), obj2.asBox());
     //     if (resOpt) {
     //         std::cout << "---- DETECT ----\n";
     //         std::cout << obj1.asBox().center << " " << obj2.asBox().center << '\n';
@@ -534,6 +534,8 @@ void HmlPhysics::updateForDt(float dt) noexcept {
     const glm::vec3 F {0,0,0};
     // const glm::vec3 cp{1,0,0};
     // const glm::vec3 Ft{0,0,0};
+
+// TODO use unordered_set to store collisions on this iteration to prevent objects present in multiple buckets to being processed multiple times unnecesserily
 
     const uint8_t SUBSTEPS = 1;
     const float subDt = dt / SUBSTEPS;
@@ -731,68 +733,33 @@ inline HmlPhysics::Bucket::Bounding HmlPhysics::boundingBucketsForObject(const O
 // ============================================================================
 // Returns dir from b1 towards b2
 std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept {
-    assert(b1.modelMatrixCached);
-    assert(b2.modelMatrixCached);
-    const auto& modelMatrix1 = *(b1.modelMatrixCached);
-    const auto& modelMatrix2 = *(b2.modelMatrixCached);
-    glm::vec3 i1{ modelMatrix1[0][0], modelMatrix1[0][1], modelMatrix1[0][2] };
-    glm::vec3 j1{ modelMatrix1[1][0], modelMatrix1[1][1], modelMatrix1[1][2] };
-    glm::vec3 k1{ modelMatrix1[2][0], modelMatrix1[2][1], modelMatrix1[2][2] };
-    glm::vec3 i2{ modelMatrix2[0][0], modelMatrix2[0][1], modelMatrix2[0][2] };
-    glm::vec3 j2{ modelMatrix2[1][0], modelMatrix2[1][1], modelMatrix2[1][2] };
-    glm::vec3 k2{ modelMatrix2[2][0], modelMatrix2[2][1], modelMatrix2[2][2] };
+    const auto orientationData1 = b1.orientationDataUnnormalized();
+    const auto orientationData2 = b2.orientationDataUnnormalized();
+    const auto& [i1, j1, k1] = orientationData1;
+    const auto& [i2, j2, k2] = orientationData2;
+    const auto p1 = b1.toPoints();
+    const auto p2 = b2.toPoints();
 
-    int index;
-    const glm::vec3 center1{ modelMatrix1[3][0], modelMatrix1[3][1], modelMatrix1[3][2] };
-    std::array<glm::vec3, 8> p1;
-    index = 0;
-    for (float i = -1; i <= 1; i += 2) {
-        for (float j = -1; j <= 1; j += 2) {
-            for (float k = -1; k <= 1; k += 2) {
-                p1[index++] = (i * i1 + j * j1 + k * k1) + center1;
-            }
+    static const auto minMaxProjAt = [](const glm::vec3& axis, std::span<const glm::vec3> ps){
+        float min = std::numeric_limits<float>::max();
+        float max = std::numeric_limits<float>::lowest();
+        for (const auto& p : ps) {
+            const auto proj = glm::dot(p, axis);
+            const bool newMin = proj < min;
+            const bool newMax = proj > max;
+            min = min * (1 - newMin) + proj * newMin;
+            max = max * (1 - newMax) + proj * newMax;
         }
-    }
-    assert(index == 8);
-
-    const glm::vec3 center2{ modelMatrix2[3][0], modelMatrix2[3][1], modelMatrix2[3][2] };
-    std::array<glm::vec3, 8> p2;
-    index = 0;
-    for (float i = -1; i <= 1; i += 2) {
-        for (float j = -1; j <= 1; j += 2) {
-            for (float k = -1; k <= 1; k += 2) {
-                p2[index++] = (i * i2 + j * j2 + k * k2) + center2;
-            }
-        }
-    }
-    assert(index == 8);
-
-    std::vector<glm::vec3> axes = {
-        i1, j1, k1, i2, j2, k2,
-        // glm::cross(i1, i2), glm::cross(i1, j2), glm::cross(i1, k2),
-        // glm::cross(j1, i2), glm::cross(j1, j2), glm::cross(j1, k2),
-        // glm::cross(k1, i2), glm::cross(k1, j2), glm::cross(k1, k2)
+        return std::make_pair(min, max);
     };
-    for (auto& a : axes) a = glm::normalize(a);
+
     glm::vec3 dir;
     float minExtent = std::numeric_limits<float>::max();
-    std::vector<std::pair<float, float>> minMaxPerAxis;
+    std::array<glm::vec3, 6> axes = { i1, j1, k1, i2, j2, k2 };
+    for (auto& a : axes) a = glm::normalize(a);
     for (const auto& axis : axes) {
-        float min1 = std::numeric_limits<float>::max();
-        float max1 = std::numeric_limits<float>::lowest();
-        for (const auto& p : p1) {
-            const auto proj = glm::dot(p, axis);
-            if (proj < min1) min1 = proj;
-            if (proj > max1) max1 = proj;
-        }
-
-        float min2 = std::numeric_limits<float>::max();
-        float max2 = std::numeric_limits<float>::lowest();
-        for (const auto& p : p2) {
-            const auto proj = glm::dot(p, axis);
-            if (proj < min2) min2 = proj;
-            if (proj > max2) max2 = proj;
-        }
+        const auto& [min1, max1] = minMaxProjAt(axis, p1);
+        const auto& [min2, max2] = minMaxProjAt(axis, p2);
 
         if (!(min1 < max2 && min2 < max1)) return std::nullopt;
 
@@ -801,61 +768,102 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
             minExtent = extent;
             dir = axis;
         }
-        const float max = std::min(max1, max2);
-        const float min = std::max(min1, min2);
-        minMaxPerAxis.push_back(std::make_pair(min, max));
     }
 
-    // Find contact points
-    std::vector<glm::vec3> contactPoints;
-    for (const auto& p : p1) {
-        int index = 0;
-        bool all = true;
-        for (const auto& axis : axes) {
-            const auto proj = glm::dot(p, axis);
-            const auto& [min, max] = minMaxPerAxis[index++];
-            if (min <= proj && proj <= max) {} else { all = false; break; }
-        }
-        if (all) contactPoints.push_back(p);
-    }
-    for (const auto& p : p2) {
-        int index = 0;
-        bool all = true;
-        for (const auto& axis : axes) {
-            const auto proj = glm::dot(p, axis);
-            const auto& [min, max] = minMaxPerAxis[index++];
-            if (min <= proj && proj <= max) {} else { all = false; break; }
-        }
-        if (all) contactPoints.push_back(p);
-    }
-
-    const auto centers = center2 - center1;
+    const auto centers = b2.center - b1.center;
     const bool aligned = glm::dot(centers, dir) >= 0.0f;
     if (!aligned) dir *= -1;
 
-std::cout << "======================" << '\n';
-std::cout << "DETECT" << '\n';
-std::cout << "=========" << '\n';
-std::cout << "C1 = " << center1 << " C2= " << center2 << "\n";
-std::cout << "=========" << '\n';
-std::cout << "P1:" << '\n';
-for (const auto& p : p1) {
-    std::cout << p << '\n';
-}
-std::cout << "P2:" << '\n';
-for (const auto& p : p2) {
-    std::cout << p << '\n';
-}
-std::cout << "=========" << '\n';
-std::cout << "Dir = " << dir << "  MinEx=" << minExtent << '\n';
-std::cout << "B1=" << i1 << " " << j1 << " " << k1 << '\n';
-std::cout << "B2=" << i2 << " " << j2 << " " << k2 << '\n';
-std::cout << "====CP=====" << '\n';
-for (const auto& cp : contactPoints) std::cout << cp << ";";
-assert(!contactPoints.empty() && "No contact points");
-std::cout << "=========" << '\n';
-std::cout << std::endl;
+    // Find contact points
 
+    static const auto pointInsideRect = [](const glm::vec3& P, const glm::vec3& A, const glm::vec3& B, const glm::vec3& C){
+        const auto AB = B - A;
+        const auto AC = C - A;
+        const auto AP = P - A;
+        const float projAb = glm::dot(AP, AB);
+        const float projAc = glm::dot(AP, AC);
+        const float maxAb = glm::dot(AB, AB);
+        const float maxAc = glm::dot(AC, AC);
+        return 0.0f <= projAb && projAb <= maxAb && 0.0f <= projAc && projAc <= maxAc;
+    };
+    static const auto addContactPointsFromOnto = [](
+            std::span<const glm::vec3> psFrom,
+            std::span<const glm::vec3> psOnto,
+            const Object::Box::OrientationData& orientationDataOnto,
+            std::vector<glm::vec3>& contactPoints){
+        static const std::array<std::pair<size_t, size_t>, 12> edges{
+            std::make_pair(0, 1),
+            std::make_pair(2, 3),
+            std::make_pair(0, 2),
+            std::make_pair(1, 3),
+            std::make_pair(4, 5),
+            std::make_pair(6, 7),
+            std::make_pair(4, 6),
+            std::make_pair(5, 7),
+            std::make_pair(0, 4),
+            std::make_pair(1, 5),
+            std::make_pair(2, 6),
+            std::make_pair(3, 7)
+        };
+        static const std::array<std::array<size_t, 4>, 6> faces{
+            std::array<size_t, 4>{0,1,2,3},
+            std::array<size_t, 4>{4,5,6,7},
+            std::array<size_t, 4>{0,1,4,5},
+            std::array<size_t, 4>{2,3,6,7},
+            std::array<size_t, 4>{0,2,4,6},
+            std::array<size_t, 4>{1,3,5,7}
+        };
+        static const auto faceNormalForIndex = [](size_t i, const Object::Box::OrientationData& orientationData){
+            switch (i / 2) {
+                case 0: return orientationData.i;
+                case 1: return orientationData.j;
+                case 2: return orientationData.k;
+            }
+            assert(false && "Unexpected index in faceNormalForIndex()");
+            return glm::vec3{}; // stub
+        };
+        for (const auto& edge : edges) {
+            const auto& linePoint1 = psFrom[edge.first];
+            const auto& linePoint2 = psFrom[edge.second];
+            for (size_t i = 0; i < faces.size(); i++) {
+                const auto& face = faces[i];
+                const auto& planePoint = psOnto[face[0]]; // any point on plane
+                const auto planeDir = faceNormalForIndex(i, orientationDataOnto);
+                const auto intOpt = edgePlaneIntersection(linePoint1, linePoint2, planePoint, planeDir);
+                if (!intOpt) continue;
+                if (pointInsideRect(*intOpt, psOnto[face[0]], psOnto[face[1]], psOnto[face[2]])) {
+                    contactPoints.push_back(*intOpt);
+                }
+            }
+        }
+    };
+
+    std::vector<glm::vec3> contactPoints;
+    addContactPointsFromOnto(p1, p2, orientationData2, contactPoints);
+    addContactPointsFromOnto(p2, p1, orientationData1, contactPoints);
+
+// std::cout << "======================" << '\n';
+// std::cout << "DETECT" << '\n';
+// std::cout << "=========" << '\n';
+// std::cout << "C1 = " << b1.center << " C2= " << b2.center << "\n";
+// std::cout << "=========" << '\n';
+// std::cout << "P1:" << '\n';
+// for (const auto& p : p1) {
+//     std::cout << p << '\n';
+// }
+// std::cout << "P2:" << '\n';
+// for (const auto& p : p2) {
+//     std::cout << p << '\n';
+// }
+// std::cout << "=========" << '\n';
+// std::cout << "Dir = " << dir << "  MinEx=" << minExtent << '\n';
+// std::cout << "B1=" << i1 << " " << j1 << " " << k1 << '\n';
+// std::cout << "B2=" << i2 << " " << j2 << " " << k2 << '\n';
+// std::cout << "====CP=====" << '\n';
+// for (const auto& cp : contactPoints) std::cout << cp << ";";
+// assert(!contactPoints.empty() && "No contact points");
+// std::cout << "=========" << '\n';
+// std::cout << std::endl;
 
     return { Detection{
         .dir = dir,
@@ -925,4 +933,27 @@ float HmlPhysics::pointToLineDstSqr(const glm::vec3& point, const glm::vec3& l1,
     const auto denom = (l1 - l2);
     const float denomSqr = glm::dot(denom, denom);
     return nomSqr / denomSqr;
+}
+
+
+std::optional<glm::vec3> HmlPhysics::linePlaneIntersection(
+        const glm::vec3& linePoint, const glm::vec3& lineDirNorm,
+        const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept {
+    const auto dot = glm::dot(lineDirNorm, planeDir);
+    if (dot == 0) return std::nullopt;
+    const auto t = (glm::dot(planeDir, planePoint) - glm::dot(planeDir, linePoint)) / dot;
+    return { linePoint + lineDirNorm * t };
+}
+
+
+std::optional<glm::vec3> HmlPhysics::edgePlaneIntersection(
+        const glm::vec3& linePoint1, const glm::vec3& linePoint2,
+        const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept {
+    const auto lineDir = linePoint2 - linePoint1;
+    const auto dot = glm::dot(lineDir, planeDir);
+    if (dot == 0) return std::nullopt;
+    const auto t = (glm::dot(planeDir, planePoint) - glm::dot(planeDir, linePoint1)) / dot;
+    const auto res = linePoint1 + lineDir * t;
+    if (t < 0.0f || t > 1.0f) return std::nullopt;
+    return { res };
 }

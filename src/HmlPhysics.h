@@ -84,7 +84,7 @@ struct HmlPhysics {
         // Possibly stores redundant data, but this way we can generalize across all shapes
         glm::vec3 position;
         std::array<float, 3> dimensions;
-        std::optional<glm::mat4> modelMatrixCached;
+        mutable std::optional<glm::mat4> modelMatrixCached;
         glm::quat orientation = glm::quat(1, 0, 0, 0); // unit = quat(w, x, y, z)
         // glm::quat orientation = glm::rotate(glm::quat(1, 0, 0, 0), 1.0f, glm::vec3(0,0,1)); // unit = quat(w, x, y, z)
 
@@ -138,7 +138,7 @@ struct HmlPhysics {
         }
 
 
-        inline const glm::mat4& modelMatrix() noexcept {
+        inline const glm::mat4& modelMatrix() const noexcept {
             if (!modelMatrixCached) modelMatrixCached = generateModelMatrix();
             return *modelMatrixCached;
         }
@@ -220,6 +220,34 @@ struct HmlPhysics {
             glm::vec3 halfDimensions;
             std::optional<glm::mat4> modelMatrixCached;
 
+            struct OrientationData {
+                glm::vec3 i, j, k;
+            };
+
+            OrientationData orientationDataUnnormalized() const noexcept {
+                const auto& mm = asObject().modelMatrix();
+                return OrientationData{
+                    .i = glm::vec3{ mm[0][0], mm[0][1], mm[0][2] },
+                    .j = glm::vec3{ mm[1][0], mm[1][1], mm[1][2] },
+                    .k = glm::vec3{ mm[2][0], mm[2][1], mm[2][2] }
+                };
+            };
+
+            std::array<glm::vec3, 8> toPoints() const noexcept {
+                const auto& [i, j, k] = orientationDataUnnormalized();
+                std::array<glm::vec3, 8> ps;
+                size_t indexP = 0;
+                for (float a = -1; a <= 1; a += 2) {
+                    for (float b = -1; b <= 1; b += 2) {
+                        for (float c = -1; c <= 1; c += 2) {
+                            ps[indexP++] = (a * i + b * j + c * k) + center;
+                        }
+                    }
+                }
+                assert(indexP == 8);
+                return ps;
+            }
+
             inline glm::vec3 dimensions() const noexcept { return halfDimensions * 2.0f; }
             inline AABB aabb() const noexcept {
                 return AABB{
@@ -237,6 +265,9 @@ struct HmlPhysics {
                     0, 0, m * (dimSqr.x + dimSqr.z)
                 };
             }
+
+            inline       Object& asObject()       noexcept { return *reinterpret_cast<      Object*>(this); }
+            inline const Object& asObject() const noexcept { return *reinterpret_cast<const Object*>(this); }
         };
         static_assert(sizeof(Box) == sizeof(position) + sizeof(dimensions) + sizeof(modelMatrixCached) && "Please allocate larger dimensions[] in Object because Box doesn't fit.");
 
@@ -433,6 +464,12 @@ struct HmlPhysics {
         const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept;
     // ========================================================================
     static float pointToLineDstSqr(const glm::vec3& point, const glm::vec3& l1, const glm::vec3& l2) noexcept;
+    static std::optional<glm::vec3> linePlaneIntersection(
+            const glm::vec3& linePoint, const glm::vec3& lineDirNorm,
+            const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept;
+    static std::optional<glm::vec3> edgePlaneIntersection(
+            const glm::vec3& linePoint1, const glm::vec3& linePoint2,
+            const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept;
 };
 
 

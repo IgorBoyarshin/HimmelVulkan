@@ -186,7 +186,7 @@ bool Himmel::init() noexcept {
         const auto color = glm::vec3(1.0, 1.0, 1.0);
         pointLightsStatic.push_back(HmlLightRenderer::PointLight{
             .color = color,
-            .intensity = 5000.0f,
+            .intensity = 9000.0f,
             .position = pos,
             .radius = LIGHT_RADIUS,
         });
@@ -388,9 +388,9 @@ bool Himmel::init() noexcept {
 
             hmlPhysics = std::make_unique<HmlPhysics>();
             const float halfSide = 50.0f;
-            const float baseHeight = 50.0f;
 #define WITH_WALLS 1
 #if WITH_WALLS
+            const float baseHeight = 50.0f;
             const float wallThickness = 2.0f;
             // const float halfHeight = 10.0f;
             const float halfHeight = halfSide;

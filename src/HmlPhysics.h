@@ -250,9 +250,25 @@ struct HmlPhysics {
 
             inline glm::vec3 dimensions() const noexcept { return halfDimensions * 2.0f; }
             inline AABB aabb() const noexcept {
+                const auto& [i, j, k] = orientationDataUnnormalized();
+                glm::vec3 min{ std::numeric_limits<float>::max() };
+                glm::vec3 max{ std::numeric_limits<float>::lowest() };
+                for (float a = -1; a <= 1; a += 2) {
+                    for (float b = -1; b <= 1; b += 2) {
+                        for (float c = -1; c <= 1; c += 2) {
+                            const auto p = a * i + b * j + c * k; // NOTE: +center to make a real point
+                            min.x = min.x * (1 - (p.x < min.x)) + p.x * (p.x < min.x);
+                            min.y = min.y * (1 - (p.y < min.y)) + p.y * (p.y < min.y);
+                            min.z = min.z * (1 - (p.z < min.z)) + p.z * (p.z < min.z);
+                            max.x = max.x * (1 - (p.x > max.x)) + p.x * (p.x > max.x);
+                            max.y = max.y * (1 - (p.y > max.y)) + p.y * (p.y > max.y);
+                            max.z = max.z * (1 - (p.z > max.z)) + p.z * (p.z > max.z);
+                        }
+                    }
+                }
                 return AABB{
-                    .begin = center - halfDimensions,
-                    .end   = center + halfDimensions,
+                    .begin = center + min,
+                    .end   = center + max,
                 };
             }
 

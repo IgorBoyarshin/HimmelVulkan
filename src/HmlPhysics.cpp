@@ -515,8 +515,6 @@ void HmlPhysics::updateForDt(float dt) noexcept {
     // const glm::vec3 cp{1,0,0};
     // const glm::vec3 Ft{0,0,0};
 
-// TODO use unordered_set to store collisions on this iteration to prevent objects present in multiple buckets to being processed multiple times unnecesserily
-
     const uint8_t SUBSTEPS = 1;
     const float subDt = dt / SUBSTEPS;
     static int stepTimer = 0;
@@ -548,6 +546,7 @@ void HmlPhysics::updateForDt(float dt) noexcept {
         const auto mark2 = std::chrono::high_resolution_clock::now();
 
         // Check for and handle collisions
+        processedPairsOnThisIteration.clear();
         for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
             const auto& [_bucket, objects] = *it;
             if (objects.empty()) {
@@ -562,7 +561,12 @@ void HmlPhysics::updateForDt(float dt) noexcept {
                 for (size_t j = i + 1; j < objects.size(); j++) {
                     auto& obj2 = objects[j];
                     if (obj1->isStationary() && obj2->isStationary()) continue;
-                    process(*obj1, *obj2);
+
+                    auto id1 = obj1->id;
+                    auto id2 = obj2->id;
+                    if (id1 > id2) std::swap(id1, id2);
+                    const auto& [_, notPresentBefore] = processedPairsOnThisIteration.emplace(id1, id2);
+                    if (notPresentBefore) process(*obj1, *obj2);
                 }
             }
 

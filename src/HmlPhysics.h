@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <memory>
 #include <bitset>
@@ -470,6 +471,14 @@ struct HmlPhysics {
     std::vector<std::shared_ptr<Object>> objects;
     // Not to allocate every frame
     std::vector<Bucket::Bounding> allBoundingBucketsBefore;
+
+    struct PairHasher {
+        inline size_t operator()(const std::pair<Object::Id, Object::Id>& pair) const {
+            const uint64_t comb = (std::hash<uint64_t>{}(pair.first) << 32) | std::hash<uint64_t>{}(pair.second);
+            return std::hash<uint64_t>{}(comb);
+        }
+    };
+    std::unordered_set<std::pair<Object::Id, Object::Id>, PairHasher> processedPairsOnThisIteration;
     // ========================================================================
     struct LineIntersectsTriangleResult {
         float t;

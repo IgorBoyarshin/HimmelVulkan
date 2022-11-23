@@ -481,8 +481,9 @@ bool Himmel::init() noexcept {
 #endif
 
 
-            const size_t boxesCount = 100;
-            const size_t spheresCount = 100;
+            const float density = 3.0f;
+            const size_t boxesCount = 50;
+            const size_t spheresCount = 50;
             const float maxSpeed = 7.0f;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{
@@ -491,7 +492,7 @@ bool Himmel::init() noexcept {
                     // hml::getRandomUniformFloat(55, 65),
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
                 };
-                const auto v = glm::vec3{
+                const auto velocity = glm::vec3{
                     hml::getRandomUniformFloat(-maxSpeed, maxSpeed),
                     0.0f,
                     hml::getRandomUniformFloat(-maxSpeed, maxSpeed)
@@ -508,9 +509,9 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.4f, 3.0f)
                 };
 
-                const float m = halfDimensions.x * halfDimensions.y * halfDimensions.z;
-                auto object = HmlPhysics::Object::createBox(pos, halfDimensions, m, v, glm::vec3{0,0,0});
-                // object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, v) };
+                const float volume = halfDimensions.x * halfDimensions.y * halfDimensions.z;
+                const float mass = volume * density;
+                auto object = HmlPhysics::Object::createBox(pos, halfDimensions, mass, velocity, glm::vec3{0,0,0});
                 const auto& b = object.asBox();
 
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, color));
@@ -529,7 +530,7 @@ bool Himmel::init() noexcept {
                     // hml::getRandomUniformFloat(55, 65),
                     hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
                 };
-                const auto v = glm::vec3{
+                const auto velocity = glm::vec3{
                     hml::getRandomUniformFloat(-maxSpeed, maxSpeed),
                     0.0f,
                     hml::getRandomUniformFloat(-maxSpeed, maxSpeed)
@@ -541,10 +542,9 @@ bool Himmel::init() noexcept {
                 };
 
                 const float radius = hml::getRandomUniformFloat(0.4f, 2.0f);
-                const float m = 4.0f / 3.0f * glm::pi<float>() * radius * radius * radius;
-                // const float m = radius;
-                auto object = HmlPhysics::Object::createSphere(pos, radius, m, v, glm::vec3{});
-                // object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, v) };
+                const float volume = 4.0f / 3.0f * glm::pi<float>() * radius * radius * radius;
+                const float mass = volume * density;
+                auto object = HmlPhysics::Object::createSphere(pos, radius, mass, velocity, glm::vec3{});
                 const auto& s = object.asSphere();
 
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, color));

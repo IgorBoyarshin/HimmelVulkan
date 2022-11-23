@@ -181,16 +181,16 @@ bool Himmel::init() noexcept {
             .radius = LIGHT_RADIUS,
         });
     }
-    // { // The light for 2 flat planes
-    //     const auto pos = glm::vec3(0.0, 60.0, 20.0);
-    //     const auto color = glm::vec3(1.0, 1.0, 1.0);
-    //     pointLightsStatic.push_back(HmlLightRenderer::PointLight{
-    //         .color = color,
-    //         .intensity = 10.0f,
-    //         .position = pos,
-    //         .radius = LIGHT_RADIUS,
-    //     });
-    // }
+    { // The light for the setup
+        const auto pos = glm::vec3(0, 157, 0);
+        const auto color = glm::vec3(1.0, 1.0, 1.0);
+        pointLightsStatic.push_back(HmlLightRenderer::PointLight{
+            .color = color,
+            .intensity = 5000.0f,
+            .position = pos,
+            .radius = LIGHT_RADIUS,
+        });
+    }
     {
         pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(1.0, 0.0, 0.0),
@@ -218,10 +218,12 @@ bool Himmel::init() noexcept {
 
 
     // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 205.0f, 135.0f, 215.0f });
+    hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 40, 145, 40 });
+    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-55, 320);
     // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 70, 0 });
     // dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-25.0f, 210.0f);
-    hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 200, 0 });
-    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-89.0f, 0.0f);
+    // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 180, 0 });
+    // dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-89.0f, 0.0f);
     // hmlCamera = std::make_unique<HmlCameraFollow>(100);
     // dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
     // dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->target(car);
@@ -386,12 +388,28 @@ bool Himmel::init() noexcept {
 
             hmlPhysics = std::make_unique<HmlPhysics>();
             const float halfSide = 50.0f;
+            const float baseHeight = 50.0f;
 #define WITH_WALLS 1
 #if WITH_WALLS
             const float wallThickness = 2.0f;
-            const float halfHeight = 10.0f;
+            // const float halfHeight = 10.0f;
+            const float halfHeight = halfSide;
             { // Bottom
-                auto object = HmlPhysics::Object::createBox({ 0, 50, 0 }, { halfSide, wallThickness, halfSide });
+                auto object = HmlPhysics::Object::createBox({ 0, baseHeight, 0 }, { halfSide, wallThickness, halfSide });
+                object.dynamicProperties = std::nullopt;
+                const auto& b = object.asBox();
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.7f, 1.0f, 0.7f}));
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, b.center);
+                modelMatrix = glm::scale(modelMatrix, b.halfDimensions);
+                entities.back()->modelMatrix = modelMatrix;
+
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
+            { // Up
+                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 2 * halfHeight, 0 }, { halfSide, wallThickness, halfSide });
                 object.dynamicProperties = std::nullopt;
                 const auto& b = object.asBox();
 
@@ -405,11 +423,11 @@ bool Himmel::init() noexcept {
                 physicsIdToEntity[id] = entities.back();
             }
             { // Far
-                auto object = HmlPhysics::Object::createBox({ 0, 50 + halfHeight, -halfSide }, { halfSide, halfHeight, wallThickness });
+                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + halfHeight, -halfSide }, { halfSide, halfHeight, wallThickness });
                 object.dynamicProperties = std::nullopt;
                 const auto& b = object.asBox();
 
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.8f, 0.8f, 0.8f}));
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.7f, 0.7f, 1.0f}));
                 auto modelMatrix = glm::mat4(1.0f);
                 modelMatrix = glm::translate(modelMatrix, b.center);
                 modelMatrix = glm::scale(modelMatrix, b.halfDimensions);
@@ -419,11 +437,11 @@ bool Himmel::init() noexcept {
                 physicsIdToEntity[id] = entities.back();
             }
             { // Left
-                auto object = HmlPhysics::Object::createBox({ -halfSide, 50 + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
+                auto object = HmlPhysics::Object::createBox({ -halfSide, baseHeight + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
                 object.dynamicProperties = std::nullopt;
                 const auto& b = object.asBox();
 
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.8f, 0.8f, 0.8f}));
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 1.0f, 0.7f, 0.7f}));
                 auto modelMatrix = glm::mat4(1.0f);
                 modelMatrix = glm::translate(modelMatrix, b.center);
                 modelMatrix = glm::scale(modelMatrix, b.halfDimensions);
@@ -433,7 +451,7 @@ bool Himmel::init() noexcept {
                 physicsIdToEntity[id] = entities.back();
             }
             { // Right
-                auto object = HmlPhysics::Object::createBox({ +halfSide, 50 + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
+                auto object = HmlPhysics::Object::createBox({ +halfSide, baseHeight + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
                 object.dynamicProperties = std::nullopt;
                 const auto& b = object.asBox();
 
@@ -447,7 +465,7 @@ bool Himmel::init() noexcept {
                 physicsIdToEntity[id] = entities.back();
             }
             { // Near
-                auto object = HmlPhysics::Object::createBox({ 0, 50 + halfHeight, +halfSide }, { halfSide, halfHeight, wallThickness });
+                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + halfHeight, +halfSide }, { halfSide, halfHeight, wallThickness });
                 object.dynamicProperties = std::nullopt;
                 const auto& b = object.asBox();
 

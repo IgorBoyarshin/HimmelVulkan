@@ -482,8 +482,8 @@ bool Himmel::init() noexcept {
 
 
             const float density = 3.0f;
-            const size_t boxesCount = 50;
-            const size_t spheresCount = 50;
+            const size_t boxesCount = 20;
+            const size_t spheresCount = 20;
             const float maxSpeed = 7.0f;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{

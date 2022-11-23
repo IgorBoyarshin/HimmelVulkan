@@ -302,7 +302,7 @@ struct HmlPhysics {
     static std::optional<LineIntersectsTriangleResult> lineIntersectsTriangle(
         const glm::vec3& start, const glm::vec3& finish,
         const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept;
-    // ========================================================================
+
     static float pointToLineDstSqr(const glm::vec3& point, const glm::vec3& l1, const glm::vec3& l2) noexcept;
     static std::optional<glm::vec3> linePlaneIntersection(
             const glm::vec3& linePoint, const glm::vec3& lineDirNorm,
@@ -310,6 +310,7 @@ struct HmlPhysics {
     static std::optional<glm::vec3> edgePlaneIntersection(
             const glm::vec3& linePoint1, const glm::vec3& linePoint2,
             const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept;
+    static bool pointInsideRect(const glm::vec3& P, const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept;
 };
 
 

@@ -88,8 +88,8 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxSphere(const O
 
 // Returns dir from b1 towards b2
 std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept {
-    const auto orientationData1 = b1.orientationDataUnnormalized();
-    const auto orientationData2 = b2.orientationDataUnnormalized();
+    const auto orientationData1 = b1.orientationDataNormalized();
+    const auto orientationData2 = b2.orientationDataNormalized();
     const auto& [i1, j1, k1] = orientationData1;
     const auto& [i2, j2, k2] = orientationData2;
     const auto p1 = b1.toPoints();
@@ -110,9 +110,7 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
 
     glm::vec3 dir;
     float minExtent = std::numeric_limits<float>::max();
-    std::array<glm::vec3, 6> axes = { i1, j1, k1, i2, j2, k2 };
-    for (auto& a : axes) a = glm::normalize(a);
-    for (const auto& axis : axes) {
+    for (const auto& axis : { i1, j1, k1, i2, j2, k2 }) {
         const auto& [min1, max1] = minMaxProjAt(axis, p1);
         const auto& [min2, max2] = minMaxProjAt(axis, p2);
 
@@ -131,16 +129,6 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
 
     // Find contact points
 
-    static const auto pointInsideRect = [](const glm::vec3& P, const glm::vec3& A, const glm::vec3& B, const glm::vec3& C){
-        const auto AB = B - A;
-        const auto AC = C - A;
-        const auto AP = P - A;
-        const float projAb = glm::dot(AP, AB);
-        const float projAc = glm::dot(AP, AC);
-        const float maxAb = glm::dot(AB, AB);
-        const float maxAc = glm::dot(AC, AC);
-        return 0.0f <= projAb && projAb <= maxAb && 0.0f <= projAc && projAc <= maxAc;
-    };
     static const auto addContactPointsFromOnto = [](
             std::span<const glm::vec3> psFrom,
             std::span<const glm::vec3> psOnto,
@@ -287,11 +275,13 @@ void HmlPhysics::resolveVelocities(Object& obj1, Object& obj2, const Detection& 
 
 
 void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
+    // const auto mark1 = std::chrono::high_resolution_clock::now();
     std::optional<Detection> detectionOpt = std::nullopt;
     if      (obj1.isSphere() && obj2.isSphere()) detectionOpt = detect(obj1.asSphere(), obj2.asSphere());
     else if (obj1.isBox()    && obj2.isSphere()) detectionOpt = detect(obj1.asBox(),    obj2.asSphere());
     else if (obj1.isSphere() && obj2.isBox())    detectionOpt = detect(obj1.asSphere(), obj2.asBox());
     else if (obj1.isBox()    && obj2.isBox())    detectionOpt = detect(obj1.asBox(),    obj2.asBox());
+    // const auto mark2 = std::chrono::high_resolution_clock::now();
 
     if (!detectionOpt) return;
     const auto& [dir, extent, _contactPoints] = *detectionOpt;
@@ -300,6 +290,13 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
     if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
 
     resolveVelocities(obj1, obj2, *detectionOpt);
+    // const auto mark3 = std::chrono::high_resolution_clock::now();
+
+    // const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
+    // const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
+    // std::cout << "Detection=" << static_cast<float>(step1Mks)
+    //     << "mks. Resolve=" << static_cast<float>(step2Mks)
+    //     << "mks. (" << (obj1.isBox() ? "Box":"Sphere") << "--" << (obj2.isBox() ? "Box":"Sphere") << ")\n";
 }
 // ============================================================================
 // ===================== Main Update ==========================================
@@ -319,7 +316,7 @@ void HmlPhysics::updateForDt(float dt) noexcept {
     // const glm::vec3 cp{1,0,0};
     // const glm::vec3 Ft{0,0,0};
 
-    const uint8_t SUBSTEPS = 8;
+    const uint8_t SUBSTEPS = 1;
     const float subDt = dt / SUBSTEPS;
     for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
         // Apply velocity onto position change
@@ -583,6 +580,20 @@ std::optional<glm::vec3> HmlPhysics::edgePlaneIntersection(
     if (t < 0.0f || t > 1.0f) return std::nullopt;
     return { res };
 }
+
+
+// Returns whether point P located on the same plane as ABC is
+// inside the rectangle formed by two sides AB and AC
+bool HmlPhysics::pointInsideRect(const glm::vec3& P, const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept {
+    const auto AB = B - A;
+    const auto AC = C - A;
+    const auto AP = P - A;
+    const float projAb = glm::dot(AP, AB);
+    const float projAc = glm::dot(AP, AC);
+    const float maxAb = glm::dot(AB, AB);
+    const float maxAc = glm::dot(AC, AC);
+    return 0.0f <= projAb && projAb <= maxAb && 0.0f <= projAc && projAc <= maxAc;
+};
 // ============================================================================
 // ===================== GJK ==================================================
 // ============================================================================

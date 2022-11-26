@@ -9,18 +9,18 @@ VULKAN_SDK_PATH_LAYER = /usr/share/vulkan/explicit_layer.d
 # The name of the main file and executable
 mainFileName = main
 # Files that have .h and .cpp versions
-classFiles = HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer HmlTerrainRenderer HmlRenderPass HmlUiRenderer HmlDeferredRenderer HmlLightRenderer HmlBloomRenderer util HmlQueries HmlImgui HmlImguiRenderer HmlDispatcher HmlPhysics Himmel
+classFiles = HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlDescriptors HmlDevice HmlWindow HmlPipeline HmlRenderer HmlSnowParticleRenderer HmlTerrainRenderer HmlRenderPass HmlUiRenderer HmlDeferredRenderer HmlLightRenderer HmlBloomRenderer util HmlQueries HmlImgui HmlImguiRenderer HmlDispatcher HmlPhysics HmlMath Himmel
 # Files that only have the .h version
 # justHeaderFiles = renderer settings
 # Compilation flags
 COMPILER = g++
 OPTIMIZATION_FLAG = -O0
 LANGUAGE_LEVEL = -std=c++20
-COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter -Wpedantic -I$(VULKAN_SDK_PATH_INCLUDE) -mavx
+COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-ignored-attributes -I$(VULKAN_SDK_PATH_INCLUDE) -mavx
 LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvulkan
 # Can also use in conjunction with:
 # :> valgrind --leak-check=full ./main
-# COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter -Wpedantic -I$(VULKAN_SDK_PATH_INCLUDE) -fsanitize=address -g -fno-omit-frame-pointer
+# COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter -Wpedantic -I$(VULKAN_SDK_PATH_INCLUDE) -fsanitize=address -g -fno-omit-frame-pointer -mavx
 # LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvulkan -fsanitize=address
 
 
@@ -35,7 +35,7 @@ LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvul
 ../build/util.o: util.cpp util.h settings.h
 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
 
-../build/Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h HmlTerrainRenderer.h util.h HmlRenderPass.h HmlUiRenderer.h HmlDeferredRenderer.h HmlLightRenderer.h HmlBloomRenderer.h renderer.h HmlContext.h HmlQueries.h settings.h HmlDispatcher.h HmlPhysics.h
+../build/Himmel.o: Himmel.cpp Himmel.h HmlWindow.h HmlDevice.h HmlDescriptors.h HmlCommands.h HmlSwapchain.h HmlResourceManager.h HmlRenderer.h HmlSnowParticleRenderer.h HmlModel.h HmlCamera.h HmlTerrainRenderer.h util.h HmlRenderPass.h HmlUiRenderer.h HmlDeferredRenderer.h HmlLightRenderer.h HmlBloomRenderer.h renderer.h HmlContext.h HmlQueries.h settings.h HmlDispatcher.h HmlPhysics.h HmlMath.h
 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
 
 ../build/HmlCamera.o: HmlCamera.cpp HmlCamera.h settings.h
@@ -104,7 +104,10 @@ LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvul
 ../build/HmlImgui.o: HmlImgui.cpp HmlImgui.h HmlWindow.h HmlResourceManager.h settings.h
 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
 
-../build/HmlPhysics.o: HmlPhysics.cpp HmlPhysics.h settings.h
+../build/HmlMath.o: HmlMath.cpp HmlMath.h settings.h
+	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
+
+../build/HmlPhysics.o: HmlPhysics.cpp HmlPhysics.h settings.h HmlMath.h
 	$(COMPILER) $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $< -o $@
 
 

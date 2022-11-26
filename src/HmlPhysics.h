@@ -316,7 +316,30 @@ struct HmlPhysics {
             const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept;
     static bool pointInsideRect(const glm::vec3& P, const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept;
 
-    static void edgeFaceIntersection(
+    static void edgeFaceIntersection8(
+            const float edgePointA_xs_ptr[8],
+            const float edgePointA_ys_ptr[8],
+            const float edgePointA_zs_ptr[8],
+            const float edgePointB_xs_ptr[8],
+            const float edgePointB_ys_ptr[8],
+            const float edgePointB_zs_ptr[8],
+            const float planePointA_xs_ptr[8],
+            const float planePointA_ys_ptr[8],
+            const float planePointA_zs_ptr[8],
+            const float planePointB_xs_ptr[8],
+            const float planePointB_ys_ptr[8],
+            const float planePointB_zs_ptr[8],
+            const float planePointC_xs_ptr[8],
+            const float planePointC_ys_ptr[8],
+            const float planePointC_zs_ptr[8],
+            const float planeDir_xs_ptr[8],
+            const float planeDir_ys_ptr[8],
+            const float planeDir_zs_ptr[8],
+            bool foundIntersection_ptr[8],
+            float I_xs_ptr[8],
+            float I_ys_ptr[8],
+            float I_zs_ptr[8]) noexcept;
+    static void edgeFaceIntersection4(
             const float edgePointA_xs_ptr[4],
             const float edgePointA_ys_ptr[4],
             const float edgePointA_zs_ptr[4],

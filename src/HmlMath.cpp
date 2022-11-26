@@ -1,13 +1,59 @@
 #include "HmlMath.h"
 
+
 namespace hml {
 
 template<typename T>
 vec3_t<T>::vec3_t() noexcept {}
 
 template<typename T>
-vec3_t<T>::vec3_t(T x, T y, T z) noexcept : x(x), y(y), z(z) {}
+vec3_t<T>::vec3_t(T a) noexcept
+    : x(a), y(a), z(a) {}
 
+template<typename T>
+vec3_t<T>::vec3_t(T x, T y, T z) noexcept
+    : x(x), y(y), z(z) {}
+
+template<typename T>
+vec3_t<T>::vec3_t(const TF* xsPtr, const TF* ysPtr, const TF* zsPtr) noexcept
+    : x(load<T>(xsPtr)), y(load<T>(ysPtr)), z(load<T>(zsPtr)) {}
+// ============================================================================
+template<typename T>
+void vec3_t<T>::store(TF* xsPtr, TF* ysPtr, TF* zsPtr) const noexcept {
+    hml::store<T>(xsPtr, x);
+    hml::store<T>(ysPtr, y);
+    hml::store<T>(zsPtr, z);
+}
+// ============================================================================
+template<>
+void store(TF* ptr, const TF& value) noexcept {
+    *ptr = value;
+}
+
+template<>
+void store(TF* ptr, const TF128& value) noexcept {
+    _mm_store_ps(ptr, value);
+}
+
+template<>
+void store(TF* ptr, const TF256& value) noexcept {
+    _mm256_store_ps(ptr, value);
+}
+// ============================================================================
+template<>
+TF load(const TF* ptr) noexcept {
+    return *ptr;
+}
+
+template<>
+TF128 load(const TF* ptr) noexcept {
+    return _mm_load_ps(ptr);
+}
+
+template<>
+TF256 load(const TF* ptr) noexcept {
+    return _mm256_load_ps(ptr);
+}
 // ============================================================================
 template<>
 TF add(const TF& t1, const TF& t2) noexcept {
@@ -69,6 +115,36 @@ TF256 div(const TF256& t1, const TF256& t2) noexcept {
     return _mm256_div_ps(t1, t2);
 }
 // ============================================================================
+template<>
+TF sqrt(const TF& t) noexcept {
+    return std::sqrt(t);
+}
+
+template<>
+TF128 sqrt(const TF128& t) noexcept {
+    return _mm_sqrt_ps(t);
+}
+
+template<>
+TF256 sqrt(const TF256& t) noexcept {
+    return _mm256_sqrt_ps(t);
+}
+// ============================================================================
+template<>
+TF rsqrt(const TF& t) noexcept {
+    return 1.0f / std::sqrt(t);
+}
+
+template<>
+TF128 rsqrt(const TF128& t) noexcept {
+    return _mm_rsqrt_ps(t);
+}
+
+template<>
+TF256 rsqrt(const TF256& t) noexcept {
+    return _mm256_rsqrt_ps(t);
+}
+// ============================================================================
 // template<>
 // vec3 add(const vec3& v1, const vec3& v2) noexcept {
 //     return vec3(
@@ -94,123 +170,95 @@ TF256 div(const TF256& t1, const TF256& t2) noexcept {
 // }
 // ============================================================================
 template<typename T>
-T add(const T& v1, const T& v2) noexcept {
-    return vec3<T>(
+vec3_t<T> add(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return vec3_t<T>(
         add(v1.x, v2.x),
         add(v1.y, v2.y),
         add(v1.z, v2.z));
 }
 
 template<typename T>
-T sub(const T& v1, const T& v2) noexcept {
-    return vec3<T>(
+vec3_t<T> sub(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return vec3_t<T>(
         sub(v1.x, v2.x),
         sub(v1.y, v2.y),
         sub(v1.z, v2.z));
 }
 
 template<typename T>
-T mul(const T& v1, const T& v2) noexcept {
-    return vec3<T>(
+vec3_t<T> mul(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return vec3_t<T>(
         mul(v1.x, v2.x),
         mul(v1.y, v2.y),
         mul(v1.z, v2.z));
 }
 
 template<typename T>
-T div(const T& v1, const T& v2) noexcept {
-    return vec3<T>(
+vec3_t<T> div(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return vec3_t<T>(
         div(v1.x, v2.x),
         div(v1.y, v2.y),
         div(v1.z, v2.z));
 }
-// template<>
-// vec3 sub(const vec3& v1, const vec3& v2) noexcept {
-//     return vec3(
-//         v1.x - v2.x,
-//         v1.y - v2.y,
-//         v1.z - v2.z);
-// }
-
-// template<>
-// vec3_128 sub(const vec3_128& v1, const vec3_128& v2) noexcept {
-//     return vec3_128(
-//         _mm_sub_ps(v1.x, v2.x),
-//         _mm_sub_ps(v1.y, v2.y),
-//         _mm_sub_ps(v1.z, v2.z));
-// }
-
-// template<>
-// vec3_256 sub(const vec3_256& v1, const vec3_256& v2) noexcept {
-//     return vec3_256(
-//         _mm256_sub_ps(v1.x, v2.x),
-//         _mm256_sub_ps(v1.y, v2.y),
-//         _mm256_sub_ps(v1.z, v2.z));
-// }
 // ============================================================================
-// template<>
-// vec3 mul(const vec3& v1, const vec3& v2) noexcept {
-//     return vec3(
-//         v1.x * v2.x,
-//         v1.y * v2.y,
-//         v1.z * v2.z);
-// }
-
-// template<>
-// vec3_128 mul(const vec3_128& v1, const vec3_128& v2) noexcept {
-//     return vec3_128(
-//         _mm_mul_ps(v1.x, v2.x),
-//         _mm_mul_ps(v1.y, v2.y),
-//         _mm_mul_ps(v1.z, v2.z));
-// }
-
-// template<>
-// vec3_256 mul(const vec3_256& v1, const vec3_256& v2) noexcept {
-//     return vec3_256(
-//         _mm256_mul_ps(v1.x, v2.x),
-//         _mm256_mul_ps(v1.y, v2.y),
-//         _mm256_mul_ps(v1.z, v2.z));
-// }
-// ============================================================================
-// template<>
-// vec3 div(const vec3& v1, const vec3& v2) noexcept {
-//     return vec3(
-//         v1.x / v2.x,
-//         v1.y / v2.y,
-//         v1.z / v2.z);
-// }
-
-// template<>
-// vec3_128 div(const vec3_128& v1, const vec3_128& v2) noexcept {
-//     return vec3_128(
-//         _mm_div_ps(v1.x, v2.x),
-//         _mm_div_ps(v1.y, v2.y),
-//         _mm_div_ps(v1.z, v2.z));
-// }
-
-// template<>
-// vec3_256 div(const vec3_256& v1, const vec3_256& v2) noexcept {
-//     return vec3_256(
-//         _mm256_div_ps(v1.x, v2.x),
-//         _mm256_div_ps(v1.y, v2.y),
-//         _mm256_div_ps(v1.z, v2.z));
-// }
-// ============================================================================
-template<>
-vec3 normalize(const vec3& v) noexcept {
-    const float denom = std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-    return vec3(v.x / denom, v.y / denom, v.z / denom);
+template<typename T>
+vec3_t<T> operator+(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return add(v1, v2);
 }
 
-template<>
-vec3_128 normalize(const vec3_128& v) noexcept {
-    vec3_128 sqr = mul(v, v);
-    TF128 denom = _mm_rsqrt_ps(add(add(sqr.x, sqr.y), sqr.z));
-    return vec3_128(mul(v.x, denom), mul(v.y, denom), mul(v.z, denom));
+template<typename T>
+vec3_t<T> operator-(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return sub(v1, v2);
 }
 
-// template<>
-// T dot(const vec3_t<T>& v) noexcept;
+template<typename T>
+vec3_t<T> operator*(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return mul(v1, v2);
+}
+
+template<typename T>
+vec3_t<T> operator/(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return div(v1, v2);
+}
+
+template vec3     operator+(const vec3&     v1, const vec3&     v2) noexcept;
+template vec3_128 operator+(const vec3_128& v1, const vec3_128& v2) noexcept;
+template vec3_256 operator+(const vec3_256& v1, const vec3_256& v2) noexcept;
+template vec3     operator-(const vec3&     v1, const vec3&     v2) noexcept;
+template vec3_128 operator-(const vec3_128& v1, const vec3_128& v2) noexcept;
+template vec3_256 operator-(const vec3_256& v1, const vec3_256& v2) noexcept;
+template vec3     operator*(const vec3&     v1, const vec3&     v2) noexcept;
+template vec3_128 operator*(const vec3_128& v1, const vec3_128& v2) noexcept;
+template vec3_256 operator*(const vec3_256& v1, const vec3_256& v2) noexcept;
+template vec3     operator/(const vec3&     v1, const vec3&     v2) noexcept;
+template vec3_128 operator/(const vec3_128& v1, const vec3_128& v2) noexcept;
+template vec3_256 operator/(const vec3_256& v1, const vec3_256& v2) noexcept;
 // ============================================================================
+template<typename T>
+vec3_t<T> normalize(const vec3_t<T>& v) noexcept {
+    vec3_t<T> sqr = mul(v, v);
+    auto rsqrt = hml::rsqrt(add(add(sqr.x, sqr.y), sqr.z));
+    return vec3_t<T>(mul(v.x, rsqrt), mul(v.y, rsqrt), mul(v.z, rsqrt));
+}
+
+template vec3     normalize(const vec3&     v) noexcept;
+template vec3_128 normalize(const vec3_128& v) noexcept;
+template vec3_256 normalize(const vec3_256& v) noexcept;
+
+template<typename T>
+T dot(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
+    return add(add(
+        mul(v1.x, v2.x),
+        mul(v1.y, v2.y)),
+        mul(v1.z, v2.z));
+}
+
+template TF    dot(const vec3&     v1, const vec3&     v2) noexcept;
+template TF128 dot(const vec3_128& v1, const vec3_128& v2) noexcept;
+template TF256 dot(const vec3_256& v1, const vec3_256& v2) noexcept;
+// ============================================================================
+template class vec3_t<TF>;
+template class vec3_t<TF128>;
+template class vec3_t<TF256>;
 
 }

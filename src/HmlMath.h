@@ -6,21 +6,32 @@
 
 namespace hml {
 
+using TF    = float;
+using TF128 = __m128;
+using TF256 = __m256;
+
+
 template<typename T>
 struct vec3_t {
     T x, y, z;
 
     vec3_t() noexcept;
+    vec3_t(T x) noexcept;
     vec3_t(T x, T y, T z) noexcept;
+    vec3_t(const TF* xsPtr, const TF* ysPtr, const TF* zsPtr) noexcept;
+
+    void store(TF* xsPtr, TF* ysPtr, TF* zsPtr) const noexcept;
 };
 
-
-using TF    = float;
-using TF128 = __m128;
-using TF256 = __m256;
 using vec3     = vec3_t<TF>;
 using vec3_128 = vec3_t<TF128>;
 using vec3_256 = vec3_t<TF256>;
+
+template<typename T>
+void store(TF* ptr, const T& value) noexcept;
+
+template<typename T>
+T load(const TF* ptr) noexcept;
 
 
 template<typename T>
@@ -36,10 +47,10 @@ template<typename T>
 T div(const T& t1, const T& t2) noexcept;
 
 template<typename T>
-T sqrt(const T& t1, const T& t2) noexcept;
+T sqrt(const T& t) noexcept;
 
 template<typename T>
-T rsqrt(const T& t1, const T& t2) noexcept;
+T rsqrt(const T& t) noexcept;
 
 template<typename T>
 vec3_t<T> add(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept;
@@ -55,33 +66,41 @@ vec3_t<T> div(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept;
 
 
 template<typename T>
-inline vec3_t<T> operator+(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
-    return add(v1, v2);
-}
+vec3_t<T> operator+(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept;
 
 template<typename T>
-inline vec3_t<T> operator-(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
-    return sub(v1, v2);
-}
+vec3_t<T> operator-(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept;
 
 template<typename T>
-inline vec3_t<T> operator*(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
-    return mul(v1, v2);
-}
+vec3_t<T> operator*(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept;
 
 template<typename T>
-inline vec3_t<T> operator/(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
-    return div(v1, v2);
-}
+vec3_t<T> operator/(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept;
 
 
 template<typename T>
 vec3_t<T> normalize(const vec3_t<T>& v) noexcept;
 
 template<typename T>
-T dot(const vec3_t<T>& v) noexcept;
+T dot(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept;
 
 } // namespace hml
+
+// float hml_hsum128(__m128 v) noexcept {
+//     __m128 shuf = _mm_movehdup_ps(v);        // broadcast elements 3,1 to 2,0
+//     __m128 sums = _mm_add_ps(v, shuf);
+//     shuf        = _mm_movehl_ps(shuf, sums); // high half -> low half
+//     sums        = _mm_add_ss(sums, shuf);
+//     return        _mm_cvtss_f32(sums);
+// }
+//
+//
+// float hml_hsum256(__m256 v) noexcept {
+//     __m128 vlow  = _mm256_castps256_ps128(v);
+//     __m128 vhigh = _mm256_extractf128_ps(v, 1); // high 128
+//            vlow  = _mm_add_ps(vlow, vhigh);     // add the low 128
+//     return hml_hsum128(vlow);
+// }
 
 
 #endif

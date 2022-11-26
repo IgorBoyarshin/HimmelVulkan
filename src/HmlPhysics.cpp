@@ -88,6 +88,8 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxSphere(const O
 
 // Returns dir from b1 towards b2
 std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(const Object::Box& b1, const Object::Box& b2) noexcept {
+    // const auto mark1 = std::chrono::high_resolution_clock::now();
+
     const auto orientationData1 = b1.orientationDataNormalized();
     const auto orientationData2 = b2.orientationDataNormalized();
     const auto& [i1, j1, k1] = orientationData1;
@@ -126,6 +128,8 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
     const auto centers = b2.center - b1.center;
     const bool aligned = glm::dot(centers, dir) >= 0.0f;
     if (!aligned) dir *= -1;
+
+    // const auto mark2 = std::chrono::high_resolution_clock::now();
 
     // Find contact points
 
@@ -168,9 +172,75 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
         }
     };
 
+    static const auto addContactPointsFromOntoAvx = [](
+            std::span<const glm::vec3> psFrom,
+            std::span<const glm::vec3> psOnto,
+            const Object::Box::OrientationData& orientationDataOnto,
+            std::vector<glm::vec3>& contactPoints){
+
+        // for (size_t f = 0; f < 6; f++) {
+        //     const auto& face = faces[f];
+        //     const glm::vec3& planePointA = psOnto[face[0]];
+        //     const glm::vec3& planePointB = psOnto[face[1]];
+        //     const glm::vec3& planePointC = psOnto[face[2]];
+        //     const glm::vec3& planeDir = faceNormalForIndex(i, orientationDataOnto); // TODO
+        //     for (size_t e = 0; e < 12; e++) {
+        //         const auto& edge = edges[e];
+        //
+        //         const glm::vec3& edgePointA = psFrom[edge.first];
+        //         const glm::vec3& edgePointB = psFrom[edge.second];
+        //
+        //         // XXX
+        //     }
+        // }
+
+
+
+
+        static const std::array<std::pair<size_t, size_t>, 12> edges{
+            std::make_pair(0, 1), std::make_pair(2, 3), std::make_pair(0, 2), std::make_pair(1, 3),
+            std::make_pair(4, 5), std::make_pair(6, 7), std::make_pair(4, 6), std::make_pair(5, 7),
+            std::make_pair(0, 4), std::make_pair(1, 5), std::make_pair(2, 6), std::make_pair(3, 7)
+        };
+        static const std::array<std::array<size_t, 4>, 6> faces{
+            std::array<size_t, 4>{0,1,2,3}, std::array<size_t, 4>{4,5,6,7},
+            std::array<size_t, 4>{0,1,4,5}, std::array<size_t, 4>{2,3,6,7},
+            std::array<size_t, 4>{0,2,4,6}, std::array<size_t, 4>{1,3,5,7}
+        };
+        static const auto faceNormalForIndex = [](size_t i, const Object::Box::OrientationData& orientationData){
+            switch (i / 2) {
+                case 0: return orientationData.i;
+                case 1: return orientationData.j;
+                case 2: return orientationData.k;
+            }
+            assert(false && "Unexpected index in faceNormalForIndex()"); return glm::vec3{}; // stub
+        };
+        for (const auto& edge : edges) {
+            const auto& linePoint1 = psFrom[edge.first];
+            const auto& linePoint2 = psFrom[edge.second];
+            for (size_t i = 0; i < faces.size(); i++) {
+                const auto& face = faces[i];
+                const auto& planePoint = psOnto[face[0]]; // any point on plane
+                const auto planeDir = faceNormalForIndex(i, orientationDataOnto);
+                const auto intOpt = edgePlaneIntersection(linePoint1, linePoint2, planePoint, planeDir);
+                if (!intOpt) continue;
+                if (pointInsideRect(*intOpt, psOnto[face[0]], psOnto[face[1]], psOnto[face[2]])) {
+                    contactPoints.push_back(*intOpt);
+                }
+            }
+        }
+    };
+
     std::vector<glm::vec3> contactPoints;
     addContactPointsFromOnto(p1, p2, orientationData2, contactPoints);
     addContactPointsFromOnto(p2, p1, orientationData1, contactPoints);
+
+    // const auto mark3 = std::chrono::high_resolution_clock::now();
+    // const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
+    // const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
+    // std::cout << "SAT=" << static_cast<float>(step1Mks)
+    //     << "mks. Contact points=" << static_cast<float>(step2Mks)
+    //     << "mks\n";
 
     return { Detection{
         .dir = dir,
@@ -559,6 +629,7 @@ float HmlPhysics::pointToLineDstSqr(const glm::vec3& point, const glm::vec3& l1,
 }
 
 
+// NOTE planeDir need not be normalized thanks to the formula for t
 std::optional<glm::vec3> HmlPhysics::linePlaneIntersection(
         const glm::vec3& linePoint, const glm::vec3& lineDirNorm,
         const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept {
@@ -572,12 +643,15 @@ std::optional<glm::vec3> HmlPhysics::linePlaneIntersection(
 std::optional<glm::vec3> HmlPhysics::edgePlaneIntersection(
         const glm::vec3& linePoint1, const glm::vec3& linePoint2,
         const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept {
-    const auto lineDir = linePoint2 - linePoint1;
+    const auto lineDir = glm::normalize(linePoint2 - linePoint1);
     const auto dot = glm::dot(lineDir, planeDir);
     if (dot == 0) return std::nullopt;
-    const auto t = (glm::dot(planeDir, planePoint) - glm::dot(planeDir, linePoint1)) / dot;
+    const auto tp = glm::dot(planeDir, planePoint);
+    const auto t1 = glm::dot(planeDir, linePoint1);
+    const auto t2 = glm::dot(planeDir, linePoint2);
+    if ((tp - t1) * (t2 - tp) < 0) return std::nullopt;
+    const auto t = (tp - t1) / dot;
     const auto res = linePoint1 + lineDir * t;
-    if (t < 0.0f || t > 1.0f) return std::nullopt;
     return { res };
 }
 
@@ -594,6 +668,171 @@ bool HmlPhysics::pointInsideRect(const glm::vec3& P, const glm::vec3& A, const g
     const float maxAc = glm::dot(AC, AC);
     return 0.0f <= projAb && projAb <= maxAb && 0.0f <= projAc && projAc <= maxAc;
 };
+// ============================================================================
+// ===================== AVX/SSE ==============================================
+// ============================================================================
+void edgeFaceIntersection(
+        const float edgePointA_xs_ptr[4],
+        const float edgePointA_ys_ptr[4],
+        const float edgePointA_zs_ptr[4],
+        const float edgePointB_xs_ptr[4],
+        const float edgePointB_ys_ptr[4],
+        const float edgePointB_zs_ptr[4],
+        const float planePointA_xs_ptr[4],
+        const float planePointA_ys_ptr[4],
+        const float planePointA_zs_ptr[4],
+        const float planePointB_xs_ptr[4],
+        const float planePointB_ys_ptr[4],
+        const float planePointB_zs_ptr[4],
+        const float planePointC_xs_ptr[4],
+        const float planePointC_ys_ptr[4],
+        const float planePointC_zs_ptr[4],
+        const float planeDir_xs_ptr[4],
+        const float planeDir_ys_ptr[4],
+        const float planeDir_zs_ptr[4]
+        ) noexcept {
+    const __m128 edgePointA_xs = _mm_load_ps(edgePointA_xs_ptr);
+    const __m128 edgePointA_ys = _mm_load_ps(edgePointA_ys_ptr);
+    const __m128 edgePointA_zs = _mm_load_ps(edgePointA_zs_ptr);
+    const __m128 edgePointB_xs = _mm_load_ps(edgePointB_xs_ptr);
+    const __m128 edgePointB_ys = _mm_load_ps(edgePointB_ys_ptr);
+    const __m128 edgePointB_zs = _mm_load_ps(edgePointB_zs_ptr);
+    const __m128 planePointA_xs = _mm_load_ps(planePointA_xs_ptr);
+    const __m128 planePointA_ys = _mm_load_ps(planePointA_ys_ptr);
+    const __m128 planePointA_zs = _mm_load_ps(planePointA_zs_ptr);
+    const __m128 planePointB_xs = _mm_load_ps(planePointB_xs_ptr);
+    const __m128 planePointB_ys = _mm_load_ps(planePointB_ys_ptr);
+    const __m128 planePointB_zs = _mm_load_ps(planePointB_zs_ptr);
+    const __m128 planePointC_xs = _mm_load_ps(planePointC_xs_ptr);
+    const __m128 planePointC_ys = _mm_load_ps(planePointC_ys_ptr);
+    const __m128 planePointC_zs = _mm_load_ps(planePointC_zs_ptr);
+    const __m128 planeDir_xs = _mm_load_ps(planeDir_xs_ptr);
+    const __m128 planeDir_ys = _mm_load_ps(planeDir_ys_ptr);
+    const __m128 planeDir_zs = _mm_load_ps(planeDir_zs_ptr);
+
+    // edgeDir = edgePointB - edgePointA;
+    __m128 edgeDir_xs = _mm_sub_ps(edgePointB_xs, edgePointA_xs);
+    __m128 edgeDir_ys = _mm_sub_ps(edgePointB_ys, edgePointA_ys);
+    __m128 edgeDir_zs = _mm_sub_ps(edgePointB_zs, edgePointA_zs);
+    // normalize(edgeDir);
+    hml_norm128(edgeDir_xs, edgeDir_ys, edgeDir_zs);
+
+    // dot = glm::dot(edgeDir, planeDir)
+    const __m128 dot = hml_dot128(
+            edgeDir_xs, edgeDir_ys, edgeDir_zs,
+            planeDir_xs, planeDir_ys, planeDit_zs);
+}
+
+
+// void edgeFaceIntersection(
+//         const float edgePointA_xs_ptr[8],
+//         const float edgePointA_ys_ptr[8],
+//         const float edgePointA_zs_ptr[8],
+//         const float edgePointB_xs_ptr[8],
+//         const float edgePointB_ys_ptr[8],
+//         const float edgePointB_zs_ptr[8],
+//         const float planePointA_xs_ptr[8],
+//         const float planePointA_ys_ptr[8],
+//         const float planePointA_zs_ptr[8],
+//         const float planePointB_xs_ptr[8],
+//         const float planePointB_ys_ptr[8],
+//         const float planePointB_zs_ptr[8],
+//         const float planePointC_xs_ptr[8],
+//         const float planePointC_ys_ptr[8],
+//         const float planePointC_zs_ptr[8],
+//         const float planeDir_xs_ptr[8],
+//         const float planeDir_ys_ptr[8],
+//         const float planeDir_zs_ptr[8]
+//         ) noexcept {
+//
+// }
+//
+//
+// void edgeFaceIntersection(
+//         const float edgePointA_xs_ptr[12],
+//         const float edgePointA_ys_ptr[12],
+//         const float edgePointA_zs_ptr[12],
+//         const float edgePointB_xs_ptr[12],
+//         const float edgePointB_ys_ptr[12],
+//         const float edgePointB_zs_ptr[12],
+//         const float planePointA_xs_ptr[12],
+//         const float planePointA_ys_ptr[12],
+//         const float planePointA_zs_ptr[12],
+//         const float planePointB_xs_ptr[12],
+//         const float planePointB_ys_ptr[12],
+//         const float planePointB_zs_ptr[12],
+//         const float planePointC_xs_ptr[12],
+//         const float planePointC_ys_ptr[12],
+//         const float planePointC_zs_ptr[12],
+//         const float planeDir_xs_ptr[12],
+//         const float planeDir_ys_ptr[12],
+//         const float planeDir_zs_ptr[12]
+//         ) noexcept {
+//
+// }
+
+
+__m128 hml_dot128(
+        __m128 xs1, __m128 ys1, __m128 zs1,
+        __m128 xs2, __m128 ys2, __m128 zs2) noexcept {
+    return _mm_add_ps(
+        _mm_add_ps(
+            _mm_mul_ps(xs1, xs2),
+            _mm_mul_ps(ys1, ys2)),
+        _mm_mul_ps(zs1, zs2));
+}
+
+
+__m256 hml_dot256(
+        __m256 xs1, __m256 ys1, __m256 zs1,
+        __m256 xs2, __m256 ys2, __m256 zs2) noexcept {
+    return _mm256_add_ps(
+        _mm256_add_ps(
+            _mm256_mul_ps(xs1, xs2),
+            _mm256_mul_ps(ys1, ys2)),
+        _mm256_mul_ps(zs1, zs2));
+}
+
+
+void hml_norm128(__m128& xs, __m128& ys, __m128& zs) noexcept {
+    const __m128 xs_sqr = _mm_mul_ps(xs, xs);
+    const __m128 ys_sqr = _mm_mul_ps(ys, ys);
+    const __m128 zs_sqr = _mm_mul_ps(zs, zs);
+    const __m128 s = _mm_add_ps(_mm_add_ps(xs_sqr, ys_sqr), zs_sqr);
+    const __m128 s_rsqrt = _mm_rsqrt_ps(s);
+    xs = _mm_mul_ps(xs, s_rsqrt);
+    ys = _mm_mul_ps(ys, s_rsqrt);
+    zs = _mm_mul_ps(zs, s_rsqrt);
+}
+
+
+void hml_norm256(__m256& xs, __m256& ys, __m256& zs) noexcept {
+    const __m256 xs_sqr = _mm256_mul_ps(xs, xs);
+    const __m256 ys_sqr = _mm256_mul_ps(ys, ys);
+    const __m256 zs_sqr = _mm256_mul_ps(zs, zs);
+    const __m256 s = _mm256_add_ps(_mm256_add_ps(xs_sqr, ys_sqr), zs_sqr);
+    const __m256 s_rsqrt = _mm256_rsqrt_ps(s);
+    xs = _mm256_mul_ps(xs, s_rsqrt);
+    ys = _mm256_mul_ps(ys, s_rsqrt);
+    zs = _mm256_mul_ps(zs, s_rsqrt);
+}
+
+
+float hml_hsum128(__m128 v) noexcept {
+    __m128 shuf = _mm_movehdup_ps(v);        // broadcast elements 3,1 to 2,0
+    __m128 sums = _mm_add_ps(v, shuf);
+    shuf        = _mm_movehl_ps(shuf, sums); // high half -> low half
+    sums        = _mm_add_ss(sums, shuf);
+    return        _mm_cvtss_f32(sums);
+}
+
+
+float hml_hsum256(__m256 v) noexcept {
+    __m128 vlow  = _mm256_castps256_ps128(v);
+    __m128 vhigh = _mm256_extractf128_ps(v, 1); // high 128
+           vlow  = _mm_add_ps(vlow, vhigh);     // add the low 128
+    return hml_hsum128(vlow);
+}
 // ============================================================================
 // ===================== GJK ==================================================
 // ============================================================================

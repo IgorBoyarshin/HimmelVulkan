@@ -356,7 +356,9 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectAxisAlignedBoxes(const Ob
 // ============================================================================
 // ===================== Resolver =============================================
 // ============================================================================
-void HmlPhysics::resolveVelocities(Object& obj1, Object& obj2, const Detection& detection) noexcept {
+HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& obj1, const Object& obj2, const Detection& detection) noexcept {
+    assert(!(obj1.isStationary() && obj2.isStationary()) && "Shouldn't've called resolveVelocities with both objects being static");
+
     const auto& [dir, extent, contactPoints] = detection;
 
     static const auto avg = [](std::span<const glm::vec3> vs){
@@ -370,7 +372,7 @@ void HmlPhysics::resolveVelocities(Object& obj1, Object& obj2, const Detection& 
     const auto relativeV = obj2DP.velocity - obj1DP.velocity;
     if (glm::dot(relativeV, dir) > 0.0f) {
         // Objects are already moving apart
-        return;
+        return std::make_pair(VelocitiesAdjustment{}, VelocitiesAdjustment{});
     }
     // e == 0 --- perfectly inelastic collision
     // e == 1 --- perfectly elastic collision, no kinetic energy is dissipated
@@ -385,18 +387,21 @@ void HmlPhysics::resolveVelocities(Object& obj1, Object& obj2, const Detection& 
     denom += glm::dot(a + b, dir);
     const float j = nom / denom;
     const auto impulse = j * dir;
-    if (!obj1.isStationary()) {
-        obj1.dynamicProperties->velocity -= impulse * obj1DP.invMass;
-        obj1.dynamicProperties->angularMomentum -= glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor;
-    }
-    if (!obj2.isStationary()) {
-        obj2.dynamicProperties->velocity += impulse * obj2DP.invMass;
-        obj2.dynamicProperties->angularMomentum += glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor;
-    }
+
+    return std::make_pair(
+        obj1.isStationary() ? VelocitiesAdjustment{} : VelocitiesAdjustment{
+            .velocity        = - impulse * obj1DP.invMass,
+            .angularMomentum = - glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor,
+        },
+        obj2.isStationary() ? VelocitiesAdjustment{} : VelocitiesAdjustment{
+            .velocity        = + impulse * obj2DP.invMass,
+            .angularMomentum = + glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor,
+        }
+    );
 }
 
 
-void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
+HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& obj2) noexcept {
     // const auto mark1 = std::chrono::high_resolution_clock::now();
     std::optional<Detection> detectionOpt = std::nullopt;
     if      (obj1.isSphere() && obj2.isSphere()) detectionOpt = detect(obj1.asSphere(), obj2.asSphere());
@@ -405,13 +410,15 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
     else if (obj1.isBox()    && obj2.isBox())    detectionOpt = detect(obj1.asBox(),    obj2.asBox());
     // const auto mark2 = std::chrono::high_resolution_clock::now();
 
-    if (!detectionOpt) return;
+    if (!detectionOpt) return std::make_pair(ObjectAdjustment{}, ObjectAdjustment{});
     const auto& [dir, extent, _contactPoints] = *detectionOpt;
 
-    if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
-    if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
+    const bool oneStationary = obj1.isStationary() || obj2.isStationary();
+    const auto positionAdjustment = dir * extent * (oneStationary ? 1.0f : 0.5f);
+    // if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
+    // if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
 
-    resolveVelocities(obj1, obj2, *detectionOpt);
+    const auto [velAdj1, velAdj2] = resolveVelocities(obj1, obj2, *detectionOpt);
     // const auto mark3 = std::chrono::high_resolution_clock::now();
 
     // const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
@@ -419,6 +426,21 @@ void HmlPhysics::process(Object& obj1, Object& obj2) noexcept {
     // std::cout << "Detection=" << static_cast<float>(step1Mks)
     //     << "mks. Resolve=" << static_cast<float>(step2Mks)
     //     << "mks. (" << (obj1.isBox() ? "Box":"Sphere") << "--" << (obj2.isBox() ? "Box":"Sphere") << ")\n";
+
+    return std::make_pair(
+        obj1.isStationary() ? ObjectAdjustment{} : ObjectAdjustment{
+            .id              = obj1.id,
+            .position        = - positionAdjustment,
+            .velocity        =   velAdj1.velocity,
+            .angularMomentum =   velAdj1.angularMomentum,
+        },
+        obj2.isStationary() ? ObjectAdjustment{} : ObjectAdjustment{
+            .id              = obj2.id,
+            .position        = + positionAdjustment,
+            .velocity        =   velAdj2.velocity,
+            .angularMomentum =   velAdj2.angularMomentum,
+        }
+    );
 }
 // ============================================================================
 // ===================== Main Update ==========================================
@@ -434,85 +456,129 @@ void HmlPhysics::updateForDt(float dt) noexcept {
         }
     }
 
+    const uint8_t SUBSTEPS = 1;
+    const float subDt = dt / SUBSTEPS;
+    for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
+        const auto mark0 = std::chrono::high_resolution_clock::now();
+        applyAdjustments();
+        const auto mark1 = std::chrono::high_resolution_clock::now();
+        advanceState(subDt); // Apply velocity onto position change
+        const auto mark2 = std::chrono::high_resolution_clock::now();
+        reassign(); // Put objects into proper buckets after they have finished being moved
+        const auto mark3 = std::chrono::high_resolution_clock::now();
+        checkForAndHandleCollisions();
+        const auto mark4 = std::chrono::high_resolution_clock::now();
+
+        static int stepTimer = 0;
+        if (true && ++stepTimer == 100) {
+            stepTimer = 0;
+            const auto step0Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark1 - mark0).count();
+            const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
+            const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
+            const auto step3Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark4 - mark3).count();
+            std::cout << "Step 0 = " << static_cast<float>(step0Mks) << " mks\n";
+            std::cout << "Step 1 = " << static_cast<float>(step1Mks) << " mks\n";
+            std::cout << "Step 2 = " << static_cast<float>(step2Mks) << " mks\n";
+            std::cout << "Step 3 = " << static_cast<float>(step3Mks) << " mks\n";
+        }
+    }
+}
+
+
+void HmlPhysics::applyAdjustments() noexcept {
+    // std::cout << "Have " << adjustments.size() << " adjustments\n";
+    for (auto& object : objects) {
+        if (object->isStationary()) continue;
+
+        for (auto it = adjustments.begin(); it != adjustments.end();) {
+            const auto& [id, positionAdj, velocityAdj, angularMomentumAdj] = *it;
+            if (id == Object::INVALID_ID) {
+                it = adjustments.erase(it);
+                continue;
+            }
+            if (id == object->id) {
+                object->position += positionAdj;
+                object->dynamicProperties->velocity += velocityAdj;
+                object->dynamicProperties->angularMomentum += angularMomentumAdj;
+                it = adjustments.erase(it);
+                break;
+            }
+
+            ++it;
+        }
+        if (adjustments.empty()) break;
+    }
+}
+
+
+void HmlPhysics::advanceState(float dt) noexcept {
     // const glm::vec3 F {0,-199.8,0};
     const glm::vec3 F {0,0,0};
     // const glm::vec3 cp{1,0,0};
     // const glm::vec3 Ft{0,0,0};
 
-    const uint8_t SUBSTEPS = 1;
-    const float subDt = dt / SUBSTEPS;
-    for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
-        // Apply velocity onto position change
-        const auto mark1 = std::chrono::high_resolution_clock::now();
-        for (auto& object : objects) {
-            if (object->isStationary()) continue;
+    for (auto& object : objects) {
+        if (object->isStationary()) continue;
 
-            object->position += subDt * object->dynamicProperties->velocity;
-            object->dynamicProperties->velocity += subDt * F * object->dynamicProperties->invMass;
+        object->position += dt * object->dynamicProperties->velocity;
+        object->dynamicProperties->velocity += dt * F * object->dynamicProperties->invMass;
 
-            // World-space inverse inertia tensor
-            const auto I =
-                quatToMat3(object->orientation) *
-                object->dynamicProperties->invRotationalInertiaTensor *
-                quatToMat3(glm::conjugate(object->orientation));
-            const auto angularVelocity = I * object->dynamicProperties->angularMomentum;
-            object->orientation += subDt * glm::cross(glm::quat(0, angularVelocity), object->orientation);
-            // const auto torque = glm::cross(cp, Ft);
-            // object->dynamicProperties->angularMomentum += subDt * torque;
+        // World-space inverse inertia tensor
+        const auto I =
+            quatToMat3(object->orientation) *
+            object->dynamicProperties->invRotationalInertiaTensor *
+            quatToMat3(glm::conjugate(object->orientation));
+        const auto angularVelocity = I * object->dynamicProperties->angularMomentum;
+        object->orientation += dt * glm::cross(glm::quat(0, angularVelocity), object->orientation);
+        // const auto torque = glm::cross(cp, Ft);
+        // object->dynamicProperties->angularMomentum += dt * torque;
 
-            // NOTE can be done not every step, but this is too trivial so we don't bother
-            object->orientation = glm::normalize(object->orientation);
+        // NOTE can be done not every step, but this is too trivial so we don't bother
+        object->orientation = glm::normalize(object->orientation);
 
-            // Invalidate modelMatrix (force further recalculation)
-            // Do it here because this has been the biggest state change,
-            // but not later because the next step requires presice positions
-            object->modelMatrixCached = std::nullopt;
+        // Invalidate modelMatrix (force further recalculation)
+        // Do it here because this has been the biggest state change,
+        // but not later because the next step requires presice positions
+        object->modelMatrixCached = std::nullopt;
+    }
+}
+
+
+void HmlPhysics::checkForAndHandleCollisions() noexcept {
+    // processedPairsOnThisIteration.clear();
+    adjustments.clear();
+    for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
+        const auto& [_bucket, objects] = *it;
+        if (objects.empty()) {
+            it = objectsInBuckets.erase(it);
+            continue;
         }
-        const auto mark2 = std::chrono::high_resolution_clock::now();
 
-        // Check for and handle collisions
-        processedPairsOnThisIteration.clear();
-        for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
-            const auto& [_bucket, objects] = *it;
-            if (objects.empty()) {
-                it = objectsInBuckets.erase(it);
-                continue;
+        for (size_t i = 0; i < objects.size(); i++) {
+            auto& obj1 = objects[i];
+
+            // For each object, test it against all other objects in current bucket...
+            for (size_t j = i + 1; j < objects.size(); j++) {
+                auto& obj2 = objects[j];
+                if (obj1->isStationary() && obj2->isStationary()) continue;
+
+                // auto id1 = obj1->id;
+                // auto id2 = obj2->id;
+                // if (id1 > id2) std::swap(id1, id2);
+                // const auto& [_, notPresentBefore] = processedPairsOnThisIteration.emplace(id1, id2);
+                // if (notPresentBefore) {
+                    const auto [adj1, adj2] = process(*obj1, *obj2);
+                    adjustments.insert(adj1);
+                    adjustments.insert(adj2);
+                    // const auto& [_1, notPresent1] = adjustments.insert(adj1);
+                    // const auto& [_2, notPresent2] = adjustments.insert(adj2);
+                    //  std::cout << "1=" << adj1.id << (notPresent1 ? " new" : "old") << std::endl;
+                    //  std::cout << "2=" << adj2.id << (notPresent2 ? " new" : "old") << std::endl;
+                // }
             }
-
-            for (size_t i = 0; i < objects.size(); i++) {
-                auto& obj1 = objects[i];
-
-                // For each object, test it against all other objects in current bucket...
-                for (size_t j = i + 1; j < objects.size(); j++) {
-                    auto& obj2 = objects[j];
-                    if (obj1->isStationary() && obj2->isStationary()) continue;
-
-                    auto id1 = obj1->id;
-                    auto id2 = obj2->id;
-                    if (id1 > id2) std::swap(id1, id2);
-                    const auto& [_, notPresentBefore] = processedPairsOnThisIteration.emplace(id1, id2);
-                    if (notPresentBefore) process(*obj1, *obj2);
-                }
-            }
-
-            ++it;
         }
-        const auto mark3 = std::chrono::high_resolution_clock::now();
 
-        // Put objects into proper buckets after they have finished being moved
-        reassign();
-        const auto mark4 = std::chrono::high_resolution_clock::now();
-
-        static int stepTimer = 0;
-        if (false && ++stepTimer == 100) {
-            stepTimer = 0;
-            const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
-            const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
-            const auto step3Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark4 - mark3).count();
-            std::cout << "Step 1 = " << static_cast<float>(step1Mks) << " mks\n";
-            std::cout << "Step 2 = " << static_cast<float>(step2Mks) << " mks\n";
-            std::cout << "Step 3 = " << static_cast<float>(step3Mks) << " mks\n";
-        }
+        ++it;
     }
 }
 // ============================================================================

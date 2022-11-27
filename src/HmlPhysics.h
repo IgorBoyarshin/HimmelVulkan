@@ -192,8 +192,31 @@ struct HmlPhysics {
     template<typename Arg1, typename Arg2>
     static std::optional<Detection> detect(const Arg1& arg1, const Arg2& arg2) noexcept;
 
-    static void resolveVelocities(Object& obj1, Object& obj2, const Detection& detection) noexcept;
-    static void process(Object& obj1, Object& obj2) noexcept;
+    struct VelocitiesAdjustment {
+        glm::vec3 velocity        = glm::vec3(0.0f);
+        glm::vec3 angularMomentum = glm::vec3(0.0f);
+    };
+    struct ObjectAdjustment {
+        Object::Id id             = Object::INVALID_ID;
+        glm::vec3 position        = glm::vec3(0.0f);
+        glm::vec3 velocity        = glm::vec3(0.0f);
+        glm::vec3 angularMomentum = glm::vec3(0.0f);
+    };
+    struct ObjectAdjustmentHasher {
+        inline size_t operator()(const ObjectAdjustment& objectAdjustment) const {
+            return std::hash<Object::Id>{}(objectAdjustment.id);
+        }
+    };
+    struct ObjectAdjustmentEqual {
+        inline size_t operator()(const ObjectAdjustment& objAdj1, const ObjectAdjustment& objAdj2) const {
+            return objAdj1.id == objAdj2.id;
+        }
+    };
+
+    using ProcessResult           = std::pair<ObjectAdjustment, ObjectAdjustment>;
+    using ResolveVelocitiesResult = std::pair<VelocitiesAdjustment, VelocitiesAdjustment>;
+    static ProcessResult           process(const Object& obj1, const Object& obj2) noexcept;
+    static ResolveVelocitiesResult resolveVelocities(const Object& obj1, const Object& obj2, const Detection& detection) noexcept;
     // ========================================================================
     struct Simplex {
         inline Simplex() noexcept : points({ glm::vec3{0}, glm::vec3{0}, glm::vec3{0}, glm::vec3{0} }), count(0) {}
@@ -274,6 +297,9 @@ struct HmlPhysics {
     // NOTE can contain Buckets not present in any of the inputs
     static Bucket::Bounding boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept;
     static Bucket::Bounding boundingBucketsForObject(const Object& object) noexcept;
+    void applyAdjustments() noexcept;
+    void advanceState(float dt) noexcept;
+    void checkForAndHandleCollisions() noexcept;
     void reassign() noexcept;
     void removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept;
     void printStats() const noexcept;
@@ -287,13 +313,14 @@ struct HmlPhysics {
     // Not to allocate every frame
     std::vector<Bucket::Bounding> allBoundingBucketsBefore;
 
-    struct PairHasher {
-        inline size_t operator()(const std::pair<Object::Id, Object::Id>& pair) const {
-            const uint64_t comb = (std::hash<uint64_t>{}(pair.first) << 32) | std::hash<uint64_t>{}(pair.second);
-            return std::hash<uint64_t>{}(comb);
-        }
-    };
-    std::unordered_set<std::pair<Object::Id, Object::Id>, PairHasher> processedPairsOnThisIteration;
+    // struct PairHasher {
+    //     inline size_t operator()(const std::pair<Object::Id, Object::Id>& pair) const {
+    //         const uint64_t comb = (std::hash<uint64_t>{}(pair.first) << 32) | std::hash<uint64_t>{}(pair.second);
+    //         return std::hash<uint64_t>{}(comb);
+    //     }
+    // };
+    // std::unordered_set<std::pair<Object::Id, Object::Id>, PairHasher> processedPairsOnThisIteration;
+    std::unordered_set<ObjectAdjustment, ObjectAdjustmentHasher, ObjectAdjustmentEqual> adjustments;
     // ========================================================================
     // ============== Geometry helpers
     // ========================================================================

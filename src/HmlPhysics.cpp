@@ -545,41 +545,71 @@ void HmlPhysics::advanceState(float dt) noexcept {
 
 
 void HmlPhysics::checkForAndHandleCollisions() noexcept {
-    // processedPairsOnThisIteration.clear();
-    adjustments.clear();
-    for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
-        const auto& [_bucket, objects] = *it;
-        if (objects.empty()) {
-            it = objectsInBuckets.erase(it);
-            continue;
-        }
+    assert(adjustments.empty()); // because it has been exhausted during adjustment application traversal
 
-        for (size_t i = 0; i < objects.size(); i++) {
-            auto& obj1 = objects[i];
-
-            // For each object, test it against all other objects in current bucket...
-            for (size_t j = i + 1; j < objects.size(); j++) {
-                auto& obj2 = objects[j];
-                if (obj1->isStationary() && obj2->isStationary()) continue;
-
-                // auto id1 = obj1->id;
-                // auto id2 = obj2->id;
-                // if (id1 > id2) std::swap(id1, id2);
-                // const auto& [_, notPresentBefore] = processedPairsOnThisIteration.emplace(id1, id2);
-                // if (notPresentBefore) {
-                    const auto [adj1, adj2] = process(*obj1, *obj2);
-                    adjustments.insert(adj1);
-                    adjustments.insert(adj2);
-                    // const auto& [_1, notPresent1] = adjustments.insert(adj1);
-                    // const auto& [_2, notPresent2] = adjustments.insert(adj2);
-                    //  std::cout << "1=" << adj1.id << (notPresent1 ? " new" : "old") << std::endl;
-                    //  std::cout << "2=" << adj2.id << (notPresent2 ? " new" : "old") << std::endl;
+    const size_t thread_count = 4;
+    const auto count = objectsInBuckets.size();
+    const auto chunk = count / thread_count;
+    thread_pool.resize(thread_count);
+    std::vector<std::future<Adjustments>> results(thread_count);
+    for (size_t threadIndex = 0; threadIndex < thread_count; threadIndex++) {
+        const bool lastThread = threadIndex + 1 == thread_count;
+        const auto startIt = std::next(objectsInBuckets.cbegin(), threadIndex * chunk);
+        const auto endIt = lastThread ? objectsInBuckets.cend() : std::next(objectsInBuckets.cbegin(), (threadIndex + 1) * chunk);
+        results[threadIndex] = thread_pool.push([=](int){
+            Adjustments adjustments;
+            for (auto it = startIt; it != endIt; ++it) {
+                const auto& [_bucket, objects] = *it;
+                // TODO
+                // if (objects.empty()) {
+                //     it = objectsInBuckets.erase(it);
+                //     continue;
                 // }
-            }
-        }
 
-        ++it;
+                for (size_t i = 0; i < objects.size(); i++) {
+                    const auto& obj1 = objects[i];
+
+                    // For each object, test it against all other objects in current bucket
+                    for (size_t j = i + 1; j < objects.size(); j++) {
+                        const auto& obj2 = objects[j];
+                        if (obj1->isStationary() && obj2->isStationary()) continue;
+
+                        const auto [adj1, adj2] = process(*obj1, *obj2);
+                        adjustments.insert(adj1);
+                        adjustments.insert(adj2);
+                    }
+                }
+            }
+            return adjustments;
+        });
     }
+    for (size_t threadIndex = 0; threadIndex < thread_count; threadIndex++) {
+        adjustments.merge(results[threadIndex].get()); // wait on results
+    }
+
+    // for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
+    //     const auto& [_bucket, objects] = *it;
+    //     if (objects.empty()) {
+    //         it = objectsInBuckets.erase(it);
+    //         continue;
+    //     }
+    //
+    //     for (size_t i = 0; i < objects.size(); i++) {
+    //         auto& obj1 = objects[i];
+    //
+    //         // For each object, test it against all other objects in current bucket
+    //         for (size_t j = i + 1; j < objects.size(); j++) {
+    //             auto& obj2 = objects[j];
+    //             if (obj1->isStationary() && obj2->isStationary()) continue;
+    //
+    //             const auto [adj1, adj2] = process(*obj1, *obj2);
+    //             adjustments.insert(adj1);
+    //             adjustments.insert(adj2);
+    //         }
+    //     }
+    //
+    //     ++it;
+    // }
 }
 // ============================================================================
 // =================== Register/remove/get ====================================

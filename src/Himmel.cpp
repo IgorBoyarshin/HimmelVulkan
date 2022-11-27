@@ -482,8 +482,8 @@ bool Himmel::init() noexcept {
 
 
             const float density = 3.0f;
-            const size_t boxesCount = 30;
-            const size_t spheresCount = 30;
+            const size_t boxesCount = 50;
+            const size_t spheresCount = 50;
             const float maxSpeed = 7.0f;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{
@@ -503,10 +503,10 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.0f, 1.0f)
                 };
                 const auto halfDimensions = glm::vec3{
-                    hml::getRandomUniformFloat(0.4f, 3.0f),
+                    hml::getRandomUniformFloat(0.4f, 2.0f),
                     // hml::getRandomUniformFloat(0.2f, 2.0f),
                     2.0f,
-                    hml::getRandomUniformFloat(0.4f, 3.0f)
+                    hml::getRandomUniformFloat(0.4f, 2.0f)
                 };
 
                 const float volume = halfDimensions.x * halfDimensions.y * halfDimensions.z;
@@ -541,7 +541,7 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.0f, 1.0f)
                 };
 
-                const float radius = hml::getRandomUniformFloat(0.4f, 2.5f);
+                const float radius = hml::getRandomUniformFloat(0.4f, 2.0f);
                 const float volume = 4.0f / 3.0f * glm::pi<float>() * radius * radius * radius;
                 const float mass = volume * density;
                 auto object = HmlPhysics::Object::createSphere(pos, radius, mass, velocity, glm::vec3{});

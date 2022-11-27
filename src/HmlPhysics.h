@@ -18,6 +18,8 @@
 
 #include "HmlMath.h"
 
+#include "../libs/ctpl_stl.h"
+
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -307,6 +309,7 @@ struct HmlPhysics {
     Object::Id registerObject(Object&& object) noexcept;
     // Object& getObject(Object::Id id) noexcept;
 
+    ctpl::thread_pool thread_pool;
     bool firstUpdateAfterLastRegister = true;
     std::unordered_map<Bucket, std::vector<std::shared_ptr<Object>>, BucketHasher> objectsInBuckets;
     std::vector<std::shared_ptr<Object>> objects;
@@ -320,7 +323,8 @@ struct HmlPhysics {
     //     }
     // };
     // std::unordered_set<std::pair<Object::Id, Object::Id>, PairHasher> processedPairsOnThisIteration;
-    std::unordered_set<ObjectAdjustment, ObjectAdjustmentHasher, ObjectAdjustmentEqual> adjustments;
+    using Adjustments = std::unordered_set<ObjectAdjustment, ObjectAdjustmentHasher, ObjectAdjustmentEqual>;
+    Adjustments adjustments;
     // ========================================================================
     // ============== Geometry helpers
     // ========================================================================

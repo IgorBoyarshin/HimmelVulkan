@@ -17,7 +17,7 @@ COMPILER = g++
 OPTIMIZATION_FLAG = -O0
 LANGUAGE_LEVEL = -std=c++20
 COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-ignored-attributes -I$(VULKAN_SDK_PATH_INCLUDE) -mavx
-LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvulkan
+LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvulkan -lpthread
 # Can also use in conjunction with:
 # :> valgrind --leak-check=full ./main
 # COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter -Wpedantic -I$(VULKAN_SDK_PATH_INCLUDE) -fsanitize=address -g -fno-omit-frame-pointer -mavx

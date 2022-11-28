@@ -392,7 +392,7 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     // e == 0 --- perfectly inelastic collision
     // e == 1 --- perfectly elastic collision, no kinetic energy is dissipated
     // const float e = std::min(obj1.restitution, obj2.restitution);
-    const float e = 0.3f; // restitution
+    const float e = 1.0f; // restitution
     const float nom = -(1.0f + e) * glm::dot(relativeV, dir);
     float denom = (obj1DP.invMass + obj2DP.invMass);
     const auto rap = avg(contactPoints) - obj1.position;
@@ -483,8 +483,8 @@ static void assertGood(const std::shared_ptr<HmlPhysics::Object>& object, const 
     // assert(object->position < end && start < object->position);
     bool good = (object->position < end && start < object->position);
     if (!object->isStationary()) {
-        good &= object->dynamicProperties->velocity < glm::vec3{100,100,100} &&
-                object->dynamicProperties->velocity > glm::vec3{-100,-100,-100};
+        good &= object->dynamicProperties->velocity < glm::vec3{150,150,150} &&
+                object->dynamicProperties->velocity > glm::vec3{-150,-150,-150};
     }
     if (!good) {
         std::cout

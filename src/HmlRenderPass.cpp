@@ -51,7 +51,7 @@ std::unique_ptr<HmlRenderPass> HmlRenderPass::create(
             case LoadColor::Type::Clear:    loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; break;
             case LoadColor::Type::Load:     loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; break;
             case LoadColor::Type::DontCare: loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; break;
-            default: assert(false && "::> Unexpected loadColor type.");
+            default: assert(false && "::> Unexpected loadColor type."); loadOp = static_cast<VkAttachmentLoadOp>(0); // stub
         }
         attachments.push_back({
             .flags = 0,

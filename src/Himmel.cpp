@@ -218,8 +218,8 @@ bool Himmel::init() noexcept {
 
 
     // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 205.0f, 135.0f, 215.0f });
-    hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 40, 145, 40 });
-    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-40, 320);
+    hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 91.5, 50 });
+    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(0, 0);
     // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 70, 0 });
     // dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-25.0f, 210.0f);
     // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 180, 0 });
@@ -465,8 +465,8 @@ bool Himmel::init() noexcept {
 
 
             const float density = 3.0f;
-            const size_t boxesCount = 45;
-            const size_t spheresCount = 45;
+            const size_t boxesCount = 0;
+            const size_t spheresCount = 0;
             const float maxSpeed = 7.0f;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{
@@ -561,11 +561,11 @@ bool Himmel::init() noexcept {
             //     const auto id = hmlPhysics->registerObject(std::move(object));
             //     physicsIdToEntity[id] = entities.back();
             // }
-#if 0
+#if 1
             { // Dyn wall 1
-                const float halfHeight = 6.0f;
-                auto object = HmlPhysics::Object::createBox({ -6.5f, 61, 20 }, { 1, halfHeight, 1 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
-                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(1,0,0));
+                auto object = HmlPhysics::Object::createBox(
+                    { 0, baseHeight + 0.9f * halfHeight, 0 }, { 1, 1, 1 }, 1, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.3f, glm::vec3(0,0,1));
 
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.9f, 0.9f, 0.9f}));
                 entities.back()->modelMatrix = object.modelMatrix();
@@ -574,17 +574,17 @@ bool Himmel::init() noexcept {
                 physicsIdToEntity[id] = entities.back();
                 debugId = id;
             }
-            { // Dyn wall 2
-                const float halfHeight = 2.0f;
-                auto object = HmlPhysics::Object::createBox({ -10, 59, 25 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
-                // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 0.3f, glm::vec3(1,0,0));
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.6f, 1.0f, 0.6f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
+            // { // Dyn wall 2
+            //     const float halfHeight = 2.0f;
+            //     auto object = HmlPhysics::Object::createBox({ -10, 59, 25 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+            //     // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 0.3f, glm::vec3(1,0,0));
+            //
+            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.6f, 1.0f, 0.6f}));
+            //     entities.back()->modelMatrix = object.modelMatrix();
+            //
+            //     const auto id = hmlPhysics->registerObject(std::move(object));
+            //     physicsIdToEntity[id] = entities.back();
+            // }
 #endif
 #if 0
             // { // Dyn wall 3

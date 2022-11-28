@@ -286,18 +286,23 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
     addContactPointsFromOnto(p2, p1, orientationData1, contactPoints);
 
     if (contactPoints.empty()) return std::nullopt;
-    // if (contactPoints.empty()) {
-    //     std::cout << "Dir=" << dir << " minExtent=" << minExtent << '\n';
-    //     std::cout << "C1=" << b1.center << " C2=" << b2.center << '\n';
-    //     std::cout << "IJK1=" << i1 << " " << j1 << " " << k1 << '\n';
-    //     std::cout << "IJK2=" << i2 << " " << j2 << " " << k2 << '\n';
-    //     std::cout << "P1:" << '\n';
-    //     for (const auto& p : p1) std::cout << p << " ";
-    //     std::cout << '\n';
-    //     std::cout << "P2:" << '\n';
-    //     for (const auto& p : p2) std::cout << p << " ";
-    //     std::cout << '\n';
-    // }
+    if (true) {
+        std::cout << "=====================================" << '\n';
+        std::cout << "Dir=" << dir << " minExtent=" << minExtent << '\n';
+        std::cout << "C1=" << b1.center << " C2=" << b2.center << '\n';
+        std::cout << "IJK1=" << i1 << " " << j1 << " " << k1 << '\n';
+        std::cout << "IJK2=" << i2 << " " << j2 << " " << k2 << '\n';
+        std::cout << "P1:" << '\n';
+        for (const auto& p : p1) std::cout << p << " ";
+        std::cout << '\n';
+        std::cout << "P2:" << '\n';
+        for (const auto& p : p2) std::cout << p << " ";
+        std::cout << '\n';
+        std::cout << "CP:" << '\n';
+        for (const auto& cp : contactPoints) std::cout << cp << " ";
+        std::cout << '\n';
+        std::cout << "=====================================" << '\n';
+    }
     // assert(!contactPoints.empty() && "No contact points!");
     // addContactPointsFromOntoAvx(p1, p2, orientationData2, contactPoints);
     // addContactPointsFromOntoAvx(p2, p1, orientationData1, contactPoints);
@@ -387,7 +392,7 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     const auto relativeV = obj2DP.velocity - obj1DP.velocity;
     if (glm::dot(relativeV, dir) > 0.0f) {
         // Objects are already moving apart
-        return std::make_pair(VelocitiesAdjustment{}, VelocitiesAdjustment{});
+        // return std::make_pair(VelocitiesAdjustment{}, VelocitiesAdjustment{});
     }
     // e == 0 --- perfectly inelastic collision
     // e == 1 --- perfectly elastic collision, no kinetic energy is dissipated
@@ -417,6 +422,12 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     //     std::cout << "BAD IMPULSE=" << impulse << std::endl;
     //     assert(false);
     // }
+    std::cout << "Impulse = " << impulse << '\n';
+    std::cout << "Dir = " << dir << " J = " << j << " denom = " << denom << " nom = " << nom << std::endl;
+    std::cout << "RAP = " << rap << " RBP = " << rbp << " a = " << a << " b = " << b
+        << " invTensor1 = " << obj1DP.invRotationalInertiaTensor << " invTensor2 = " <<  obj2DP.invRotationalInertiaTensor  << std::endl;
+    std::cout << "Delta1 = " << -glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor << '\n';
+    std::cout << "Delta2 = " << +glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor << '\n';
 
     return std::make_pair(
         obj1.isStationary() ? VelocitiesAdjustment{} : VelocitiesAdjustment{
@@ -512,7 +523,8 @@ void HmlPhysics::updateForDt(float dt) noexcept {
     }
 
     const uint8_t SUBSTEPS = 1;
-    const float subDt = dt / SUBSTEPS;
+    const float simulationSppedFactor = 0.4f;
+    const float subDt = dt / SUBSTEPS * simulationSppedFactor;
     for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
         const auto mark0 = std::chrono::high_resolution_clock::now();
         applyAdjustments();
@@ -525,7 +537,7 @@ void HmlPhysics::updateForDt(float dt) noexcept {
         const auto mark4 = std::chrono::high_resolution_clock::now();
 
         static int stepTimer = 0;
-        if (true && ++stepTimer == 100) {
+        if (false && ++stepTimer == 100) {
             stepTimer = 0;
             const auto step0Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark1 - mark0).count();
             const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
@@ -657,10 +669,10 @@ void HmlPhysics::checkForAndHandleCollisions() noexcept {
 
     for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
         const auto& [_bucket, objects] = *it;
-        // if (objects.empty()) {
-        //     it = objectsInBuckets.erase(it);
-        //     continue;
-        // }
+        if (objects.empty()) {
+            it = objectsInBuckets.erase(it);
+            continue;
+        }
 
         for (size_t i = 0; i < objects.size(); i++) {
             auto& obj1 = objects[i];
@@ -669,6 +681,19 @@ void HmlPhysics::checkForAndHandleCollisions() noexcept {
             for (size_t j = i + 1; j < objects.size(); j++) {
                 auto& obj2 = objects[j];
                 if (obj1->isStationary() && obj2->isStationary()) continue;
+
+                { // To prevent processing a pair if it has been processed already
+                    ObjectAdjustment fakeAdj1;
+                    fakeAdj1.id      = obj1->id;
+                    fakeAdj1.idOther = obj2->id;
+                    ObjectAdjustment fakeAdj2;
+                    fakeAdj2.id      = obj2->id;
+                    fakeAdj2.idOther = obj1->id;
+                    assert(((obj1->isStationary() || obj2->isStationary()) ||
+                        (adjustments.contains(fakeAdj1) && adjustments.contains(fakeAdj2))) &&
+                        "Not mirrored adjustments for dynamic objects");
+                    if (adjustments.contains(fakeAdj1) || adjustments.contains(fakeAdj2)) continue;
+                }
 
                 const auto [adj1, adj2] = process(*obj1, *obj2);
                 adjustments.insert(adj1);

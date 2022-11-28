@@ -460,12 +460,14 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
     return std::make_pair(
         obj1.isStationary() ? ObjectAdjustment{} : ObjectAdjustment{
             .id              = obj1.id,
+            .idOther         = obj2.id,
             .position        = - positionAdjustment,
             .velocity        =   velAdj1.velocity,
             .angularMomentum =   velAdj1.angularMomentum,
         },
         obj2.isStationary() ? ObjectAdjustment{} : ObjectAdjustment{
             .id              = obj2.id,
+            .idOther         = obj1.id,
             .position        = + positionAdjustment,
             .velocity        =   velAdj2.velocity,
             .angularMomentum =   velAdj2.angularMomentum,
@@ -545,7 +547,7 @@ void HmlPhysics::applyAdjustments() noexcept {
         if (object->isStationary()) continue;
 
         for (auto it = adjustments.begin(); it != adjustments.end();) {
-            const auto& [id, positionAdj, velocityAdj, angularMomentumAdj] = *it;
+            const auto& [id, _otherId, positionAdj, velocityAdj, angularMomentumAdj] = *it;
             if (id == Object::INVALID_ID) {
                 it = adjustments.erase(it);
                 continue;
@@ -556,7 +558,9 @@ void HmlPhysics::applyAdjustments() noexcept {
                 object->dynamicProperties->velocity += velocityAdj;
                 object->dynamicProperties->angularMomentum += angularMomentumAdj;
                 it = adjustments.erase(it);
-                break;
+                // Don't break because there can be multiple adjustments for a single object
+                // break;
+                continue;
             }
 
             ++it;

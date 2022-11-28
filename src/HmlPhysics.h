@@ -199,7 +199,9 @@ struct HmlPhysics {
         glm::vec3 angularMomentum = glm::vec3(0.0f);
     };
     struct ObjectAdjustment {
+        // NOTE storing idOther ensures that interactions with multiple objects for a single object are recorded
         Object::Id id             = Object::INVALID_ID;
+        Object::Id idOther        = Object::INVALID_ID;
         glm::vec3 position        = glm::vec3(0.0f);
         glm::vec3 velocity        = glm::vec3(0.0f);
         glm::vec3 angularMomentum = glm::vec3(0.0f);
@@ -211,7 +213,7 @@ struct HmlPhysics {
     };
     struct ObjectAdjustmentEqual {
         inline size_t operator()(const ObjectAdjustment& objAdj1, const ObjectAdjustment& objAdj2) const {
-            return objAdj1.id == objAdj2.id;
+            return objAdj1.id == objAdj2.id && objAdj1.idOther == objAdj2.idOther;
         }
     };
 

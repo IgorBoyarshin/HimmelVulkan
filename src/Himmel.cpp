@@ -482,8 +482,8 @@ bool Himmel::init() noexcept {
 
 
             const float density = 3.0f;
-            const size_t boxesCount = 50;
-            const size_t spheresCount = 50;
+            const size_t boxesCount = 30;
+            const size_t spheresCount = 30;
             const float maxSpeed = 7.0f;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{
@@ -1078,15 +1078,27 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     {
         // const auto startTime = std::chrono::high_resolution_clock::now();
         for (const auto& object : hmlPhysics->objects) {
+            // const glm::vec3 start{-55, 45, -55};
+            // const glm::vec3 end{ 55, 55 + 100, 55 };
             physicsIdToEntity[object->id]->modelMatrix = object->modelMatrix();
-            if (object->id == debugId) {
+            // assert(object->position < end && start < object->position);
+            // if (!(object->position < end && start < object->position)) {
+            //     std::cout
+            //         << "P=" << object->position
+            //         << "  V=" << object->dynamicProperties->velocity
+            //         << "  O=" << object->orientation << " = " << quatToAxisAngle(object->orientation)
+            //         << "  AM=" << object->dynamicProperties->angularMomentum
+            //         << std::endl;
+            //         assert(false);
+            // }
+            // if (object->id == debugId) {
                 // std::cout
                 //     // << "P=" << object->position
                 //     // << "  V=" << object->dynamicProperties->velocity
                 //     << "  O=" << object->orientation << " = " << quatToAxisAngle(object->orientation)
                 //     << "  AM=" << object->dynamicProperties->angularMomentum
                 //     << '\n';
-            }
+            // }
         }
 
 

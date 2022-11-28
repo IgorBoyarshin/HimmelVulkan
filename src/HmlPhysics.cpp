@@ -284,6 +284,7 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
     std::vector<glm::vec3> contactPoints;
     addContactPointsFromOnto(p1, p2, orientationData2, contactPoints);
     addContactPointsFromOnto(p2, p1, orientationData1, contactPoints);
+    assert(!contactPoints.empty() && "No contact points!");
     // addContactPointsFromOntoAvx(p1, p2, orientationData2, contactPoints);
     // addContactPointsFromOntoAvx(p2, p1, orientationData1, contactPoints);
 
@@ -377,7 +378,7 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     // e == 0 --- perfectly inelastic collision
     // e == 1 --- perfectly elastic collision, no kinetic energy is dissipated
     // const float e = std::min(obj1.restitution, obj2.restitution);
-    const float e = 1.0f; // restitution
+    const float e = 0.3f; // restitution
     const float nom = -(1.0f + e) * glm::dot(relativeV, dir);
     float denom = (obj1DP.invMass + obj2DP.invMass);
     const auto rap = avg(contactPoints) - obj1.position;
@@ -387,6 +388,21 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     denom += glm::dot(a + b, dir);
     const float j = nom / denom;
     const auto impulse = j * dir;
+
+    if (!(obj1DP.invMass < 100 && obj1DP.invMass > -100)) {
+        std::cout << "BAD inv mass=" << obj1DP.invMass << std::endl;
+        assert(false);
+    }
+    if (!(obj2DP.invMass < 100 && obj2DP.invMass > -100)) {
+        std::cout << "BAD inv mass=" << obj2DP.invMass << std::endl;
+        assert(false);
+    }
+    if (!(impulse < glm::vec3{10000} && impulse > glm::vec3{-10000})) {
+        std::cout << dir << " " << j << " " << denom << " " << nom << std::endl;
+        std::cout << rap << " " << rbp << " " << a << " " << b << " " << obj1DP.invRotationalInertiaTensor << " " <<  obj2DP.invRotationalInertiaTensor  << std::endl;
+        std::cout << "BAD IMPULSE=" << impulse << std::endl;
+        assert(false);
+    }
 
     return std::make_pair(
         obj1.isStationary() ? VelocitiesAdjustment{} : VelocitiesAdjustment{
@@ -445,6 +461,29 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
 // ============================================================================
 // ===================== Main Update ==========================================
 // ============================================================================
+static void assertGood(const std::shared_ptr<HmlPhysics::Object>& object, const char* msg) noexcept {
+    const glm::vec3 start{-55, 45, -55};
+    const glm::vec3 end{ 55, 55 + 100, 55 };
+    // assert(object->position < end && start < object->position);
+    bool good = (object->position < end && start < object->position);
+    if (!object->isStationary()) {
+        good &= object->dynamicProperties->velocity < glm::vec3{100,100,100} &&
+                object->dynamicProperties->velocity > glm::vec3{-100,-100,-100};
+    }
+    if (!good) {
+        std::cout
+            << "T=" << (object->isBox() ? "Box" : "Sphere")
+            << "  P=" << object->position
+            << "  V=" << object->dynamicProperties->velocity
+            << "  O=" << object->orientation << " = " << quatToAxisAngle(object->orientation)
+            << "  AM=" << object->dynamicProperties->angularMomentum
+            << std::endl;
+            std::cout << "MSG=" << msg << std::endl;
+            assert(false);
+    }
+}
+
+
 void HmlPhysics::updateForDt(float dt) noexcept {
     if (firstUpdateAfterLastRegister) {
         firstUpdateAfterLastRegister = false;
@@ -488,6 +527,7 @@ void HmlPhysics::updateForDt(float dt) noexcept {
 void HmlPhysics::applyAdjustments() noexcept {
     // std::cout << "Have " << adjustments.size() << " adjustments\n";
     for (auto& object : objects) {
+        assertGood(object, "applyAdjustments 1");
         if (object->isStationary()) continue;
 
         for (auto it = adjustments.begin(); it != adjustments.end();) {
@@ -497,6 +537,7 @@ void HmlPhysics::applyAdjustments() noexcept {
                 continue;
             }
             if (id == object->id) {
+                assert(!object->isStationary() && "adjusting a stationary object");
                 object->position += positionAdj;
                 object->dynamicProperties->velocity += velocityAdj;
                 object->dynamicProperties->angularMomentum += angularMomentumAdj;
@@ -507,21 +548,24 @@ void HmlPhysics::applyAdjustments() noexcept {
             ++it;
         }
         if (adjustments.empty()) break;
+        assertGood(object, "applyAdjustments 2");
     }
 }
 
 
 void HmlPhysics::advanceState(float dt) noexcept {
-    // const glm::vec3 F {0,-199.8,0};
-    const glm::vec3 F {0,0,0};
+    const glm::vec3 F {0,-9.8,0};
+    // const glm::vec3 F {0,0,0};
     // const glm::vec3 cp{1,0,0};
     // const glm::vec3 Ft{0,0,0};
 
     for (auto& object : objects) {
+        assertGood(object, "advanceState 1");
         if (object->isStationary()) continue;
 
         object->position += dt * object->dynamicProperties->velocity;
-        object->dynamicProperties->velocity += dt * F * object->dynamicProperties->invMass;
+        object->dynamicProperties->velocity += dt * F;
+        // object->dynamicProperties->velocity += dt * F * object->dynamicProperties->invMass;
 
         // World-space inverse inertia tensor
         const auto I =
@@ -540,6 +584,7 @@ void HmlPhysics::advanceState(float dt) noexcept {
         // Do it here because this has been the biggest state change,
         // but not later because the next step requires presice positions
         object->modelMatrixCached = std::nullopt;
+        assertGood(object, "advanceState 6");
     }
 }
 
@@ -547,7 +592,7 @@ void HmlPhysics::advanceState(float dt) noexcept {
 void HmlPhysics::checkForAndHandleCollisions() noexcept {
     assert(adjustments.empty()); // because it has been exhausted during adjustment application traversal
 
-    const size_t thread_count = 4;
+    const size_t thread_count = 1;
     const auto count = objectsInBuckets.size();
     const auto chunk = count / thread_count;
     thread_pool.resize(thread_count);
@@ -668,6 +713,7 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
 void HmlPhysics::reassign() noexcept {
     auto boundingBoundsBeforeIt = allBoundingBucketsBefore.begin();
     for (const auto& object : objects) {
+        assertGood(object, "advanceState 1");
         if (object->isStationary()) continue;
 
         const auto boundingBucketsBefore = *boundingBoundsBeforeIt;
@@ -691,6 +737,7 @@ void HmlPhysics::reassign() noexcept {
                 }
             }
         }
+        assertGood(object, "reassign 2");
     }
 }
 

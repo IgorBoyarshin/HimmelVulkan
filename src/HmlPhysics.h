@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <map>
-#include <memory>
 #include <bitset>
 #include <chrono>
 #include <span>
@@ -256,6 +255,7 @@ struct HmlPhysics {
     static std::optional<Detection> epa(const Simplex& simplex, const auto& ps1, const auto& ps2) noexcept;
     // ========================================================================
     void updateForDt(float dt) noexcept;
+    void step(float dt) noexcept;
     // ========================================================================
     struct Bucket {
         inline static constexpr float SIZE = 9.0f;
@@ -312,20 +312,17 @@ struct HmlPhysics {
     Object::Id registerObject(Object&& object) noexcept;
     // Object& getObject(Object::Id id) noexcept;
 
+    // ========================================================================
     ctpl::thread_pool thread_pool;
     bool firstUpdateAfterLastRegister = true;
-    std::unordered_map<Bucket, std::vector<std::shared_ptr<Object>>, BucketHasher> objectsInBuckets;
-    std::vector<std::shared_ptr<Object>> objects;
-    // Not to allocate every frame
-    std::vector<Bucket::Bounding> allBoundingBucketsBefore;
+    std::vector<Bucket::Bounding> allBoundingBucketsBefore; // for each non-stationary object; from previous frame
 
-    // struct PairHasher {
-    //     inline size_t operator()(const std::pair<Object::Id, Object::Id>& pair) const {
-    //         const uint64_t comb = (std::hash<uint64_t>{}(pair.first) << 32) | std::hash<uint64_t>{}(pair.second);
-    //         return std::hash<uint64_t>{}(comb);
-    //     }
-    // };
-    // std::unordered_set<std::pair<Object::Id, Object::Id>, PairHasher> processedPairsOnThisIteration;
+    std::vector<Object> objects;
+    std::unordered_map<Object::Id, size_t> objectIndexFromId;
+    std::unordered_map<Bucket, std::vector<Object::Id>, BucketHasher> objectsInBuckets;
+    // std::vector<ObjectAdjustment> adjustments;
+    // std::vector<std::unordered_set<ObjectAdjustment, ObjectAdjustmentHasher, ObjectAdjustmentEqual>> adjustments;
+
     using Adjustments = std::unordered_set<ObjectAdjustment, ObjectAdjustmentHasher, ObjectAdjustmentEqual>;
     Adjustments adjustments;
     // ========================================================================

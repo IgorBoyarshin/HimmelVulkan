@@ -1031,7 +1031,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         for (const auto& object : hmlPhysics->objects) {
             // const glm::vec3 start{-55, 45, -55};
             // const glm::vec3 end{ 55, 55 + 100, 55 };
-            physicsIdToEntity[object->id]->modelMatrix = object->modelMatrix();
+            physicsIdToEntity[object.id]->modelMatrix = object.modelMatrix();
             // assert(object->position < end && start < object->position);
             // if (!(object->position < end && start < object->position)) {
             //     std::cout

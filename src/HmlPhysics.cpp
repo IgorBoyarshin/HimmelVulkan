@@ -451,27 +451,27 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
 // ============================================================================
 // ===================== Main Update ==========================================
 // ============================================================================
-static void assertGood(const std::shared_ptr<HmlPhysics::Object>& object, const char* msg) noexcept {
-    const glm::vec3 start{-55, 45, -55};
-    const glm::vec3 end{ 55, 55 + 100, 55 };
-    // assert(object->position < end && start < object->position);
-    bool good = (object->position < end && start < object->position);
-    if (!object->isStationary()) {
-        good &= object->dynamicProperties->velocity < glm::vec3{150,150,150} &&
-                object->dynamicProperties->velocity > glm::vec3{-150,-150,-150};
-    }
-    if (!good) {
-        std::cout
-            << "T=" << (object->isBox() ? "Box" : "Sphere")
-            << "  P=" << object->position
-            << "  V=" << object->dynamicProperties->velocity
-            << "  O=" << object->orientation << " = " << quatToAxisAngle(object->orientation)
-            << "  AM=" << object->dynamicProperties->angularMomentum
-            << std::endl;
-            std::cout << "MSG=" << msg << std::endl;
-            assert(false);
-    }
-}
+// static void assertGood(const std::shared_ptr<HmlPhysics::Object>& object, const char* msg) noexcept {
+//     const glm::vec3 start{-55, 45, -55};
+//     const glm::vec3 end{ 55, 55 + 100, 55 };
+//     // assert(object->position < end && start < object->position);
+//     bool good = (object->position < end && start < object->position);
+//     if (!object->isStationary()) {
+//         good &= object->dynamicProperties->velocity < glm::vec3{150,150,150} &&
+//                 object->dynamicProperties->velocity > glm::vec3{-150,-150,-150};
+//     }
+//     if (!good) {
+//         std::cout
+//             << "T=" << (object->isBox() ? "Box" : "Sphere")
+//             << "  P=" << object->position
+//             << "  V=" << object->dynamicProperties->velocity
+//             << "  O=" << object->orientation << " = " << quatToAxisAngle(object->orientation)
+//             << "  AM=" << object->dynamicProperties->angularMomentum
+//             << std::endl;
+//             std::cout << "MSG=" << msg << std::endl;
+//             assert(false);
+//     }
+// }
 
 
 void HmlPhysics::updateForDt(float dt) noexcept {
@@ -479,9 +479,9 @@ void HmlPhysics::updateForDt(float dt) noexcept {
         firstUpdateAfterLastRegister = false;
 
         allBoundingBucketsBefore.clear();
-        for (auto& object : objects) {
-            if (object->isStationary()) continue;
-            allBoundingBucketsBefore.push_back(boundingBucketsForObject(*object));
+        for (const auto& object : objects) {
+            if (object.isStationary()) continue;
+            allBoundingBucketsBefore.push_back(boundingBucketsForObject(object));
         }
     }
 
@@ -489,97 +489,213 @@ void HmlPhysics::updateForDt(float dt) noexcept {
     // const float simulationSppedFactor = 0.5f;
     const float simulationSppedFactor = 1.0f;
     const float subDt = dt / SUBSTEPS * simulationSppedFactor;
-    for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
-        const auto mark0 = std::chrono::high_resolution_clock::now();
-        applyAdjustments();
-        const auto mark1 = std::chrono::high_resolution_clock::now();
-        advanceState(subDt); // Apply velocity onto position change
-        const auto mark2 = std::chrono::high_resolution_clock::now();
-        reassign(); // Put objects into proper buckets after they have finished being moved
-        const auto mark3 = std::chrono::high_resolution_clock::now();
-        checkForAndHandleCollisions();
-        const auto mark4 = std::chrono::high_resolution_clock::now();
+    for (uint8_t i = 0; i < SUBSTEPS; i++) step(subDt);
+}
 
-        static int stepTimer = 0;
-        if (false && ++stepTimer == 100) {
-            stepTimer = 0;
-            const auto step0Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark1 - mark0).count();
-            const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
-            const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
-            const auto step3Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark4 - mark3).count();
-            std::cout << "Step 0 = " << static_cast<float>(step0Mks) << " mks\n";
-            std::cout << "Step 1 = " << static_cast<float>(step1Mks) << " mks\n";
-            std::cout << "Step 2 = " << static_cast<float>(step2Mks) << " mks\n";
-            std::cout << "Step 3 = " << static_cast<float>(step3Mks) << " mks\n";
+
+void HmlPhysics::step(float dt) noexcept {
+    auto boundingBoundsBeforeIt = allBoundingBucketsBefore.begin();
+
+    const auto mark0 = std::chrono::high_resolution_clock::now();
+    for (auto& object : objects) {
+        if (object.isStationary()) continue;
+        // ======================== Apply adjustments ========================
+        {
+            // TODO maybe make per-object to speed up
+            for (auto it = adjustments.begin(); it != adjustments.end();) {
+                const auto& [id, _otherId, positionAdj, velocityAdj, angularMomentumAdj] = *it;
+                if (id == Object::INVALID_ID) {
+                    it = adjustments.erase(it);
+                    continue;
+                }
+                if (id == object.id) {
+                    assert(!object.isStationary() && "adjusting a stationary object");
+                    object.position                           += positionAdj;
+                    object.dynamicProperties->velocity        += velocityAdj;
+                    object.dynamicProperties->angularMomentum += angularMomentumAdj;
+                    it = adjustments.erase(it);
+                    // NOTE Don't break because there can be multiple adjustments for a single object
+                    continue;
+                }
+
+                ++it;
+            }
         }
+        // ======================== Advance state ========================
+        {
+            static constexpr glm::vec3 F {0,-9.8,0};
+            // static constexpr glm::vec3 F {0,0,0};
+            // static constexpr glm::vec3 cp{1,0,0};
+            // static constexpr glm::vec3 Ft{0,0,0};
+
+            object.position += dt * object.dynamicProperties->velocity;
+            object.dynamicProperties->velocity += dt * F; // NOTE * object.dynamicProperties->invMass
+
+            // World-space inverse inertia tensor
+            const auto I =
+                quatToMat3(object.orientation) *
+                object.dynamicProperties->invRotationalInertiaTensor *
+                quatToMat3(glm::conjugate(object.orientation));
+            // const auto I = object.dynamicProperties->invRotationalInertiaTensor;
+            const auto angularVelocity = I * object.dynamicProperties->angularMomentum;
+            object.orientation += dt * glm::cross(glm::quat(0, angularVelocity), object.orientation);
+            // const auto torque = glm::cross(cp, Ft);
+            // object.dynamicProperties->angularMomentum += dt * torque;
+
+            // NOTE can be done not every step, but this is too trivial so we don't bother
+            object.orientation = glm::normalize(object.orientation);
+            // Invalidate modelMatrix (force further recalculation)
+            object.modelMatrixCached = std::nullopt;
+        }
+        // ======================== Reassign ========================
+        {
+            const auto boundingBucketsBefore = *boundingBoundsBeforeIt;
+            const auto boundingBucketsAfter = boundingBucketsForObject(object);
+            *boundingBoundsBeforeIt = boundingBucketsAfter; // for use during next iteration
+            ++boundingBoundsBeforeIt;
+            if (boundingBucketsBefore != boundingBucketsAfter) {
+                const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);
+                for (Bucket::Coord x = superset.first.x; x <= superset.second.x; x++) {
+                    for (Bucket::Coord y = superset.first.y; y <= superset.second.y; y++) {
+                        for (Bucket::Coord z = superset.first.z; z <= superset.second.z; z++) {
+                            const Bucket b{ .x = x, .y = y, .z = z };
+                            const bool before = b.isInsideBoundingBuckets(boundingBucketsBefore);
+                            const bool after  = b.isInsideBoundingBuckets(boundingBucketsAfter);
+                            if (before && !after) { // remove from this bucket
+                                removeObjectWithIdFromBucket(object.id, b);
+                            } else if (!before && after) { // add to this bucket
+                                objectsInBuckets[b].push_back(object.id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    // const auto mark0 = std::chrono::high_resolution_clock::now();
+    // applyAdjustments();
+    // const auto mark1 = std::chrono::high_resolution_clock::now();
+    // advanceState(subDt); // Apply velocity onto position change
+    // const auto mark2 = std::chrono::high_resolution_clock::now();
+    // reassign(); // Put objects into proper buckets after they have finished being moved
+    const auto mark3 = std::chrono::high_resolution_clock::now();
+    checkForAndHandleCollisions();
+    const auto mark4 = std::chrono::high_resolution_clock::now();
+
+    static int stepTimer = 0;
+    if (true && ++stepTimer == 100) {
+        stepTimer = 0;
+        const auto step0Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark0).count();
+        // const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
+        // const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
+        const auto step3Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark4 - mark3).count();
+        std::cout << "Step 0 = " << static_cast<float>(step0Mks) << " mks\n";
+        // std::cout << "Step 1 = " << static_cast<float>(step1Mks) << " mks\n";
+        // std::cout << "Step 2 = " << static_cast<float>(step2Mks) << " mks\n";
+        std::cout << "Step 3 = " << static_cast<float>(step3Mks) << " mks\n";
     }
 }
 
 
 void HmlPhysics::applyAdjustments() noexcept {
-    // std::cout << "Have " << adjustments.size() << " adjustments\n";
-    for (auto& object : objects) {
-        // assertGood(object, "applyAdjustments 1");
-        if (object->isStationary()) continue;
-
-        for (auto it = adjustments.begin(); it != adjustments.end();) {
-            const auto& [id, _otherId, positionAdj, velocityAdj, angularMomentumAdj] = *it;
-            if (id == Object::INVALID_ID) {
-                it = adjustments.erase(it);
-                continue;
-            }
-            if (id == object->id) {
-                assert(!object->isStationary() && "adjusting a stationary object");
-                object->position += positionAdj;
-                object->dynamicProperties->velocity += velocityAdj;
-                object->dynamicProperties->angularMomentum += angularMomentumAdj;
-                it = adjustments.erase(it);
-                // Don't break because there can be multiple adjustments for a single object
-                // break;
-                continue;
-            }
-
-            ++it;
-        }
-        if (adjustments.empty()) break;
-        assertGood(object, "applyAdjustments 2"); // do it once per loop, here
-    }
+    // // std::cout << "Have " << adjustments.size() << " adjustments\n";
+    // for (auto& object : objects) {
+    //     // assertGood(object, "applyAdjustments 1");
+    //     if (object->isStationary()) continue;
+    //
+    //     for (auto it = adjustments.begin(); it != adjustments.end();) {
+    //         const auto& [id, _otherId, positionAdj, velocityAdj, angularMomentumAdj] = *it;
+    //         if (id == Object::INVALID_ID) {
+    //             it = adjustments.erase(it);
+    //             continue;
+    //         }
+    //         if (id == object->id) {
+    //             assert(!object->isStationary() && "adjusting a stationary object");
+    //             object->position += positionAdj;
+    //             object->dynamicProperties->velocity += velocityAdj;
+    //             object->dynamicProperties->angularMomentum += angularMomentumAdj;
+    //             it = adjustments.erase(it);
+    //             // Don't break because there can be multiple adjustments for a single object
+    //             // break;
+    //             continue;
+    //         }
+    //
+    //         ++it;
+    //     }
+    //     if (adjustments.empty()) break;
+    //     assertGood(object, "applyAdjustments 2"); // do it once per loop, here
+    // }
 }
 
 
 void HmlPhysics::advanceState(float dt) noexcept {
-    const glm::vec3 F {0,-9.8,0};
-    // const glm::vec3 F {0,0,0};
-    // const glm::vec3 cp{1,0,0};
-    // const glm::vec3 Ft{0,0,0};
+    // const glm::vec3 F {0,-9.8,0};
+    // // const glm::vec3 F {0,0,0};
+    // // const glm::vec3 cp{1,0,0};
+    // // const glm::vec3 Ft{0,0,0};
+    //
+    // for (auto& object : objects) {
+    //     // assertGood(object, "advanceState 1");
+    //     if (object->isStationary()) continue;
+    //
+    //     object->position += dt * object->dynamicProperties->velocity;
+    //     object->dynamicProperties->velocity += dt * F;
+    //     // object->dynamicProperties->velocity += dt * F * object->dynamicProperties->invMass;
+    //
+    //     // World-space inverse inertia tensor
+    //     const auto I =
+    //         quatToMat3(object->orientation) *
+    //         object->dynamicProperties->invRotationalInertiaTensor *
+    //         quatToMat3(glm::conjugate(object->orientation));
+    //     const auto angularVelocity = I * object->dynamicProperties->angularMomentum;
+    //     object->orientation += dt * glm::cross(glm::quat(0, angularVelocity), object->orientation);
+    //     // const auto torque = glm::cross(cp, Ft);
+    //     // object->dynamicProperties->angularMomentum += dt * torque;
+    //
+    //     // NOTE can be done not every step, but this is too trivial so we don't bother
+    //     object->orientation = glm::normalize(object->orientation);
+    //
+    //     // Invalidate modelMatrix (force further recalculation)
+    //     // Do it here because this has been the biggest state change,
+    //     // but not later because the next step requires presice positions
+    //     object->modelMatrixCached = std::nullopt;
+    //     // assertGood(object, "advanceState 2");
+    // }
+}
 
-    for (auto& object : objects) {
-        // assertGood(object, "advanceState 1");
-        if (object->isStationary()) continue;
 
-        object->position += dt * object->dynamicProperties->velocity;
-        object->dynamicProperties->velocity += dt * F;
-        // object->dynamicProperties->velocity += dt * F * object->dynamicProperties->invMass;
-
-        // World-space inverse inertia tensor
-        const auto I =
-            quatToMat3(object->orientation) *
-            object->dynamicProperties->invRotationalInertiaTensor *
-            quatToMat3(glm::conjugate(object->orientation));
-        const auto angularVelocity = I * object->dynamicProperties->angularMomentum;
-        object->orientation += dt * glm::cross(glm::quat(0, angularVelocity), object->orientation);
-        // const auto torque = glm::cross(cp, Ft);
-        // object->dynamicProperties->angularMomentum += dt * torque;
-
-        // NOTE can be done not every step, but this is too trivial so we don't bother
-        object->orientation = glm::normalize(object->orientation);
-
-        // Invalidate modelMatrix (force further recalculation)
-        // Do it here because this has been the biggest state change,
-        // but not later because the next step requires presice positions
-        object->modelMatrixCached = std::nullopt;
-        // assertGood(object, "advanceState 2");
-    }
+void HmlPhysics::reassign() noexcept {
+    // // NOTE does not store BB for stationary objects
+    // auto boundingBoundsBeforeIt = allBoundingBucketsBefore.begin();
+    // for (const auto& object : objects) {
+    //     // assertGood(object, "reassign 1");
+    //     if (object->isStationary()) continue;
+    //
+    //     const auto boundingBucketsBefore = *boundingBoundsBeforeIt;
+    //     const auto boundingBucketsAfter = boundingBucketsForObject(*object);
+    //     *boundingBoundsBeforeIt = boundingBucketsAfter; // for use during next iteration
+    //     ++boundingBoundsBeforeIt;
+    //     if (boundingBucketsBefore == boundingBucketsAfter) continue;
+    //
+    //     const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);
+    //     for (Bucket::Coord x = superset.first.x; x <= superset.second.x; x++) {
+    //         for (Bucket::Coord y = superset.first.y; y <= superset.second.y; y++) {
+    //             for (Bucket::Coord z = superset.first.z; z <= superset.second.z; z++) {
+    //                 const Bucket b{ .x = x, .y = y, .z = z };
+    //                 const bool before = b.isInsideBoundingBuckets(boundingBucketsBefore);
+    //                 const bool after  = b.isInsideBoundingBuckets(boundingBucketsAfter);
+    //                 if (before && !after) { // remove from this bucket
+    //                     removeObjectWithIdFromBucket(object->id, b);
+    //                 } else if (!before && after) { // add to this bucket
+    //                     objectsInBuckets[b].push_back(object);
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     // assertGood(object, "reassign 2");
+    // }
 }
 
 
@@ -587,34 +703,36 @@ void HmlPhysics::checkForAndHandleCollisions() noexcept {
     assert(adjustments.empty()); // because it has been exhausted during adjustment application traversal
 
     for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
-        const auto& [_bucket, objects] = *it;
-        if (objects.empty()) {
+        const auto& [_bucket, ids] = *it;
+        if (ids.empty()) {
             it = objectsInBuckets.erase(it);
             continue;
         }
 
-        for (size_t i = 0; i < objects.size(); i++) {
-            auto& obj1 = objects[i];
+        for (size_t i = 0; i < ids.size(); i++) {
+            // auto& obj1 = objects[i];
+            const auto& obj1 = objects[objectIndexFromId[ids[i]]];
 
             // For each object, test it against all other objects in current bucket
-            for (size_t j = i + 1; j < objects.size(); j++) {
-                auto& obj2 = objects[j];
-                if (obj1->isStationary() && obj2->isStationary()) continue;
+            for (size_t j = i + 1; j < ids.size(); j++) {
+                // auto& obj2 = objects[j];
+                const auto& obj2 = objects[objectIndexFromId[ids[j]]];
+                if (obj1.isStationary() && obj2.isStationary()) continue;
 
                 { // To prevent processing a pair if it has been processed already
                     ObjectAdjustment fakeAdj1;
-                    fakeAdj1.id      = obj1->id;
-                    fakeAdj1.idOther = obj2->id;
+                    fakeAdj1.id      = obj1.id;
+                    fakeAdj1.idOther = obj2.id;
                     ObjectAdjustment fakeAdj2;
-                    fakeAdj2.id      = obj2->id;
-                    fakeAdj2.idOther = obj1->id;
-                    assert(((obj1->isStationary() || obj2->isStationary()) || // at least one static, or else
+                    fakeAdj2.id      = obj2.id;
+                    fakeAdj2.idOther = obj1.id;
+                    assert(((obj1.isStationary() || obj2.isStationary()) || // at least one static, or else
                         (!(adjustments.contains(fakeAdj1) ^ adjustments.contains(fakeAdj2)))) && // either both present or both not present
                         "Not mirrored adjustments for dynamic objects");
                     if (adjustments.contains(fakeAdj1) || adjustments.contains(fakeAdj2)) continue;
                 }
 
-                const auto [adj1, adj2] = process(*obj1, *obj2);
+                const auto [adj1, adj2] = process(obj1, obj2);
                 adjustments.insert(adj1);
                 adjustments.insert(adj2);
             }
@@ -675,13 +793,13 @@ HmlPhysics::Object::Id HmlPhysics::registerObject(Object&& object) noexcept {
     firstUpdateAfterLastRegister = true;
     const auto id = object.id;
     const auto bounds = boundingBucketsForObject(object);
-    const auto shared = std::make_shared<Object>(std::move(object));
-    objects.push_back(shared);
+    objectIndexFromId[id] = objects.size();
+    objects.push_back(std::move(object));
     for (Bucket::Coord x = bounds.first.x; x <= bounds.second.x; x++) {
         for (Bucket::Coord y = bounds.first.y; y <= bounds.second.y; y++) {
             for (Bucket::Coord z = bounds.first.z; z <= bounds.second.z; z++) {
                 const Bucket bucket{ .x = x, .y = y, .z = z };
-                objectsInBuckets[bucket].push_back(shared);
+                objectsInBuckets[bucket].push_back(id);
             }
         }
     }
@@ -691,15 +809,14 @@ HmlPhysics::Object::Id HmlPhysics::registerObject(Object&& object) noexcept {
 
 
 void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept {
-    auto& objects = objectsInBuckets[bucket];
-    const auto size = objects.size();
+    auto& idsInBucket = objectsInBuckets[bucket];
+    const auto size = idsInBucket.size();
     for (size_t i = 0; i < size; i++) {
-        const auto& object = objects[i];
-        if (object->id == id) {
+        if (idsInBucket[i] == id) {
             // NOTE we don't check if this is the same object to remove the unnesessary if
             // NOTE swap, but with fewer steps because we'll remove the current object anyway
-            objects[i] = objects[size - 1];
-            objects.pop_back();
+            idsInBucket[i] = idsInBucket[size - 1];
+            idsInBucket.pop_back();
             return;
         }
     }
@@ -719,41 +836,8 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
 //     return objects[Bucket()][0]; // stub
 // }
 // ============================================================================
-// =================== Reassign ===============================================
+// =================== BoundingBuckets ========================================
 // ============================================================================
-// NOTE arg does not store BB for stationary objects
-void HmlPhysics::reassign() noexcept {
-    auto boundingBoundsBeforeIt = allBoundingBucketsBefore.begin();
-    for (const auto& object : objects) {
-        // assertGood(object, "reassign 1");
-        if (object->isStationary()) continue;
-
-        const auto boundingBucketsBefore = *boundingBoundsBeforeIt;
-        const auto boundingBucketsAfter = boundingBucketsForObject(*object);
-        *boundingBoundsBeforeIt = boundingBucketsAfter; // for use during next iteration
-        ++boundingBoundsBeforeIt;
-        if (boundingBucketsBefore == boundingBucketsAfter) continue;
-
-        const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);
-        for (Bucket::Coord x = superset.first.x; x <= superset.second.x; x++) {
-            for (Bucket::Coord y = superset.first.y; y <= superset.second.y; y++) {
-                for (Bucket::Coord z = superset.first.z; z <= superset.second.z; z++) {
-                    const Bucket b{ .x = x, .y = y, .z = z };
-                    const bool before = b.isInsideBoundingBuckets(boundingBucketsBefore);
-                    const bool after  = b.isInsideBoundingBuckets(boundingBucketsAfter);
-                    if (before && !after) { // remove from this bucket
-                        removeObjectWithIdFromBucket(object->id, b);
-                    } else if (!before && after) { // add to this bucket
-                        objectsInBuckets[b].push_back(object);
-                    }
-                }
-            }
-        }
-        // assertGood(object, "reassign 2");
-    }
-}
-
-
 inline HmlPhysics::Bucket::Bounding HmlPhysics::boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept {
     return std::make_pair(
         Bucket{
@@ -780,12 +864,12 @@ inline HmlPhysics::Bucket::Bounding HmlPhysics::boundingBucketsForObject(const O
 
 void HmlPhysics::printStats() const noexcept {
     std::map<uint32_t, uint32_t> countOfBucketsWithSize;
-    for (const auto& [bucket, objects] : objectsInBuckets) {
-        const auto size = objects.size();
+    for (const auto& [bucket, ids] : objectsInBuckets) {
+        const auto size = ids.size();
         countOfBucketsWithSize[size]++;
     }
 
-    uint32_t min = objects.size();
+    uint32_t min = std::numeric_limits<uint32_t>::max();
     uint32_t max = 0;
     float avg = 0;
     for (const auto& [size, count] : countOfBucketsWithSize) {

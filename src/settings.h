@@ -4,6 +4,8 @@
 
 #define EXIT_ON_ERROR 1
 
+#define LOG_INFO 0
+
 #define LOG_DESTROYS 0
 
 #define LOG_FPS 0

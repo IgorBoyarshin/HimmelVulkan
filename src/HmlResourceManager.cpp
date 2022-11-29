@@ -126,14 +126,18 @@ void HmlResourceManager::markForRelease(std::unique_ptr<HmlBuffer>&& hmlBuffer, 
 
 
 void HmlResourceManager::tickFrame(uint32_t currentFrame) noexcept {
+#if LOG_INFO
     const auto oldSize = releaseQueue.size();
+#endif
     std::erase_if(releaseQueue, [&](const auto& releaseData) {
         return currentFrame > releaseData.lastAliveFrame;
     });
+#if LOG_INFO
     const auto newSize = releaseQueue.size();
     if (newSize != oldSize) {
         std::cout << ":> HmlResourceManager::tickFrame() has just released " << (oldSize - newSize) << " HmlBuffers.\n";
     }
+#endif
 }
 
 

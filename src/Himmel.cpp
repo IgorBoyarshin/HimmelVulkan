@@ -452,7 +452,7 @@ bool Himmel::init() noexcept {
 
 #if 1
             { // Platform
-                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 0.8f*halfHeight, 0 }, { 0.3f*halfSide, 0.6f*wallThickness, 0.3f*halfSide });
+                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 0.8f*halfHeight, 0 }, { 0.35f*halfSide, 0.6f*wallThickness, 0.35f*halfSide });
                 object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.2f, glm::vec3(0,0,1));
 
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.1f, 0.1f, 0.1f}));
@@ -464,9 +464,9 @@ bool Himmel::init() noexcept {
 #endif
 
 
-            const float density = 3.0f;
-            const size_t boxesCount = 0;
-            const size_t spheresCount = 0;
+            const float density = 4.0f;
+            const size_t boxesCount = 30;
+            const size_t spheresCount = 30;
             const float maxSpeed = 7.0f;
             for (size_t i = 0; i < boxesCount; i++) {
                 const auto pos = glm::vec3{
@@ -492,7 +492,7 @@ bool Himmel::init() noexcept {
                     hml::getRandomUniformFloat(0.4f, 2.0f)
                 };
 
-                const float volume = halfDimensions.x * halfDimensions.y * halfDimensions.z;
+                const float volume = 8 * halfDimensions.x * halfDimensions.y * halfDimensions.z;
                 const float mass = volume * density;
                 auto object = HmlPhysics::Object::createBox(pos, halfDimensions, mass, velocity, glm::vec3{0,0,0});
 
@@ -561,11 +561,11 @@ bool Himmel::init() noexcept {
             //     const auto id = hmlPhysics->registerObject(std::move(object));
             //     physicsIdToEntity[id] = entities.back();
             // }
-#if 1
+#if 0
             { // Dyn wall 1
                 auto object = HmlPhysics::Object::createBox(
-                    { 0, baseHeight + 0.9f * halfHeight, 0 }, { 1, 1, 1 }, 1, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
-                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.3f, glm::vec3(0,0,1));
+                    { 5, baseHeight + 1.2f * halfHeight, 0 }, { 0.8f, 4, 0.8f }, 6, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.5f, glm::vec3(0,0,1));
 
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.9f, 0.9f, 0.9f}));
                 entities.back()->modelMatrix = object.modelMatrix();
@@ -1575,7 +1575,9 @@ bool Himmel::prepareResources() noexcept {
 
 
 void Himmel::recreateSwapchain() noexcept {
+#if LOG_INFO
     std::cout << ":> Recreating the Swapchain.\n";
+#endif
 
     // Handle window minimization
     for (;;) {

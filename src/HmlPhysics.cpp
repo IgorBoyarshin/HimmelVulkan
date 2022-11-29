@@ -286,23 +286,23 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
     addContactPointsFromOnto(p2, p1, orientationData1, contactPoints);
 
     if (contactPoints.empty()) return std::nullopt;
-    if (true) {
-        std::cout << "=====================================" << '\n';
-        std::cout << "Dir=" << dir << " minExtent=" << minExtent << '\n';
-        std::cout << "C1=" << b1.center << " C2=" << b2.center << '\n';
-        std::cout << "IJK1=" << i1 << " " << j1 << " " << k1 << '\n';
-        std::cout << "IJK2=" << i2 << " " << j2 << " " << k2 << '\n';
-        std::cout << "P1:" << '\n';
-        for (const auto& p : p1) std::cout << p << " ";
-        std::cout << '\n';
-        std::cout << "P2:" << '\n';
-        for (const auto& p : p2) std::cout << p << " ";
-        std::cout << '\n';
-        std::cout << "CP:" << '\n';
-        for (const auto& cp : contactPoints) std::cout << cp << " ";
-        std::cout << '\n';
-        std::cout << "=====================================" << '\n';
-    }
+    // if (true) {
+    //     std::cout << "=====================================" << '\n';
+    //     std::cout << "Dir=" << dir << " minExtent=" << minExtent << '\n';
+    //     std::cout << "C1=" << b1.center << " C2=" << b2.center << '\n';
+    //     std::cout << "IJK1=" << i1 << " " << j1 << " " << k1 << '\n';
+    //     std::cout << "IJK2=" << i2 << " " << j2 << " " << k2 << '\n';
+    //     std::cout << "P1:" << '\n';
+    //     for (const auto& p : p1) std::cout << p << " ";
+    //     std::cout << '\n';
+    //     std::cout << "P2:" << '\n';
+    //     for (const auto& p : p2) std::cout << p << " ";
+    //     std::cout << '\n';
+    //     std::cout << "CP:" << '\n';
+    //     for (const auto& cp : contactPoints) std::cout << cp << " ";
+    //     std::cout << '\n';
+    //     std::cout << "=====================================" << '\n';
+    // }
     // assert(!contactPoints.empty() && "No contact points!");
     // addContactPointsFromOntoAvx(p1, p2, orientationData2, contactPoints);
     // addContactPointsFromOntoAvx(p2, p1, orientationData1, contactPoints);
@@ -390,21 +390,21 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     const auto obj1DP = obj1.dynamicProperties.value_or(Object::DynamicProperties{});
     const auto obj2DP = obj2.dynamicProperties.value_or(Object::DynamicProperties{});
     const auto relativeV = obj2DP.velocity - obj1DP.velocity;
-    if (glm::dot(relativeV, dir) > 0.0f) {
-        // Objects are already moving apart
-        // return std::make_pair(VelocitiesAdjustment{}, VelocitiesAdjustment{});
-    }
+    // if (glm::dot(relativeV, dir) > 0.0f) {
+    //     // Objects are already moving apart
+    //     return std::make_pair(VelocitiesAdjustment{}, VelocitiesAdjustment{});
+    // }
+    const auto cp = avg(contactPoints);
+    const auto rap = cp - obj1.position;
+    const auto rbp = cp - obj2.position;
+    const auto a = glm::cross(obj1DP.invRotationalInertiaTensor * glm::cross(rap, dir), rap);
+    const auto b = glm::cross(obj2DP.invRotationalInertiaTensor * glm::cross(rbp, dir), rbp);
     // e == 0 --- perfectly inelastic collision
     // e == 1 --- perfectly elastic collision, no kinetic energy is dissipated
     // const float e = std::min(obj1.restitution, obj2.restitution);
-    const float e = 1.0f; // restitution
+    const float e = 0.9f; // restitution
     const float nom = -(1.0f + e) * glm::dot(relativeV, dir);
-    float denom = (obj1DP.invMass + obj2DP.invMass);
-    const auto rap = avg(contactPoints) - obj1.position;
-    const auto rbp = avg(contactPoints) - obj2.position;
-    const auto a = glm::cross(obj1DP.invRotationalInertiaTensor * glm::cross(rap, dir), dir);
-    const auto b = glm::cross(obj2DP.invRotationalInertiaTensor * glm::cross(rbp, dir), dir);
-    denom += glm::dot(a + b, dir);
+    const float denom = (obj1DP.invMass + obj2DP.invMass) + glm::dot(a + b, dir);
     const float j = nom / denom;
     const auto impulse = j * dir;
 
@@ -422,12 +422,12 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     //     std::cout << "BAD IMPULSE=" << impulse << std::endl;
     //     assert(false);
     // }
-    std::cout << "Impulse = " << impulse << '\n';
-    std::cout << "Dir = " << dir << " J = " << j << " denom = " << denom << " nom = " << nom << std::endl;
-    std::cout << "RAP = " << rap << " RBP = " << rbp << " a = " << a << " b = " << b
-        << " invTensor1 = " << obj1DP.invRotationalInertiaTensor << " invTensor2 = " <<  obj2DP.invRotationalInertiaTensor  << std::endl;
-    std::cout << "Delta1 = " << -glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor << '\n';
-    std::cout << "Delta2 = " << +glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor << '\n';
+    // std::cout << "Impulse = " << impulse << '\n';
+    // std::cout << "Dir = " << dir << " J = " << j << " denom = " << denom << " nom = " << nom << std::endl;
+    // std::cout << "RAP = " << rap << " RBP = " << rbp << " a = " << a << " b = " << b << std::endl;
+    // std::cout << "Delta1 = " << -glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor << '\n';
+    // std::cout << "Delta2 = " << +glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor << '\n';
+    // std::cout << "-----------------------------------------------------------" << '\n';
 
     return std::make_pair(
         obj1.isStationary() ? VelocitiesAdjustment{} : VelocitiesAdjustment{
@@ -523,7 +523,8 @@ void HmlPhysics::updateForDt(float dt) noexcept {
     }
 
     const uint8_t SUBSTEPS = 1;
-    const float simulationSppedFactor = 0.4f;
+    // const float simulationSppedFactor = 0.5f;
+    const float simulationSppedFactor = 1.0f;
     const float subDt = dt / SUBSTEPS * simulationSppedFactor;
     for (uint8_t substep = 0; substep < SUBSTEPS; substep++) {
         const auto mark0 = std::chrono::high_resolution_clock::now();
@@ -689,8 +690,8 @@ void HmlPhysics::checkForAndHandleCollisions() noexcept {
                     ObjectAdjustment fakeAdj2;
                     fakeAdj2.id      = obj2->id;
                     fakeAdj2.idOther = obj1->id;
-                    assert(((obj1->isStationary() || obj2->isStationary()) ||
-                        (adjustments.contains(fakeAdj1) && adjustments.contains(fakeAdj2))) &&
+                    assert(((obj1->isStationary() || obj2->isStationary()) || // at least one static, or else
+                        (!(adjustments.contains(fakeAdj1) ^ adjustments.contains(fakeAdj2)))) && // either both present or both not present
                         "Not mirrored adjustments for dynamic objects");
                     if (adjustments.contains(fakeAdj1) || adjustments.contains(fakeAdj2)) continue;
                 }

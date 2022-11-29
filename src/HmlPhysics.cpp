@@ -374,19 +374,27 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectAxisAlignedBoxes(const Ob
     return std::nullopt;
 }
 // ============================================================================
-// ===================== Resolver =============================================
+// ===================== Process ==============================================
 // ============================================================================
-HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& obj1, const Object& obj2, const Detection& detection) noexcept {
-    assert(!(obj1.isStationary() && obj2.isStationary()) && "Shouldn't've called resolveVelocities with both objects being static");
+HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& obj2) noexcept {
+    assert(!(obj1.isStationary() && obj2.isStationary()) && "Shouldn't've called process() with both objects being stationary");
 
-    const auto& [dir, extent, contactPoints] = detection;
+    // ================ Resolve intersection ================
+    // const auto mark1 = std::chrono::high_resolution_clock::now();
+    std::optional<Detection> detectionOpt = std::nullopt;
+    if      (obj1.isSphere() && obj2.isSphere()) detectionOpt = detect(obj1.asSphere(), obj2.asSphere());
+    else if (obj1.isBox()    && obj2.isSphere()) detectionOpt = detect(obj1.asBox(),    obj2.asSphere());
+    else if (obj1.isSphere() && obj2.isBox())    detectionOpt = detect(obj1.asSphere(), obj2.asBox());
+    else if (obj1.isBox()    && obj2.isBox())    detectionOpt = detect(obj1.asBox(),    obj2.asBox());
+    // const auto mark2 = std::chrono::high_resolution_clock::now();
 
-    static const auto avg = [](std::span<const glm::vec3> vs){
-        glm::vec3 sum{0};
-        for (const auto& v : vs) sum += v;
-        return sum / static_cast<float>(vs.size());
-    };
+    if (!detectionOpt) return std::make_pair(ObjectAdjustment{}, ObjectAdjustment{});
+    const auto& [dir, extent, contactPoints] = *detectionOpt;
 
+    const bool oneStationary = obj1.isStationary() || obj2.isStationary();
+    const auto positionAdjustment = dir * extent * (oneStationary ? 1.0f : 0.5f);
+
+    // ================ Resolve velocities ================
     const auto obj1DP = obj1.dynamicProperties.value_or(Object::DynamicProperties{});
     const auto obj2DP = obj2.dynamicProperties.value_or(Object::DynamicProperties{});
     const auto relativeV = obj2DP.velocity - obj1DP.velocity;
@@ -408,20 +416,6 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     const float j = nom / denom;
     const auto impulse = j * dir;
 
-    // if (!(obj1DP.invMass < 100 && obj1DP.invMass > -100)) {
-    //     std::cout << "BAD inv mass=" << obj1DP.invMass << std::endl;
-    //     assert(false);
-    // }
-    // if (!(obj2DP.invMass < 100 && obj2DP.invMass > -100)) {
-    //     std::cout << "BAD inv mass=" << obj2DP.invMass << std::endl;
-    //     assert(false);
-    // }
-    // if (!(impulse < glm::vec3{10000} && impulse > glm::vec3{-10000})) {
-    //     std::cout << dir << " " << j << " " << denom << " " << nom << std::endl;
-    //     std::cout << rap << " " << rbp << " " << a << " " << b << " " << obj1DP.invRotationalInertiaTensor << " " <<  obj2DP.invRotationalInertiaTensor  << std::endl;
-    //     std::cout << "BAD IMPULSE=" << impulse << std::endl;
-    //     assert(false);
-    // }
     // std::cout << "Impulse = " << impulse << '\n';
     // std::cout << "Dir = " << dir << " J = " << j << " denom = " << denom << " nom = " << nom << std::endl;
     // std::cout << "RAP = " << rap << " RBP = " << rbp << " a = " << a << " b = " << b << std::endl;
@@ -429,37 +423,6 @@ HmlPhysics::ResolveVelocitiesResult HmlPhysics::resolveVelocities(const Object& 
     // std::cout << "Delta2 = " << +glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor << '\n';
     // std::cout << "-----------------------------------------------------------" << '\n';
 
-    return std::make_pair(
-        obj1.isStationary() ? VelocitiesAdjustment{} : VelocitiesAdjustment{
-            .velocity        = - impulse * obj1DP.invMass,
-            .angularMomentum = - glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor,
-        },
-        obj2.isStationary() ? VelocitiesAdjustment{} : VelocitiesAdjustment{
-            .velocity        = + impulse * obj2DP.invMass,
-            .angularMomentum = + glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor,
-        }
-    );
-}
-
-
-HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& obj2) noexcept {
-    // const auto mark1 = std::chrono::high_resolution_clock::now();
-    std::optional<Detection> detectionOpt = std::nullopt;
-    if      (obj1.isSphere() && obj2.isSphere()) detectionOpt = detect(obj1.asSphere(), obj2.asSphere());
-    else if (obj1.isBox()    && obj2.isSphere()) detectionOpt = detect(obj1.asBox(),    obj2.asSphere());
-    else if (obj1.isSphere() && obj2.isBox())    detectionOpt = detect(obj1.asSphere(), obj2.asBox());
-    else if (obj1.isBox()    && obj2.isBox())    detectionOpt = detect(obj1.asBox(),    obj2.asBox());
-    // const auto mark2 = std::chrono::high_resolution_clock::now();
-
-    if (!detectionOpt) return std::make_pair(ObjectAdjustment{}, ObjectAdjustment{});
-    const auto& [dir, extent, _contactPoints] = *detectionOpt;
-
-    const bool oneStationary = obj1.isStationary() || obj2.isStationary();
-    const auto positionAdjustment = dir * extent * (oneStationary ? 1.0f : 0.5f);
-    // if (!obj1.isStationary()) obj1.position -= dir * extent * (obj2.isStationary() ? 1.0f : 0.5f);
-    // if (!obj2.isStationary()) obj2.position += dir * extent * (obj1.isStationary() ? 1.0f : 0.5f);
-
-    const auto [velAdj1, velAdj2] = resolveVelocities(obj1, obj2, *detectionOpt);
     // const auto mark3 = std::chrono::high_resolution_clock::now();
 
     // const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
@@ -473,15 +436,15 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
             .id              = obj1.id,
             .idOther         = obj2.id,
             .position        = - positionAdjustment,
-            .velocity        =   velAdj1.velocity,
-            .angularMomentum =   velAdj1.angularMomentum,
+            .velocity        = - impulse * obj1DP.invMass,
+            .angularMomentum = - glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor,
         },
         obj2.isStationary() ? ObjectAdjustment{} : ObjectAdjustment{
             .id              = obj2.id,
             .idOther         = obj1.id,
             .position        = + positionAdjustment,
-            .velocity        =   velAdj2.velocity,
-            .angularMomentum =   velAdj2.angularMomentum,
+            .velocity        = + impulse * obj2DP.invMass,
+            .angularMomentum = + glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor,
         }
     );
 }
@@ -623,6 +586,43 @@ void HmlPhysics::advanceState(float dt) noexcept {
 void HmlPhysics::checkForAndHandleCollisions() noexcept {
     assert(adjustments.empty()); // because it has been exhausted during adjustment application traversal
 
+    for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
+        const auto& [_bucket, objects] = *it;
+        if (objects.empty()) {
+            it = objectsInBuckets.erase(it);
+            continue;
+        }
+
+        for (size_t i = 0; i < objects.size(); i++) {
+            auto& obj1 = objects[i];
+
+            // For each object, test it against all other objects in current bucket
+            for (size_t j = i + 1; j < objects.size(); j++) {
+                auto& obj2 = objects[j];
+                if (obj1->isStationary() && obj2->isStationary()) continue;
+
+                { // To prevent processing a pair if it has been processed already
+                    ObjectAdjustment fakeAdj1;
+                    fakeAdj1.id      = obj1->id;
+                    fakeAdj1.idOther = obj2->id;
+                    ObjectAdjustment fakeAdj2;
+                    fakeAdj2.id      = obj2->id;
+                    fakeAdj2.idOther = obj1->id;
+                    assert(((obj1->isStationary() || obj2->isStationary()) || // at least one static, or else
+                        (!(adjustments.contains(fakeAdj1) ^ adjustments.contains(fakeAdj2)))) && // either both present or both not present
+                        "Not mirrored adjustments for dynamic objects");
+                    if (adjustments.contains(fakeAdj1) || adjustments.contains(fakeAdj2)) continue;
+                }
+
+                const auto [adj1, adj2] = process(*obj1, *obj2);
+                adjustments.insert(adj1);
+                adjustments.insert(adj2);
+            }
+        }
+
+        ++it;
+    }
+
     // const size_t thread_count = 1;
     // const auto count = objectsInBuckets.size();
     // const auto chunk = count / thread_count;
@@ -667,43 +667,6 @@ void HmlPhysics::checkForAndHandleCollisions() noexcept {
     //     }
     //     ++it;
     // }
-
-    for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
-        const auto& [_bucket, objects] = *it;
-        if (objects.empty()) {
-            it = objectsInBuckets.erase(it);
-            continue;
-        }
-
-        for (size_t i = 0; i < objects.size(); i++) {
-            auto& obj1 = objects[i];
-
-            // For each object, test it against all other objects in current bucket
-            for (size_t j = i + 1; j < objects.size(); j++) {
-                auto& obj2 = objects[j];
-                if (obj1->isStationary() && obj2->isStationary()) continue;
-
-                { // To prevent processing a pair if it has been processed already
-                    ObjectAdjustment fakeAdj1;
-                    fakeAdj1.id      = obj1->id;
-                    fakeAdj1.idOther = obj2->id;
-                    ObjectAdjustment fakeAdj2;
-                    fakeAdj2.id      = obj2->id;
-                    fakeAdj2.idOther = obj1->id;
-                    assert(((obj1->isStationary() || obj2->isStationary()) || // at least one static, or else
-                        (!(adjustments.contains(fakeAdj1) ^ adjustments.contains(fakeAdj2)))) && // either both present or both not present
-                        "Not mirrored adjustments for dynamic objects");
-                    if (adjustments.contains(fakeAdj1) || adjustments.contains(fakeAdj2)) continue;
-                }
-
-                const auto [adj1, adj2] = process(*obj1, *obj2);
-                adjustments.insert(adj1);
-                adjustments.insert(adj2);
-            }
-        }
-
-        ++it;
-    }
 }
 // ============================================================================
 // =================== Register/remove/get ====================================
@@ -762,7 +725,7 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
 void HmlPhysics::reassign() noexcept {
     auto boundingBoundsBeforeIt = allBoundingBucketsBefore.begin();
     for (const auto& object : objects) {
-        // assertGood(object, "advanceState 1");
+        // assertGood(object, "reassign 1");
         if (object->isStationary()) continue;
 
         const auto boundingBucketsBefore = *boundingBoundsBeforeIt;

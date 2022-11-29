@@ -46,6 +46,13 @@ namespace glm {
     // glm::mat4 cross(const glm::mat4& m, const glm::quat& q);
 }
 
+inline static glm::vec3 avg(std::span<const glm::vec3> vs) noexcept {
+    assert(!vs.empty() && "Calling avg() with empty array");
+    glm::vec3 sum{0};
+    for (const auto& v : vs) sum += v;
+    return sum / static_cast<float>(vs.size());
+};
+
 
 struct AxisAngle {
     float angle;
@@ -194,10 +201,6 @@ struct HmlPhysics {
     template<typename Arg1, typename Arg2>
     static std::optional<Detection> detect(const Arg1& arg1, const Arg2& arg2) noexcept;
 
-    struct VelocitiesAdjustment {
-        glm::vec3 velocity        = glm::vec3(0.0f);
-        glm::vec3 angularMomentum = glm::vec3(0.0f);
-    };
     struct ObjectAdjustment {
         // NOTE storing idOther ensures that interactions with multiple objects for a single object are recorded
         Object::Id id             = Object::INVALID_ID;
@@ -217,10 +220,8 @@ struct HmlPhysics {
         }
     };
 
-    using ProcessResult           = std::pair<ObjectAdjustment, ObjectAdjustment>;
-    using ResolveVelocitiesResult = std::pair<VelocitiesAdjustment, VelocitiesAdjustment>;
-    static ProcessResult           process(const Object& obj1, const Object& obj2) noexcept;
-    static ResolveVelocitiesResult resolveVelocities(const Object& obj1, const Object& obj2, const Detection& detection) noexcept;
+    using ProcessResult = std::pair<ObjectAdjustment, ObjectAdjustment>;
+    static ProcessResult process(const Object& obj1, const Object& obj2) noexcept;
     // ========================================================================
     struct Simplex {
         inline Simplex() noexcept : points({ glm::vec3{0}, glm::vec3{0}, glm::vec3{0}, glm::vec3{0} }), count(0) {}

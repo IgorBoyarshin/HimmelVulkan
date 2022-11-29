@@ -97,7 +97,7 @@ if (WIN32)
 
   target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1)
 
-  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-volatile -Wno-ignored-attributes -mavx -O0)
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-volatile -Wno-ignored-attributes -mavx -mavx2 -O0)
 elseif (UNIX)
     message(STATUS "CREATING BUILD FOR UNIX")
     target_include_directories(${PROJECT_NAME} PUBLIC

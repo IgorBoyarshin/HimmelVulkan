@@ -388,12 +388,12 @@ bool Himmel::init() noexcept {
 
             hmlPhysics = std::make_unique<HmlPhysics>();
             const float halfSide = 50.0f;
+            const float baseHeight = 50.0f;
+            const float halfHeight = halfSide;
 #define WITH_WALLS 1
 #if WITH_WALLS
-            const float baseHeight = 50.0f;
             const float wallThickness = 2.0f;
             // const float halfHeight = 10.0f;
-            const float halfHeight = halfSide;
             { // Bottom
                 auto object = HmlPhysics::Object::createBox({ 0, baseHeight, 0 }, { halfSide, wallThickness, halfSide });
 
@@ -587,21 +587,21 @@ bool Himmel::init() noexcept {
             // }
 #endif
 #if 0
-            // { // Dyn wall 3
-            //     const float halfHeight = 4.0f;
-            //     auto object = HmlPhysics::Object::createBox({ -6.5f, 61, 4.7f }, { 1, halfHeight, 1 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
-            //     object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(0,1,0));
+            { // Dyn wall 3
+                const float halfHeight = 4.0f;
+                auto object = HmlPhysics::Object::createBox({ -6.5f, 61, 5.7f }, { 1, halfHeight, 1 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+                // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(0,1,0));
 
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.9f, 0.9f, 0.9f}));
-            //     entities.back()->modelMatrix = object.modelMatrix();
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.9f, 0.9f, 0.9f}));
+                entities.back()->modelMatrix = object.modelMatrix();
 
-            //     const auto id = hmlPhysics->registerObject(std::move(object));
-            //     physicsIdToEntity[id] = entities.back();
-            // }
+                const auto id = hmlPhysics->registerObject(std::move(object));
+                physicsIdToEntity[id] = entities.back();
+            }
             { // Dyn wall 4
                 const float halfHeight = 2.0f;
                 auto object = HmlPhysics::Object::createBox({ -10, 60, 10 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 8 }, glm::vec3{0,1,0});
-                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(1,0,0));
+                // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(1,0,0));
 
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.6f, 1.0f, 0.6f}));
                 entities.back()->modelMatrix = object.modelMatrix();

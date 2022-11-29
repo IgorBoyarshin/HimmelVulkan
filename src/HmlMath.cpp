@@ -18,13 +18,6 @@ template<typename T>
 vec3_t<T>::vec3_t(const TF* xsPtr, const TF* ysPtr, const TF* zsPtr) noexcept
     : x(load<T>(xsPtr)), y(load<T>(ysPtr)), z(load<T>(zsPtr)) {}
 // ============================================================================
-template<typename T>
-void vec3_t<T>::store(TF* xsPtr, TF* ysPtr, TF* zsPtr) const noexcept {
-    hml::store<T>(xsPtr, x);
-    hml::store<T>(ysPtr, y);
-    hml::store<T>(zsPtr, z);
-}
-// ============================================================================
 template<>
 void store(TF* ptr, const TF& value) noexcept {
     *ptr = value;
@@ -38,6 +31,64 @@ void store(TF* ptr, const TF128& value) noexcept {
 template<>
 void store(TF* ptr, const TF256& value) noexcept {
     _mm256_store_ps(ptr, value);
+}
+// ============================================================================
+template<typename T>
+std::ostream& operator<<(std::ostream& ostream, const vec3_t<T>& v) {
+    ostream << "vec3(\n"
+        << '\t' << v.x << ";\n"
+        << '\t' << v.y << ";\n"
+        << '\t' << v.z
+    << ")";
+    return ostream;
+}
+
+std::ostream& operator<<(std::ostream& ostream, const TF128& tf) {
+    constexpr size_t SIZE = 4;
+    alignas(16) float arr[SIZE];
+    store(arr, tf);
+    for (size_t i = 0; i < SIZE; i++) {
+        ostream << '[' << arr[SIZE - 1 - i] << ']';
+    }
+    return ostream;
+}
+
+std::ostream& operator<<(std::ostream& ostream, const TF256& tf) {
+    constexpr size_t SIZE = 8;
+    alignas(32) float arr[SIZE];
+    store(arr, tf);
+    for (size_t i = 0; i < SIZE; i++) {
+        ostream << '[' << arr[SIZE - 1 - i] << ']';
+    }
+    return ostream;
+}
+// ============================================================================
+vec3_256 gather_from_vec3(const float* src, const __m256i& indices) noexcept {
+    return vec3_256(
+        _mm256_i32gather_ps(src + 0, indices, 4),
+        _mm256_i32gather_ps(src + 1, indices, 4),
+        _mm256_i32gather_ps(src + 2, indices, 4)
+    );
+}
+// ============================================================================
+TF256 rotl_6(TF256 v) noexcept {
+    auto tmp = _mm256_permute2f128_ps(v, v, 1); // swap the two 128-bit lanes
+    tmp = _mm256_permute_ps(tmp, 0b11); // places the first(highest) element on the last(lowest) position on each lane
+    auto tmp2 = _mm256_castps128_ps256(_mm_permute_ps(_mm256_castps256_ps128(tmp), 0b00)); // place the last (lowest) element everywhere
+    tmp = _mm256_blend_ps(tmp, tmp2, 0b00001111); // concatenate high lane from tmp and low lane from tmp2
+    auto res = _mm256_castsi256_ps(_mm256_bslli_epi128(_mm256_castps_si256(v), 4)); // shift left by one element
+    return _mm256_blend_ps(res, tmp, 0b00010100); // place the two elements from tmp into v
+}
+
+vec3_256 rotl_6(const vec3_256& v) noexcept {
+    return vec3_256 ( rotl_6(v.x), rotl_6(v.y), rotl_6(v.z) );
+}
+// ============================================================================
+template<typename T>
+void vec3_t<T>::store(TF* xsPtr, TF* ysPtr, TF* zsPtr) const noexcept {
+    hml::store<T>(xsPtr, x);
+    hml::store<T>(ysPtr, y);
+    hml::store<T>(zsPtr, z);
 }
 // ============================================================================
 template<>
@@ -256,6 +307,10 @@ T dot(const vec3_t<T>& v1, const vec3_t<T>& v2) noexcept {
 template TF    dot(const vec3&     v1, const vec3&     v2) noexcept;
 template TF128 dot(const vec3_128& v1, const vec3_128& v2) noexcept;
 template TF256 dot(const vec3_256& v1, const vec3_256& v2) noexcept;
+// ============================================================================
+template std::ostream& operator<<(std::ostream& ostream, const vec3& v);
+template std::ostream& operator<<(std::ostream& ostream, const vec3_128& v);
+template std::ostream& operator<<(std::ostream& ostream, const vec3_256& v);
 // ============================================================================
 template class vec3_t<TF>;
 template class vec3_t<TF128>;

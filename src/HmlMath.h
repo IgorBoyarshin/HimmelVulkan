@@ -3,6 +3,8 @@
 
 #include <cmath>
 #include <immintrin.h>
+#include <array>
+#include <iostream>
 
 namespace hml {
 
@@ -26,6 +28,18 @@ struct vec3_t {
 using vec3     = vec3_t<TF>;
 using vec3_128 = vec3_t<TF128>;
 using vec3_256 = vec3_t<TF256>;
+
+template<typename T>
+std::ostream& operator<<(std::ostream& ostream, const vec3_t<T>& v);
+
+std::ostream& operator<<(std::ostream& ostream, const TF128& tf);
+std::ostream& operator<<(std::ostream& ostream, const TF256& tf);
+
+vec3_256 gather_from_vec3(const float* src, const __m256i& indices) noexcept;
+
+// Rotate left within the high-most 6 elements
+TF256    rotl_6(TF256 v) noexcept;
+vec3_256 rotl_6(const vec3_256& v) noexcept;
 
 template<typename T>
 void store(TF* ptr, const T& value) noexcept;

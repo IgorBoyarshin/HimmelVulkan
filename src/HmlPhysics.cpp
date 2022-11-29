@@ -172,118 +172,181 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
         }
     };
 
-    // static const auto addContactPointsFromOntoAvx = [](
-    //         std::span<const glm::vec3> psFrom,
-    //         std::span<const glm::vec3> psOnto,
-    //         const Object::Box::OrientationData& orientationDataOnto,
-    //         std::vector<glm::vec3>& contactPoints){
-    //     static const std::array<std::pair<size_t, size_t>, 12> edges{
-    //         std::make_pair(0, 1), std::make_pair(2, 3), std::make_pair(0, 2), std::make_pair(1, 3),
-    //         std::make_pair(4, 5), std::make_pair(6, 7), std::make_pair(4, 6), std::make_pair(5, 7),
-    //         std::make_pair(0, 4), std::make_pair(1, 5), std::make_pair(2, 6), std::make_pair(3, 7)
-    //     };
-    //     static const std::array<std::array<size_t, 4>, 6> faces{
-    //         std::array<size_t, 4>{0,1,2,3}, std::array<size_t, 4>{4,5,6,7},
-    //         std::array<size_t, 4>{0,1,4,5}, std::array<size_t, 4>{2,3,6,7},
-    //         std::array<size_t, 4>{0,2,4,6}, std::array<size_t, 4>{1,3,5,7}
-    //     };
-    //     static const auto faceNormalForIndex = [](size_t i, const Object::Box::OrientationData& orientationData){
-    //         switch (i / 2) {
-    //             case 0: return orientationData.i;
-    //             case 1: return orientationData.j;
-    //             case 2: return orientationData.k;
-    //         }
-    //         assert(false && "Unexpected index in faceNormalForIndex()"); return glm::vec3{}; // stub
-    //     };
-    //
-    //     // Input
-    //     alignas(32) float edgePointA_xs[12];
-    //     alignas(32) float edgePointA_ys[12];
-    //     alignas(32) float edgePointA_zs[12];
-    //     alignas(32) float edgePointB_xs[12];
-    //     alignas(32) float edgePointB_ys[12];
-    //     alignas(32) float edgePointB_zs[12];
-    //     alignas(32) float planePointA_xs[12];
-    //     alignas(32) float planePointA_ys[12];
-    //     alignas(32) float planePointA_zs[12];
-    //     alignas(32) float planePointB_xs[12];
-    //     alignas(32) float planePointB_ys[12];
-    //     alignas(32) float planePointB_zs[12];
-    //     alignas(32) float planePointC_xs[12];
-    //     alignas(32) float planePointC_ys[12];
-    //     alignas(32) float planePointC_zs[12];
-    //     alignas(32) float planeDir_xs[12];
-    //     alignas(32) float planeDir_ys[12];
-    //     alignas(32) float planeDir_zs[12];
-    //     // Output
-    //     alignas(32) bool foundIntersection[12];
-    //     alignas(32) float I_xs[12];
-    //     alignas(32) float I_ys[12];
-    //     alignas(32) float I_zs[12];
-    //
-    //     for (size_t f = 0; f < 6; f++) {
-    //         const auto& face = faces[f];
-    //         const glm::vec3& planePointA = psOnto[face[0]];
-    //         const glm::vec3& planePointB = psOnto[face[1]];
-    //         const glm::vec3& planePointC = psOnto[face[2]];
-    //         const glm::vec3& planeDir = faceNormalForIndex(f, orientationDataOnto); // TODO
-    //
-    //         for (size_t e = 0; e < 12; e++) {
-    //             const auto& edge = edges[e];
-    //
-    //             const glm::vec3& edgePointA = psFrom[edge.first];
-    //             const glm::vec3& edgePointB = psFrom[edge.second];
-    //
-    //             edgePointA_xs[e] = edgePointA.x;
-    //             edgePointA_ys[e] = edgePointA.y;
-    //             edgePointA_zs[e] = edgePointA.z;
-    //             edgePointB_xs[e] = edgePointB.x;
-    //             edgePointB_ys[e] = edgePointB.y;
-    //             edgePointB_zs[e] = edgePointB.z;
-    //             planePointA_xs[e] = planePointA.x;
-    //             planePointA_ys[e] = planePointA.y;
-    //             planePointA_zs[e] = planePointA.z;
-    //             planePointB_xs[e] = planePointB.x;
-    //             planePointB_ys[e] = planePointB.y;
-    //             planePointB_zs[e] = planePointB.z;
-    //             planePointC_xs[e] = planePointC.x;
-    //             planePointC_ys[e] = planePointC.y;
-    //             planePointC_zs[e] = planePointC.z;
-    //             planeDir_xs[e] = planeDir.x;
-    //             planeDir_ys[e] = planeDir.y;
-    //             planeDir_zs[e] = planeDir.z;
-    //         }
-    //
-    //
-    //         edgeFaceIntersection8(
-    //             edgePointA_xs + 0, edgePointA_ys + 0, edgePointA_zs + 0,
-    //             edgePointB_xs + 0, edgePointB_ys + 0, edgePointB_zs + 0,
-    //             planePointA_xs + 0, planePointA_ys + 0, planePointA_zs + 0,
-    //             planePointB_xs + 0, planePointB_ys + 0, planePointB_zs + 0,
-    //             planePointC_xs + 0, planePointC_ys + 0, planePointC_zs + 0,
-    //             planeDir_xs + 0, planeDir_ys + 0, planeDir_zs + 0,
-    //             foundIntersection + 0,
-    //             I_xs + 0, I_ys + 0, I_zs + 0);
-    //         edgeFaceIntersection4(
-    //             edgePointA_xs + 8, edgePointA_ys + 8, edgePointA_zs + 8,
-    //             edgePointB_xs + 8, edgePointB_ys + 8, edgePointB_zs + 8,
-    //             planePointA_xs + 8, planePointA_ys + 8, planePointA_zs + 8,
-    //             planePointB_xs + 8, planePointB_ys + 8, planePointB_zs + 8,
-    //             planePointC_xs + 8, planePointC_ys + 8, planePointC_zs + 8,
-    //             planeDir_xs + 8, planeDir_ys + 8, planeDir_zs + 8,
-    //             foundIntersection + 8,
-    //             I_xs + 8, I_ys + 8, I_zs + 8);
-    //
-    //         for (size_t e = 0; e < 12; e++) {
-    //             const glm::vec3 p{I_xs[e], I_ys[e], I_zs[e]};
-    //             if (foundIntersection[e]) contactPoints.emplace_back(p);
-    //         }
-    //     }
-    // };
+    static const auto addContactPointsFromOntoAvx = [](
+            std::span<const glm::vec3> psFrom,
+            std::span<const glm::vec3> psOnto,
+            const Object::Box::OrientationData& orientationDataOnto,
+            std::vector<glm::vec3>& contactPoints){
+        static const std::array<std::pair<size_t, size_t>, 12> edges{
+            std::make_pair(0, 1), std::make_pair(2, 3), std::make_pair(0, 2), std::make_pair(1, 3),
+            std::make_pair(4, 5), std::make_pair(6, 7), std::make_pair(4, 6), std::make_pair(5, 7),
+            std::make_pair(0, 4), std::make_pair(1, 5), std::make_pair(2, 6), std::make_pair(3, 7)
+        };
+        static const std::array<std::array<size_t, 4>, 6> faces{
+            std::array<size_t, 4>{0,1,2,3}, std::array<size_t, 4>{4,5,6,7},
+            std::array<size_t, 4>{0,1,4,5}, std::array<size_t, 4>{2,3,6,7},
+            std::array<size_t, 4>{0,2,4,6}, std::array<size_t, 4>{1,3,5,7}
+        };
+        static const auto faceNormalForIndex = [](size_t i, const Object::Box::OrientationData& orientationData){
+            switch (i / 2) {
+                case 0: return orientationData.i;
+                case 1: return orientationData.j;
+                case 2: return orientationData.k;
+            }
+            assert(false && "Unexpected index in faceNormalForIndex()"); return glm::vec3{}; // stub
+        };
+
+        // Input
+        alignas(32) float edgePointA_xs[12];
+        alignas(32) float edgePointA_ys[12];
+        alignas(32) float edgePointA_zs[12];
+        alignas(32) float edgePointB_xs[12];
+        alignas(32) float edgePointB_ys[12];
+        alignas(32) float edgePointB_zs[12];
+        alignas(32) float planePointA_xs[12];
+        alignas(32) float planePointA_ys[12];
+        alignas(32) float planePointA_zs[12];
+        alignas(32) float planePointB_xs[12];
+        alignas(32) float planePointB_ys[12];
+        alignas(32) float planePointB_zs[12];
+        alignas(32) float planePointC_xs[12];
+        alignas(32) float planePointC_ys[12];
+        alignas(32) float planePointC_zs[12];
+        alignas(32) float planeDir_xs[12];
+        alignas(32) float planeDir_ys[12];
+        alignas(32) float planeDir_zs[12];
+        // Output
+        alignas(32) bool foundIntersection[12];
+        alignas(32) float I_xs[12];
+        alignas(32) float I_ys[12];
+        alignas(32) float I_zs[12];
+
+        for (size_t f = 0; f < 6; f++) {
+            const auto& face = faces[f];
+            const glm::vec3& planePointA = psOnto[face[0]];
+            const glm::vec3& planePointB = psOnto[face[1]];
+            const glm::vec3& planePointC = psOnto[face[2]];
+            const glm::vec3& planeDir = faceNormalForIndex(f, orientationDataOnto); // TODO
+
+            for (size_t e = 0; e < 12; e++) {
+                const auto& edge = edges[e];
+
+                const glm::vec3& edgePointA = psFrom[edge.first];
+                const glm::vec3& edgePointB = psFrom[edge.second];
+
+                edgePointA_xs[e] = edgePointA.x;
+                edgePointA_ys[e] = edgePointA.y;
+                edgePointA_zs[e] = edgePointA.z;
+                edgePointB_xs[e] = edgePointB.x;
+                edgePointB_ys[e] = edgePointB.y;
+                edgePointB_zs[e] = edgePointB.z;
+                planePointA_xs[e] = planePointA.x;
+                planePointA_ys[e] = planePointA.y;
+                planePointA_zs[e] = planePointA.z;
+                planePointB_xs[e] = planePointB.x;
+                planePointB_ys[e] = planePointB.y;
+                planePointB_zs[e] = planePointB.z;
+                planePointC_xs[e] = planePointC.x;
+                planePointC_ys[e] = planePointC.y;
+                planePointC_zs[e] = planePointC.z;
+                planeDir_xs[e] = planeDir.x;
+                planeDir_ys[e] = planeDir.y;
+                planeDir_zs[e] = planeDir.z;
+            }
+
+
+            edgeFaceIntersection8(
+                edgePointA_xs + 0, edgePointA_ys + 0, edgePointA_zs + 0,
+                edgePointB_xs + 0, edgePointB_ys + 0, edgePointB_zs + 0,
+                planePointA_xs + 0, planePointA_ys + 0, planePointA_zs + 0,
+                planePointB_xs + 0, planePointB_ys + 0, planePointB_zs + 0,
+                planePointC_xs + 0, planePointC_ys + 0, planePointC_zs + 0,
+                planeDir_xs + 0, planeDir_ys + 0, planeDir_zs + 0,
+                foundIntersection + 0,
+                I_xs + 0, I_ys + 0, I_zs + 0);
+            edgeFaceIntersection4(
+                edgePointA_xs + 8, edgePointA_ys + 8, edgePointA_zs + 8,
+                edgePointB_xs + 8, edgePointB_ys + 8, edgePointB_zs + 8,
+                planePointA_xs + 8, planePointA_ys + 8, planePointA_zs + 8,
+                planePointB_xs + 8, planePointB_ys + 8, planePointB_zs + 8,
+                planePointC_xs + 8, planePointC_ys + 8, planePointC_zs + 8,
+                planeDir_xs + 8, planeDir_ys + 8, planeDir_zs + 8,
+                foundIntersection + 8,
+                I_xs + 8, I_ys + 8, I_zs + 8);
+
+            for (size_t e = 0; e < 12; e++) {
+                const glm::vec3 p{I_xs[e], I_ys[e], I_zs[e]};
+                if (foundIntersection[e]) contactPoints.emplace_back(p);
+            }
+        }
+    };
+
+    static const auto addContactPointsFromOntoAvxCompact = [](
+            std::span<const glm::vec3> psFrom,
+            std::span<const glm::vec3> psOnto,
+            const Object::Box::OrientationData& orientationDataOnto,
+            std::vector<glm::vec3>& contactPoints){
+        const int c = 3;
+        const int DC = c*0; // don't care
+        // Input
+        alignas(32) static const __m256i indicesK = _mm256_set_epi32(c*0, c*1, c*2, c*3, c*5, c*6, DC, DC);
+        alignas(32) static const __m256i indicesL = _mm256_set_epi32(c*2, c*0, c*3, c*1, c*7, c*7, DC, DC);
+        alignas(32) static const __m256i indicesM = _mm256_set_epi32(c*4, c*5, c*6, c*7, c*4, c*4, DC, DC);
+        alignas(32) const hml::vec3_256 edgeSetK = hml::gather_from_vec3(static_cast<const float*>(&psFrom[0].x), indicesK);
+        alignas(32) const hml::vec3_256 edgeSetL = hml::gather_from_vec3(static_cast<const float*>(&psFrom[0].x), indicesL);
+        alignas(32) const hml::vec3_256 edgeSetM = hml::gather_from_vec3(static_cast<const float*>(&psFrom[0].x), indicesM);
+        alignas(32) static const __m256i indicesA = _mm256_set_epi32(c*0, c*4, c*0, c*2, c*0, c*1, DC, DC);
+        alignas(32) static const __m256i indicesB = _mm256_set_epi32(c*1, c*5, c*1, c*3, c*2, c*3, DC, DC);
+        alignas(32) static const __m256i indicesC = _mm256_set_epi32(c*2, c*6, c*4, c*6, c*4, c*5, DC, DC);
+        alignas(32) static const __m256i indicesDir = _mm256_set_epi32(c*0, c*0, c*1, c*1, c*2, c*2, DC, DC);
+        alignas(32) hml::vec3_256 planePointA = hml::gather_from_vec3(static_cast<const float*>(&psOnto[0].x), indicesA);
+        alignas(32) hml::vec3_256 planePointB = hml::gather_from_vec3(static_cast<const float*>(&psOnto[0].x), indicesB);
+        alignas(32) hml::vec3_256 planePointC = hml::gather_from_vec3(static_cast<const float*>(&psOnto[0].x), indicesC);
+        alignas(32) hml::vec3_256 planeDir = hml::gather_from_vec3(static_cast<const float*>(&orientationDataOnto.i.x), indicesDir);
+        // Output
+        alignas(32) bool foundIntersection1[8];
+        alignas(32) float I_xs1[8];
+        alignas(32) float I_ys1[8];
+        alignas(32) float I_zs1[8];
+        alignas(32) bool foundIntersection2[8];
+        alignas(32) float I_xs2[8];
+        alignas(32) float I_ys2[8];
+        alignas(32) float I_zs2[8];
+        
+        for (size_t f = 0; f < 6; f++) {
+            edgeFaceIntersection6Comp(edgeSetK, edgeSetL,
+                    planePointA, planePointB, planePointC, planeDir,
+                    foundIntersection1 + 0, I_xs1 + 0, I_ys1 + 0, I_zs1 + 0);
+            edgeFaceIntersection6Comp(edgeSetK, edgeSetM,
+                    planePointA, planePointB, planePointC, planeDir,
+                    foundIntersection2, I_xs2, I_ys2, I_zs2);
+            // Rotate faces
+            if (f < 5) {
+                planePointA = rotl_6(planePointA);
+                planePointB = rotl_6(planePointB);
+                planePointC = rotl_6(planePointC);
+                planeDir    = rotl_6(planeDir);
+            }
+            // Process result
+            for (size_t e = 2; e < 8; e++) {
+                const glm::vec3 p{ I_xs1[e], I_ys1[e], I_zs1[e] };
+                if (foundIntersection1[e]) contactPoints.emplace_back(p);
+            }
+            for (size_t e = 2; e < 8; e++) {
+                const glm::vec3 p{ I_xs2[e], I_ys2[e], I_zs2[e] };
+                if (foundIntersection2[e]) contactPoints.emplace_back(p);
+            }
+        }
+    };
+
 
     std::vector<glm::vec3> contactPoints;
-    addContactPointsFromOnto(p1, p2, orientationData2, contactPoints);
-    addContactPointsFromOnto(p2, p1, orientationData1, contactPoints);
+    // addContactPointsFromOnto(p1, p2, orientationData2, contactPoints);
+    // addContactPointsFromOnto(p2, p1, orientationData1, contactPoints);
+    addContactPointsFromOntoAvx(p1, p2, orientationData2, contactPoints);
+    addContactPointsFromOntoAvx(p2, p1, orientationData1, contactPoints);
+    // addContactPointsFromOntoAvxCompact(p1, p2, orientationData2, contactPoints);
+    // addContactPointsFromOntoAvxCompact(p2, p1, orientationData1, contactPoints);
 
     if (contactPoints.empty()) return std::nullopt;
     // if (true) {
@@ -298,9 +361,9 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
     //     std::cout << "P2:" << '\n';
     //     for (const auto& p : p2) std::cout << p << " ";
     //     std::cout << '\n';
-    //     std::cout << "CP:" << '\n';
-    //     for (const auto& cp : contactPoints) std::cout << cp << " ";
-    //     std::cout << '\n';
+        // std::cout << "CP:" << '\n';
+        // for (const auto& cp : contactPoints) std::cout << cp << " ";
+        // std::cout << '\n';
     //     std::cout << "=====================================" << '\n';
     // }
     // assert(!contactPoints.empty() && "No contact points!");
@@ -380,13 +443,13 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
     assert(!(obj1.isStationary() && obj2.isStationary()) && "Shouldn't've called process() with both objects being stationary");
 
     // ================ Resolve intersection ================
-    // const auto mark1 = std::chrono::high_resolution_clock::now();
+    const auto mark1 = std::chrono::high_resolution_clock::now();
     std::optional<Detection> detectionOpt = std::nullopt;
     if      (obj1.isSphere() && obj2.isSphere()) detectionOpt = detect(obj1.asSphere(), obj2.asSphere());
     else if (obj1.isBox()    && obj2.isSphere()) detectionOpt = detect(obj1.asBox(),    obj2.asSphere());
     else if (obj1.isSphere() && obj2.isBox())    detectionOpt = detect(obj1.asSphere(), obj2.asBox());
     else if (obj1.isBox()    && obj2.isBox())    detectionOpt = detect(obj1.asBox(),    obj2.asBox());
-    // const auto mark2 = std::chrono::high_resolution_clock::now();
+    const auto mark2 = std::chrono::high_resolution_clock::now();
 
     if (!detectionOpt) return std::make_pair(ObjectAdjustment{}, ObjectAdjustment{});
     const auto& [dir, extent, contactPoints] = *detectionOpt;
@@ -423,13 +486,12 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
     // std::cout << "Delta2 = " << +glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor << '\n';
     // std::cout << "-----------------------------------------------------------" << '\n';
 
-    // const auto mark3 = std::chrono::high_resolution_clock::now();
-
-    // const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
-    // const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
-    // std::cout << "Detection=" << static_cast<float>(step1Mks)
-    //     << "mks. Resolve=" << static_cast<float>(step2Mks)
-    //     << "mks. (" << (obj1.isBox() ? "Box":"Sphere") << "--" << (obj2.isBox() ? "Box":"Sphere") << ")\n";
+    const auto mark3 = std::chrono::high_resolution_clock::now();
+    const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
+    const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
+    std::cout << "Detection=" << static_cast<float>(step1Mks)
+        << "mks. Resolve=" << static_cast<float>(step2Mks)
+        << "mks. (" << (obj1.isBox() ? "Box":"Sphere") << "--" << (obj2.isBox() ? "Box":"Sphere") << ")\n";
 
     return std::make_pair(
         obj1.isStationary() ? ObjectAdjustment{} : ObjectAdjustment{
@@ -573,129 +635,18 @@ void HmlPhysics::step(float dt) noexcept {
         }
     }
 
-
-    // const auto mark0 = std::chrono::high_resolution_clock::now();
-    // applyAdjustments();
-    // const auto mark1 = std::chrono::high_resolution_clock::now();
-    // advanceState(subDt); // Apply velocity onto position change
-    // const auto mark2 = std::chrono::high_resolution_clock::now();
-    // reassign(); // Put objects into proper buckets after they have finished being moved
-    const auto mark3 = std::chrono::high_resolution_clock::now();
+    const auto mark1 = std::chrono::high_resolution_clock::now();
     checkForAndHandleCollisions();
-    const auto mark4 = std::chrono::high_resolution_clock::now();
+    const auto mark2 = std::chrono::high_resolution_clock::now();
 
     static int stepTimer = 0;
     if (true && ++stepTimer == 100) {
         stepTimer = 0;
-        const auto step0Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark0).count();
-        // const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
-        // const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
-        const auto step3Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark4 - mark3).count();
+        const auto step0Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark1 - mark0).count();
+        const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
         std::cout << "Step 0 = " << static_cast<float>(step0Mks) << " mks\n";
-        // std::cout << "Step 1 = " << static_cast<float>(step1Mks) << " mks\n";
-        // std::cout << "Step 2 = " << static_cast<float>(step2Mks) << " mks\n";
-        std::cout << "Step 3 = " << static_cast<float>(step3Mks) << " mks\n";
+        std::cout << "Step 1 = " << static_cast<float>(step1Mks) << " mks\n";
     }
-}
-
-
-void HmlPhysics::applyAdjustments() noexcept {
-    // // std::cout << "Have " << adjustments.size() << " adjustments\n";
-    // for (auto& object : objects) {
-    //     // assertGood(object, "applyAdjustments 1");
-    //     if (object->isStationary()) continue;
-    //
-    //     for (auto it = adjustments.begin(); it != adjustments.end();) {
-    //         const auto& [id, _otherId, positionAdj, velocityAdj, angularMomentumAdj] = *it;
-    //         if (id == Object::INVALID_ID) {
-    //             it = adjustments.erase(it);
-    //             continue;
-    //         }
-    //         if (id == object->id) {
-    //             assert(!object->isStationary() && "adjusting a stationary object");
-    //             object->position += positionAdj;
-    //             object->dynamicProperties->velocity += velocityAdj;
-    //             object->dynamicProperties->angularMomentum += angularMomentumAdj;
-    //             it = adjustments.erase(it);
-    //             // Don't break because there can be multiple adjustments for a single object
-    //             // break;
-    //             continue;
-    //         }
-    //
-    //         ++it;
-    //     }
-    //     if (adjustments.empty()) break;
-    //     assertGood(object, "applyAdjustments 2"); // do it once per loop, here
-    // }
-}
-
-
-void HmlPhysics::advanceState(float dt) noexcept {
-    // const glm::vec3 F {0,-9.8,0};
-    // // const glm::vec3 F {0,0,0};
-    // // const glm::vec3 cp{1,0,0};
-    // // const glm::vec3 Ft{0,0,0};
-    //
-    // for (auto& object : objects) {
-    //     // assertGood(object, "advanceState 1");
-    //     if (object->isStationary()) continue;
-    //
-    //     object->position += dt * object->dynamicProperties->velocity;
-    //     object->dynamicProperties->velocity += dt * F;
-    //     // object->dynamicProperties->velocity += dt * F * object->dynamicProperties->invMass;
-    //
-    //     // World-space inverse inertia tensor
-    //     const auto I =
-    //         quatToMat3(object->orientation) *
-    //         object->dynamicProperties->invRotationalInertiaTensor *
-    //         quatToMat3(glm::conjugate(object->orientation));
-    //     const auto angularVelocity = I * object->dynamicProperties->angularMomentum;
-    //     object->orientation += dt * glm::cross(glm::quat(0, angularVelocity), object->orientation);
-    //     // const auto torque = glm::cross(cp, Ft);
-    //     // object->dynamicProperties->angularMomentum += dt * torque;
-    //
-    //     // NOTE can be done not every step, but this is too trivial so we don't bother
-    //     object->orientation = glm::normalize(object->orientation);
-    //
-    //     // Invalidate modelMatrix (force further recalculation)
-    //     // Do it here because this has been the biggest state change,
-    //     // but not later because the next step requires presice positions
-    //     object->modelMatrixCached = std::nullopt;
-    //     // assertGood(object, "advanceState 2");
-    // }
-}
-
-
-void HmlPhysics::reassign() noexcept {
-    // // NOTE does not store BB for stationary objects
-    // auto boundingBoundsBeforeIt = allBoundingBucketsBefore.begin();
-    // for (const auto& object : objects) {
-    //     // assertGood(object, "reassign 1");
-    //     if (object->isStationary()) continue;
-    //
-    //     const auto boundingBucketsBefore = *boundingBoundsBeforeIt;
-    //     const auto boundingBucketsAfter = boundingBucketsForObject(*object);
-    //     *boundingBoundsBeforeIt = boundingBucketsAfter; // for use during next iteration
-    //     ++boundingBoundsBeforeIt;
-    //     if (boundingBucketsBefore == boundingBucketsAfter) continue;
-    //
-    //     const auto superset = boundingBucketsSum(boundingBucketsBefore, boundingBucketsAfter);
-    //     for (Bucket::Coord x = superset.first.x; x <= superset.second.x; x++) {
-    //         for (Bucket::Coord y = superset.first.y; y <= superset.second.y; y++) {
-    //             for (Bucket::Coord z = superset.first.z; z <= superset.second.z; z++) {
-    //                 const Bucket b{ .x = x, .y = y, .z = z };
-    //                 const bool before = b.isInsideBoundingBuckets(boundingBucketsBefore);
-    //                 const bool after  = b.isInsideBoundingBuckets(boundingBucketsAfter);
-    //                 if (before && !after) { // remove from this bucket
-    //                     removeObjectWithIdFromBucket(object->id, b);
-    //                 } else if (!before && after) { // add to this bucket
-    //                     objectsInBuckets[b].push_back(object);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     // assertGood(object, "reassign 2");
-    // }
 }
 
 
@@ -710,12 +661,10 @@ void HmlPhysics::checkForAndHandleCollisions() noexcept {
         }
 
         for (size_t i = 0; i < ids.size(); i++) {
-            // auto& obj1 = objects[i];
             const auto& obj1 = objects[objectIndexFromId[ids[i]]];
 
             // For each object, test it against all other objects in current bucket
             for (size_t j = i + 1; j < ids.size(); j++) {
-                // auto& obj2 = objects[j];
                 const auto& obj2 = objects[objectIndexFromId[ids[j]]];
                 if (obj1.isStationary() && obj2.isStationary()) continue;
 
@@ -963,6 +912,60 @@ bool HmlPhysics::pointInsideRect(const glm::vec3& P, const glm::vec3& A, const g
 // ============================================================================
 // ===================== AVX/SSE ==============================================
 // ============================================================================
+void HmlPhysics::edgeFaceIntersection6Comp(
+        const hml::vec3_256& edgePointA,
+        const hml::vec3_256& edgePointB,
+        const hml::vec3_256& planePointA,
+        const hml::vec3_256& planePointB,
+        const hml::vec3_256& planePointC,
+        const hml::vec3_256& planeDir,
+        bool foundIntersection_ptr[8],
+        float I_xs_ptr[8],
+        float I_ys_ptr[8],
+        float I_zs_ptr[8]
+        ) noexcept {
+    alignas(32) const auto edgeDir = normalize(edgePointB - edgePointA);
+    alignas(32) const auto dot = hml::dot(edgeDir, planeDir);
+    alignas(32) const auto tPs = hml::dot(planePointA, planeDir);
+    alignas(32) const auto tAs = hml::dot(edgePointA, planeDir);
+    alignas(32) const auto tBs = hml::dot(edgePointB, planeDir);
+    alignas(32) const auto ts = (tPs - tAs) / dot;
+    alignas(32) const auto I = edgePointA + edgeDir * hml::vec3_256(ts);
+
+    alignas(32) const auto AB = planePointB - planePointA;
+    alignas(32) const auto AC = planePointC - planePointA;
+    alignas(32) const auto AP = I           - planePointA;
+    alignas(32) const auto projAB = hml::dot(AP, AB);
+    alignas(32) const auto projAC = hml::dot(AP, AC);
+    alignas(32) const auto maxAB = hml::dot(AB, AB);
+    alignas(32) const auto maxAC = hml::dot(AC, AC);
+
+    alignas(32) static const __m256 ZERO = _mm256_setzero_ps();
+    // Test if !=0 than good
+    __m256 valid = _mm256_cmp_ps(dot, ZERO, _CMP_NEQ_UQ);
+    // Test if (tp - t1) * (t2 - tp) >= 0 than good
+    valid = _mm256_and_ps(valid, _mm256_cmp_ps(_mm256_mul_ps(_mm256_sub_ps(tPs, tAs), _mm256_sub_ps(tBs, tPs)), ZERO, _CMP_GE_OQ));
+    // Test if inside the rectangle than good
+    valid = _mm256_and_ps(valid, _mm256_cmp_ps(projAB, ZERO, _CMP_GE_OQ));
+    valid = _mm256_and_ps(valid, _mm256_cmp_ps(projAB, maxAB, _CMP_LE_OQ));
+    valid = _mm256_and_ps(valid, _mm256_cmp_ps(projAC, ZERO, _CMP_GE_OQ));
+    valid = _mm256_and_ps(valid, _mm256_cmp_ps(projAC, maxAC, _CMP_LE_OQ));
+
+    // Prepare and store result
+    I.store(I_xs_ptr, I_ys_ptr, I_zs_ptr);
+    alignas(32) float valid_ptr[8];
+    _mm256_store_ps(valid_ptr, valid);
+    foundIntersection_ptr[0] = valid_ptr[0] != 0.0f;
+    foundIntersection_ptr[1] = valid_ptr[1] != 0.0f;
+    foundIntersection_ptr[2] = valid_ptr[2] != 0.0f;
+    foundIntersection_ptr[3] = valid_ptr[3] != 0.0f;
+    foundIntersection_ptr[4] = valid_ptr[4] != 0.0f;
+    foundIntersection_ptr[5] = valid_ptr[5] != 0.0f;
+    foundIntersection_ptr[6] = valid_ptr[6] != 0.0f;
+    foundIntersection_ptr[7] = valid_ptr[7] != 0.0f;
+}
+
+
 void HmlPhysics::edgeFaceIntersection8(
         const float edgePointA_xs_ptr[8],
         const float edgePointA_ys_ptr[8],
@@ -1010,7 +1013,7 @@ void HmlPhysics::edgeFaceIntersection8(
     alignas(32) const auto maxAB = hml::dot(AB, AB);
     alignas(32) const auto maxAC = hml::dot(AC, AC);
 
-    alignas(32) const __m256 ZERO = _mm256_set1_ps(0);
+    alignas(32) static const __m256 ZERO = _mm256_setzero_ps();
     // Test if !=0 than good
     __m256 valid = _mm256_cmp_ps(dot, ZERO, _CMP_NEQ_UQ);
     // Test if (tp - t1) * (t2 - tp) >= 0 than good
@@ -1081,7 +1084,7 @@ void HmlPhysics::edgeFaceIntersection4(
     const auto maxAB = hml::dot(AB, AB);
     const auto maxAC = hml::dot(AC, AC);
 
-    const __m128 ZERO = _mm_set1_ps(0);
+    static const __m128 ZERO = _mm_setzero_ps();
     // Test if !=0 than good
     __m128 valid = _mm_cmpneq_ps(dot, ZERO);
     // Test if (tp - t1) * (t2 - tp) >= 0 than good

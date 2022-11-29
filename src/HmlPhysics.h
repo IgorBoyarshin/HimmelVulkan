@@ -50,7 +50,7 @@ inline static glm::vec3 avg(std::span<const glm::vec3> vs) noexcept {
     glm::vec3 sum{0};
     for (const auto& v : vs) sum += v;
     return sum / static_cast<float>(vs.size());
-};
+}
 
 
 struct AxisAngle {
@@ -302,10 +302,7 @@ struct HmlPhysics {
     // NOTE can contain Buckets not present in any of the inputs
     static Bucket::Bounding boundingBucketsSum(const Bucket::Bounding& bb1, const Bucket::Bounding& bb2) noexcept;
     static Bucket::Bounding boundingBucketsForObject(const Object& object) noexcept;
-    void applyAdjustments() noexcept;
-    void advanceState(float dt) noexcept;
     void checkForAndHandleCollisions() noexcept;
-    void reassign() noexcept;
     void removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept;
     void printStats() const noexcept;
 
@@ -320,8 +317,6 @@ struct HmlPhysics {
     std::vector<Object> objects;
     std::unordered_map<Object::Id, size_t> objectIndexFromId;
     std::unordered_map<Bucket, std::vector<Object::Id>, BucketHasher> objectsInBuckets;
-    // std::vector<ObjectAdjustment> adjustments;
-    // std::vector<std::unordered_set<ObjectAdjustment, ObjectAdjustmentHasher, ObjectAdjustmentEqual>> adjustments;
 
     using Adjustments = std::unordered_set<ObjectAdjustment, ObjectAdjustmentHasher, ObjectAdjustmentEqual>;
     Adjustments adjustments;
@@ -347,6 +342,18 @@ struct HmlPhysics {
             const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept;
     static bool pointInsideRect(const glm::vec3& P, const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept;
 
+    static void edgeFaceIntersection6Comp(
+            const hml::vec3_256& edgePointA,
+            const hml::vec3_256& edgePointB,
+            const hml::vec3_256& planePointA,
+            const hml::vec3_256& planePointB,
+            const hml::vec3_256& planePointC,
+            const hml::vec3_256& planeDir,
+            bool foundIntersection_ptr[8],
+            float I_xs_ptr[8],
+            float I_ys_ptr[8],
+            float I_zs_ptr[8]
+            ) noexcept;
     static void edgeFaceIntersection8(
             const float edgePointA_xs_ptr[8],
             const float edgePointA_ys_ptr[8],

@@ -532,11 +532,11 @@ void HmlPhysics::step(float dt) noexcept {
             object.dynamicProperties->velocity += dt * F; // NOTE * object.dynamicProperties->invMass
 
             // World-space inverse inertia tensor
-            const auto I =
-                quatToMat3(object.orientation) *
-                object.dynamicProperties->invRotationalInertiaTensor *
-                quatToMat3(glm::conjugate(object.orientation));
-            // const auto I = object.dynamicProperties->invRotationalInertiaTensor;
+            // const auto I =
+            //     quatToMat3(object.orientation) *
+            //     object.dynamicProperties->invRotationalInertiaTensor *
+            //     quatToMat3(glm::conjugate(object.orientation));
+            const auto I = object.dynamicProperties->invRotationalInertiaTensor;
             const auto angularVelocity = I * object.dynamicProperties->angularMomentum;
             object.orientation += dt * glm::cross(glm::quat(0, angularVelocity), object.orientation);
             // const auto torque = glm::cross(cp, Ft);

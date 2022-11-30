@@ -6,6 +6,9 @@
 #include <array>
 #include <iostream>
 
+#include "settings.h"
+#include "settings_simd.h"
+
 namespace hml {
 
 using TF    = float;

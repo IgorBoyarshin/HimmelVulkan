@@ -17,6 +17,9 @@
 
 #include "HmlMath.h"
 
+#include "settings.h"
+#include "settings_simd.h"
+
 #include "../libs/ctpl_stl.h"
 
 

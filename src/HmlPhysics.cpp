@@ -197,29 +197,29 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
         };
 
         // Input
-        alignas(32) float edgePointA_xs[12];
-        alignas(32) float edgePointA_ys[12];
-        alignas(32) float edgePointA_zs[12];
-        alignas(32) float edgePointB_xs[12];
-        alignas(32) float edgePointB_ys[12];
-        alignas(32) float edgePointB_zs[12];
-        alignas(32) float planePointA_xs[12];
-        alignas(32) float planePointA_ys[12];
-        alignas(32) float planePointA_zs[12];
-        alignas(32) float planePointB_xs[12];
-        alignas(32) float planePointB_ys[12];
-        alignas(32) float planePointB_zs[12];
-        alignas(32) float planePointC_xs[12];
-        alignas(32) float planePointC_ys[12];
-        alignas(32) float planePointC_zs[12];
-        alignas(32) float planeDir_xs[12];
-        alignas(32) float planeDir_ys[12];
-        alignas(32) float planeDir_zs[12];
+        alignas(ALIGN) float edgePointA_xs[12];
+        alignas(ALIGN) float edgePointA_ys[12];
+        alignas(ALIGN) float edgePointA_zs[12];
+        alignas(ALIGN) float edgePointB_xs[12];
+        alignas(ALIGN) float edgePointB_ys[12];
+        alignas(ALIGN) float edgePointB_zs[12];
+        alignas(ALIGN) float planePointA_xs[12];
+        alignas(ALIGN) float planePointA_ys[12];
+        alignas(ALIGN) float planePointA_zs[12];
+        alignas(ALIGN) float planePointB_xs[12];
+        alignas(ALIGN) float planePointB_ys[12];
+        alignas(ALIGN) float planePointB_zs[12];
+        alignas(ALIGN) float planePointC_xs[12];
+        alignas(ALIGN) float planePointC_ys[12];
+        alignas(ALIGN) float planePointC_zs[12];
+        alignas(ALIGN) float planeDir_xs[12];
+        alignas(ALIGN) float planeDir_ys[12];
+        alignas(ALIGN) float planeDir_zs[12];
         // Output
-        alignas(32) bool foundIntersection[12];
-        alignas(32) float I_xs[12];
-        alignas(32) float I_ys[12];
-        alignas(32) float I_zs[12];
+        alignas(ALIGN) bool foundIntersection[12];
+        alignas(ALIGN) float I_xs[12];
+        alignas(ALIGN) float I_ys[12];
+        alignas(ALIGN) float I_zs[12];
 
         for (size_t f = 0; f < 6; f++) {
             const auto& face = faces[f];
@@ -255,6 +255,7 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
             }
 
 
+#if HAS_AVX
             edgeFaceIntersection8(
                 edgePointA_xs + 0, edgePointA_ys + 0, edgePointA_zs + 0,
                 edgePointB_xs + 0, edgePointB_ys + 0, edgePointB_zs + 0,
@@ -273,6 +274,37 @@ std::optional<HmlPhysics::Detection> HmlPhysics::detectOrientedBoxesWithSat(cons
                 planeDir_xs + 8, planeDir_ys + 8, planeDir_zs + 8,
                 foundIntersection + 8,
                 I_xs + 8, I_ys + 8, I_zs + 8);
+#elif HAS_SSE
+            edgeFaceIntersection4(
+                edgePointA_xs + 4, edgePointA_ys + 4, edgePointA_zs + 4,
+                edgePointB_xs + 4, edgePointB_ys + 4, edgePointB_zs + 4,
+                planePointA_xs + 4, planePointA_ys + 4, planePointA_zs + 4,
+                planePointB_xs + 4, planePointB_ys + 4, planePointB_zs + 4,
+                planePointC_xs + 4, planePointC_ys + 4, planePointC_zs + 4,
+                planeDir_xs + 4, planeDir_ys + 4, planeDir_zs + 4,
+                foundIntersection + 4,
+                I_xs + 4, I_ys + 4, I_zs + 4);
+            edgeFaceIntersection4(
+                edgePointA_xs + 8, edgePointA_ys + 8, edgePointA_zs + 8,
+                edgePointB_xs + 8, edgePointB_ys + 8, edgePointB_zs + 8,
+                planePointA_xs + 8, planePointA_ys + 8, planePointA_zs + 8,
+                planePointB_xs + 8, planePointB_ys + 8, planePointB_zs + 8,
+                planePointC_xs + 8, planePointC_ys + 8, planePointC_zs + 8,
+                planeDir_xs + 8, planeDir_ys + 8, planeDir_zs + 8,
+                foundIntersection + 8,
+                I_xs + 8, I_ys + 8, I_zs + 8);
+            edgeFaceIntersection4(
+                edgePointA_xs + 8, edgePointA_ys + 8, edgePointA_zs + 8,
+                edgePointB_xs + 8, edgePointB_ys + 8, edgePointB_zs + 8,
+                planePointA_xs + 8, planePointA_ys + 8, planePointA_zs + 8,
+                planePointB_xs + 8, planePointB_ys + 8, planePointB_zs + 8,
+                planePointC_xs + 8, planePointC_ys + 8, planePointC_zs + 8,
+                planeDir_xs + 8, planeDir_ys + 8, planeDir_zs + 8,
+                foundIntersection + 8,
+                I_xs + 8, I_ys + 8, I_zs + 8);
+#else
+            assert(false && "Calling an AVX method but not even SSE is enabled");
+#endif
 
             for (size_t e = 0; e < 12; e++) {
                 const glm::vec3 p{I_xs[e], I_ys[e], I_zs[e]};

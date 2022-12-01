@@ -6,34 +6,24 @@
 
 
 bool Himmel::init() noexcept {
-    const char* windowName = "Planes game";
+    if (!initContext()) return false;
 
-    hmlContext = std::make_shared<HmlContext>();
-    hmlContext->maxFramesInFlight = 3;
+    const char* heightmapFile = "../models/heightmap.png";
+    { // World
+        const auto worldHalfSize = 250.0f;
+        const auto worldStart  = glm::vec2(-worldHalfSize, -worldHalfSize);
+        const auto worldFinish = glm::vec2( worldHalfSize,  worldHalfSize);
+        const auto worldHeight = 70.0f;
+        world = std::make_unique<World>(worldStart, worldFinish, worldHeight, heightmapFile);
+    }
 
-    hmlContext->hmlWindow = HmlWindow::create(1900, 1000, windowName);
-    if (!hmlContext->hmlWindow) return false;
-
-    hmlContext->hmlDevice = HmlDevice::create(hmlContext->hmlWindow);
-    if (!hmlContext->hmlDevice) return false;
-
-    hmlContext->hmlDescriptors = HmlDescriptors::create(hmlContext->hmlDevice);
-    if (!hmlContext->hmlDescriptors) return false;
-
-    hmlContext->hmlCommands = HmlCommands::create(hmlContext->hmlDevice);
-    if (!hmlContext->hmlCommands) return false;
-
-    hmlContext->hmlResourceManager = HmlResourceManager::create(hmlContext->hmlDevice, hmlContext->hmlCommands);
-    if (!hmlContext->hmlResourceManager) return false;
-
-    hmlContext->hmlSwapchain = HmlSwapchain::create(hmlContext->hmlWindow, hmlContext->hmlDevice, hmlContext->hmlResourceManager, std::nullopt);
-    if (!hmlContext->hmlSwapchain) return false;
-
-    hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, 2 * hmlContext->imageCount());
-    if (!hmlContext->hmlQueries) return false;
-
-    hmlContext->hmlImgui = HmlImgui::create(hmlContext->hmlWindow, hmlContext->hmlResourceManager, hmlContext->maxFramesInFlight);
-    if (!hmlContext->hmlImgui) return false;
+    { // Car
+        const float carX = 0.0f;
+        const float carZ = 0.0f;
+        const auto carPos = glm::vec3{carX, world->heightAt({ carX, carZ }), carZ};
+        const auto carSizeScaler = 2.5f;
+        car = std::make_shared<Car>(carPos, carSizeScaler);
+    }
 
 
     for (size_t i = 0; i < hmlContext->imageCount(); i++) {
@@ -87,6 +77,7 @@ bool Himmel::init() noexcept {
     }
 
 
+    // ================ Weather
     weather = Weather{
 #if 1
         // Night (no fog):
@@ -100,6 +91,65 @@ bool Himmel::init() noexcept {
     };
 
 
+    if (!initRenderers(heightmapFile)) return false;
+
+
+    // ================ Camera
+    hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 91.5, 50 });
+    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(0, 0);
+    // hmlCamera = std::make_unique<HmlCameraFollow>(100);
+    // dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
+    // dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->target(car);
+
+    proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
+
+    if (!initLights()) return false;
+    if (!initModels()) return false;
+    if (!initPhysics()) return false;
+    if (!initEntities()) return false; // NOTE must be after Physics because is expected to set the last entity
+
+    if (!prepareResources()) return false;
+
+    successfulInit = true;
+    return true;
+}
+
+
+bool Himmel::initContext() noexcept {
+    const char* windowName = "Planes game";
+
+    hmlContext = std::make_shared<HmlContext>();
+    hmlContext->maxFramesInFlight = 3;
+
+    hmlContext->hmlWindow = HmlWindow::create(1900, 1000, windowName);
+    if (!hmlContext->hmlWindow) return false;
+
+    hmlContext->hmlDevice = HmlDevice::create(hmlContext->hmlWindow);
+    if (!hmlContext->hmlDevice) return false;
+
+    hmlContext->hmlDescriptors = HmlDescriptors::create(hmlContext->hmlDevice);
+    if (!hmlContext->hmlDescriptors) return false;
+
+    hmlContext->hmlCommands = HmlCommands::create(hmlContext->hmlDevice);
+    if (!hmlContext->hmlCommands) return false;
+
+    hmlContext->hmlResourceManager = HmlResourceManager::create(hmlContext->hmlDevice, hmlContext->hmlCommands);
+    if (!hmlContext->hmlResourceManager) return false;
+
+    hmlContext->hmlSwapchain = HmlSwapchain::create(hmlContext->hmlWindow, hmlContext->hmlDevice, hmlContext->hmlResourceManager, std::nullopt);
+    if (!hmlContext->hmlSwapchain) return false;
+
+    hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, 2 * hmlContext->imageCount());
+    if (!hmlContext->hmlQueries) return false;
+
+    hmlContext->hmlImgui = HmlImgui::create(hmlContext->hmlWindow, hmlContext->hmlResourceManager, hmlContext->maxFramesInFlight);
+    if (!hmlContext->hmlImgui) return false;
+
+    return true;
+}
+
+
+bool Himmel::initRenderers(const char* heightmapFile) noexcept {
     hmlRenderer = HmlRenderer::create(hmlContext, generalDescriptorSetLayout);
     if (!hmlRenderer) return false;
 
@@ -118,25 +168,6 @@ bool Himmel::init() noexcept {
     // NOTE specify buffers explicitly, even though we have context already, to highlight this dependency
     hmlImguiRenderer = HmlImguiRenderer::create(hmlContext->hmlImgui->vertexBuffers, hmlContext->hmlImgui->indexBuffers, hmlContext);
     if (!hmlImguiRenderer) return false;
-
-
-    const char* heightmapFile = "../models/heightmap.png";
-    {
-        const auto worldHalfSize = 250.0f;
-        const auto worldStart  = glm::vec2(-worldHalfSize, -worldHalfSize);
-        const auto worldFinish = glm::vec2( worldHalfSize,  worldHalfSize);
-        const auto worldHeight = 70.0f;
-        world = std::make_unique<World>(worldStart, worldFinish, worldHeight, heightmapFile);
-    }
-
-
-    {
-        const float carX = 0.0f;
-        const float carZ = 0.0f;
-        const auto carPos = glm::vec3{carX, world->heightAt({ carX, carZ }), carZ};
-        const auto carSizeScaler = 2.5f;
-        car = std::make_shared<Car>(carPos, carSizeScaler);
-    }
 
 
 #if SNOW_IS_ON
@@ -159,7 +190,145 @@ bool Himmel::init() noexcept {
         terrainBounds, hmlContext, generalDescriptorSetLayout);
     if (!hmlTerrainRenderer) return false;
 
+    hmlLightRenderer = HmlLightRenderer::create(hmlContext, generalDescriptorSetLayout, generalDescriptorSet_0_perImage);
+    if (!hmlLightRenderer) return false;
 
+    return true;
+}
+
+
+bool Himmel::initEntities() noexcept {
+    { // Arbitrary Entities
+        // PHONY with a texture
+        {
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.phony));
+            auto modelMatrix = glm::mat4(1.0f);
+            modelMatrix = glm::translate(modelMatrix, { 0.0f, 50.0f, -200.0f });
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(150.0f));
+            modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 0.0, 1.0));
+            entities.back()->modelMatrix = modelMatrix;
+        }
+        { // back side
+            entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.phony));
+            auto modelMatrix = glm::mat4(1.0f);
+            modelMatrix = glm::translate(modelMatrix, { 0.0f, 50.0f, -200.0f - 0.001f });
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(150.0f));
+            modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 0.0, 1.0));
+            modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 1.0, 0.0));
+            entities.back()->modelMatrix = modelMatrix;
+        }
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.plane, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 30.0f});
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.plane, glm::vec3{ 0.8f, 0.2f, 0.5f }));
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 60.0f});
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.plane, glm::vec3{ 0.2f, 0.2f, 0.9f }));
+        entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 90.0f});
+
+        // Flat surface with a tree
+        // { // #1
+        //     entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.flat, glm::vec3{ 0.0f, 0.0f, 0.0f }));
+        //     auto modelMatrix = glm::mat4(1.0f);
+        //     modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f, 0.0f });
+        //     modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
+        //     modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f + 180.0f), glm::vec3(1, 0, 0));
+        //     entities.back()->modelMatrix = modelMatrix;
+        // }
+        // { // #1 back side
+        //     entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.flat, glm::vec3{ 0.0f, 0.0f, 0.0f }));
+        //     auto modelMatrix = glm::mat4(1.0f);
+        //     modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f - 0.001f, 0.0f });
+        //     modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
+        //     modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(1, 0, 0));
+        //     entities.back()->modelMatrix = modelMatrix;
+        // }
+        // { // $2
+        //     entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.flat, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+        //     auto modelMatrix = glm::mat4(1.0f);
+        //     modelMatrix = glm::translate(modelMatrix, { 0.0f, 60.0f, -20.0f });
+        //     modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
+        //     // modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(0, 0, 1));
+        //     entities.back()->modelMatrix = modelMatrix;
+        // }
+        // { // $2 back side
+        //     entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.flat, glm::vec3{ 1.0f, 1.0f, 1.0f }));
+        //     auto modelMatrix = glm::mat4(1.0f);
+        //     modelMatrix = glm::translate(modelMatrix, { 0.0f, 60.0f, -20.0f - 0.001f });
+        //     modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
+        //     modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(1, 0, 0));
+        //     entities.back()->modelMatrix = modelMatrix;
+        // }
+        // {
+        //     entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.tree2));
+        //     const auto pos = glm::vec3{ 0, 40, 0 };
+        //     const float scale = 7.0f;
+        //     auto modelMatrix = glm::mat4(1.0f);
+        //     modelMatrix = glm::translate(modelMatrix, pos);
+        //     modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
+        //     entities.back()->modelMatrix = std::move(modelMatrix);
+        // }
+        // entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.viking));
+        // entities.back()->modelMatrix = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0, 10.0, 10.0)), glm::vec3{40.0f, 30.0f, 70.0f});
+
+#if 0
+        { // Test comparing to static Entities
+            // NOTE We don't need the Color component of Entity
+            const size_t amount = 500;
+            for (size_t i = 0; i < amount; i++) {
+                // TODO utilize world height access
+                const auto pos = glm::vec3{
+                    hml::getRandomUniformFloat(world->start.x, world->finish.x),
+                    60.0f,
+                    hml::getRandomUniformFloat(world->start.y, world->finish.y),
+                };
+                const float scale = 10.0f;
+                auto modelMatrix = glm::mat4(1.0f);
+                modelMatrix = glm::translate(modelMatrix, pos);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
+                modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+
+                entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.tree));
+                entities.back()->modelMatrix = modelMatrix;
+            }
+        }
+#endif
+
+        // XXX We rely on it being last in update() XXX
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.car, glm::vec3{ 0.2f, 0.7f, 0.4f }));
+        entities.back()->modelMatrix = car->getModelMatrix();
+
+
+        hmlRenderer->specifyEntitiesToRender(entities);
+    }
+
+    { // Static Entities
+        // NOTE We don't need the Color component of Entity
+        const size_t amount = 1000;
+        staticEntities.reserve(amount);
+        for (size_t i = 0; i < amount; i++) {
+            const auto x = hml::getRandomUniformFloat(world->start.x, world->finish.x);
+            const auto z = hml::getRandomUniformFloat(world->start.y, world->finish.y);
+            const auto y = world->heightAt({ x, z });
+            const auto pos = glm::vec3{ x, y, z };
+            const float scale = 7.0f;
+            auto modelMatrix = glm::mat4(1.0f);
+            modelMatrix = glm::translate(modelMatrix, pos);
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
+            // modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+
+            staticEntities.emplace_back((i % 2) ? modelStorage.tree1 : modelStorage.tree2, modelMatrix);
+        }
+
+        hmlRenderer->specifyStaticEntitiesToRender(staticEntities);
+    }
+
+    return true;
+}
+
+
+bool Himmel::initLights() noexcept {
     // Add lights
     const float LIGHT_RADIUS = 2.0f;
     const size_t lightsCount = 2;
@@ -212,540 +381,361 @@ bool Himmel::init() noexcept {
         });
     }
 
-    hmlLightRenderer = HmlLightRenderer::create(hmlContext, generalDescriptorSetLayout, generalDescriptorSet_0_perImage);
-    if (!hmlLightRenderer) return false;
     hmlLightRenderer->specify(pointLightsStatic.size() + pointLightsDynamic.size());
 
-
-    // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 205.0f, 135.0f, 215.0f });
-    hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 91.5, 50 });
-    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(0, 0);
-    // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 70, 0 });
-    // dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-25.0f, 210.0f);
-    // hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 0, 180, 0 });
-    // dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->rotateDir(-89.0f, 0.0f);
-    // hmlCamera = std::make_unique<HmlCameraFollow>(100);
-    // dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->rotateDir(-28.0f, 307.0f);
-    // dynamic_cast<HmlCameraFollow*>(hmlCamera.get())->target(car);
-
-    proj = projFrom(hmlContext->hmlSwapchain->extentAspect());
-
-
-    {
-        { // 2D plane of a girl picture
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, -0.5f, 0.0f},
-                .texCoord = {1.0f, 0.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, -0.5f, 0.0f},
-                .texCoord = {0.0f, 0.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, 0.5f, 0.0f},
-                .texCoord = {0.0f, 1.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, 0.5f, 0.0f},
-                .texCoord = {1.0f, 1.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-
-            std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/girl.png", VK_FILTER_LINEAR);
-            models.push_back(model);
-        }
-
-        { // Just a 2D plane
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, -0.5f, 0.0f},
-                .texCoord = {1.0f, 0.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, -0.5f, 0.0f},
-                .texCoord = {0.0f, 0.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {0.5f, 0.5f, 0.0f},
-                .texCoord = {0.0f, 1.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-            vertices.push_back(HmlSimpleModel::Vertex{
-                .pos = {-0.5f, 0.5f, 0.0f},
-                .texCoord = {1.0f, 1.0f},
-                .normal = {0.0f, 0.0f, 1.0f},
-            });
-
-            std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
-            models.push_back(model);
-        }
-
-        { // A viking kitchen box
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/viking_room.obj", vertices, indices)) return false;
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
-            // const auto model = hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
-            models.push_back(model);
-        }
-
-        { // Plane
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/plane.obj", vertices, indices)) return false;
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
-            models.push_back(model);
-        }
-
-        { // Car
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/my_car.obj", vertices, indices)) return false;
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
-            models.push_back(model);
-        }
-
-        { // Tree#1
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/tree/basic_tree.obj", vertices, indices)) return false;
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/tree/basic_tree.png", VK_FILTER_LINEAR);
-            models.push_back(model);
-        }
-        { // Tree#2
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/tree/basic_tree_2.obj", vertices, indices)) return false;
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/tree/basic_tree_2.png", VK_FILTER_LINEAR);
-            models.push_back(model);
-        }
-
-        { // Sphere
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/isosphere.obj", vertices, indices)) return false;
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
-            models.push_back(model);
-        }
-
-        { // Cube
-            std::vector<HmlSimpleModel::Vertex> vertices;
-            std::vector<uint32_t> indices;
-            if (!HmlSimpleModel::load("../models/cube.obj", vertices, indices)) return false;
-
-            const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
-            const auto model = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
-            models.push_back(model);
-        }
-
-        const auto& phonyModel = models[0];
-        // const auto& flatModel = models[1];
-        // const auto& vikingModel = models[2];
-        const auto& planeModel = models[3];
-        const auto& carModel = models[4];
-        const auto& treeModel = models[5];
-        const auto& treeModel2 = models[6];
-        const auto& sphereModel = models[7];
-        const auto& cubeModel = models[8];
-
-
-        // Add Entities
-
-        { // Physics Entities
-
-            // const auto ss = HmlPhysics::Object::createSphere(glm::vec3{2, 2, 0.1}, 1).asSphere();
-            // const auto bb = HmlPhysics::Object::createBox(glm::vec3{1, 3, 5}, glm::vec3{1, 3, 5}).asBox();
-            // const auto opt = HmlPhysics::interact(ss, bb);
-            // if (opt) {
-            //     std::cout << opt->first.x << " " << opt->first.y << " " << opt->first.z << "    " << opt->second << '\n';
-            // } else {
-            //     std::cout << "NOTHIN" << '\n';
-            // }
-
-            hmlPhysics = std::make_unique<HmlPhysics>();
-            const float halfSide = 50.0f;
-            const float baseHeight = 50.0f;
-            const float halfHeight = halfSide;
-#define WITH_WALLS 1
-#if WITH_WALLS
-            const float wallThickness = 2.0f;
-            // const float halfHeight = 10.0f;
-            { // Bottom
-                auto object = HmlPhysics::Object::createBox({ 0, baseHeight, 0 }, { halfSide, wallThickness, halfSide });
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.7f, 1.0f, 0.7f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-            { // Up
-                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 2 * halfHeight, 0 }, { halfSide, wallThickness, halfSide });
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.8f, 0.8f, 0.8f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-            { // Far
-                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + halfHeight, -halfSide }, { halfSide, halfHeight, wallThickness });
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.7f, 0.7f, 1.0f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-            { // Left
-                auto object = HmlPhysics::Object::createBox({ -halfSide, baseHeight + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 1.0f, 0.7f, 0.7f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-            { // Right
-                auto object = HmlPhysics::Object::createBox({ +halfSide, baseHeight + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.8f, 0.8f, 0.8f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-            { // Near
-                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + halfHeight, +halfSide }, { halfSide, halfHeight, wallThickness });
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.8f, 0.8f, 0.8f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-#endif
-
-#if 1
-            { // Platform
-                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 0.8f*halfHeight, 0 },
-                        { 0.35f*halfSide, 0.6f*wallThickness, 0.35f*halfSide });
-                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.2f, glm::vec3(0,0,1));
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.1f, 0.1f, 0.1f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-#endif
-
-
-            const float density = 4.0f;
-            const size_t boxesCount = 30;
-            const size_t spheresCount = 30;
-            const float maxSpeed = 7.0f;
-            for (size_t i = 0; i < boxesCount; i++) {
-                const auto pos = glm::vec3{
-                    hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
-                    baseHeight + 1.3f * halfHeight,
-                    // hml::getRandomUniformFloat(55, 65),
-                    hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
-                };
-                const auto velocity = glm::vec3{
-                    hml::getRandomUniformFloat(-maxSpeed, maxSpeed),
-                    0.0f,
-                    hml::getRandomUniformFloat(-maxSpeed, maxSpeed)
-                };
-                const auto color = glm::vec3{
-                    hml::getRandomUniformFloat(0.0f, 1.0f),
-                    hml::getRandomUniformFloat(0.0f, 1.0f),
-                    hml::getRandomUniformFloat(0.0f, 1.0f)
-                };
-                const auto halfDimensions = glm::vec3{
-                    hml::getRandomUniformFloat(0.4f, 2.0f),
-                    // hml::getRandomUniformFloat(0.2f, 2.0f),
-                    2.0f,
-                    hml::getRandomUniformFloat(0.4f, 2.0f)
-                };
-
-                const float volume = 8 * halfDimensions.x * halfDimensions.y * halfDimensions.z;
-                const float mass = volume * density;
-                auto object = HmlPhysics::Object::createBox(pos, halfDimensions, mass, velocity, glm::vec3{0,0,0});
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, color));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-            for (size_t i = 0; i < spheresCount; i++) {
-                const auto pos = glm::vec3{
-                    hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
-                    baseHeight + 1.3f * halfHeight,
-                    // hml::getRandomUniformFloat(55, 65),
-                    hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
-                };
-                const auto velocity = glm::vec3{
-                    hml::getRandomUniformFloat(-maxSpeed, maxSpeed),
-                    0.0f,
-                    hml::getRandomUniformFloat(-maxSpeed, maxSpeed)
-                };
-                const auto color = glm::vec3{
-                    hml::getRandomUniformFloat(0.0f, 1.0f),
-                    hml::getRandomUniformFloat(0.0f, 1.0f),
-                    hml::getRandomUniformFloat(0.0f, 1.0f)
-                };
-
-                const float radius = hml::getRandomUniformFloat(0.4f, 2.0f);
-                const float volume = 4.0f / 3.0f * glm::pi<float>() * radius * radius * radius;
-                const float mass = volume * density;
-                auto object = HmlPhysics::Object::createSphere(pos, radius, mass, velocity, glm::vec3{});
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, color));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-            // {
-            //     const float m = 5.0f;
-            //     auto object = HmlPhysics::Object::createSphere({20,60,10}, m);
-            //     object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, { 1, 0, 0 }) };
-            //     const auto& s = object.asSphere();
-            //
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, glm::vec3{ 0.8f, 0.8f, 0.3f}));
-            //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, s.center);
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
-            //     entities.back()->modelMatrix = modelMatrix;
-            //
-            //     const auto id = hmlPhysics->registerObject(std::move(object));
-            //     physicsIdToEntity[id] = entities.back();
-            // }
-            // {
-            //     const float m = 1.0f;
-            //     auto object = HmlPhysics::Object::createSphere({40,60,20}, m);
-            //     object.dynamicProperties = { HmlPhysics::Object::DynamicProperties(m, { -11, 0, 4 }) };
-            //     const auto& s = object.asSphere();
-            //
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(sphereModel, glm::vec3{ 0.8f, 0.2f, 0.5f}));
-            //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, s.center);
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
-            //     entities.back()->modelMatrix = modelMatrix;
-            //
-            //     const auto id = hmlPhysics->registerObject(std::move(object));
-            //     physicsIdToEntity[id] = entities.back();
-            // }
-#if 0
-            { // Dyn wall 1
-                auto object = HmlPhysics::Object::createBox(
-                    { 5, baseHeight + 1.2f * halfHeight, 0 }, { 0.8f, 4, 0.8f }, 6, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
-                object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.5f, glm::vec3(0,0,1));
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.9f, 0.9f, 0.9f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-                debugId = id;
-            }
-            // { // Dyn wall 2
-            //     const float halfHeight = 2.0f;
-            //     auto object = HmlPhysics::Object::createBox({ -10, 59, 25 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
-            //     // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 0.3f, glm::vec3(1,0,0));
-            //
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.6f, 1.0f, 0.6f}));
-            //     entities.back()->modelMatrix = object.modelMatrix();
-            //
-            //     const auto id = hmlPhysics->registerObject(std::move(object));
-            //     physicsIdToEntity[id] = entities.back();
-            // }
-#endif
-#if 0
-            { // Dyn wall 3
-                const float halfHeight = 4.0f;
-                auto object = HmlPhysics::Object::createBox({ -6.5f, 61, 5.7f }, { 1, halfHeight, 1 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
-                // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(0,1,0));
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.9f, 0.9f, 0.9f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-            { // Dyn wall 4
-                const float halfHeight = 2.0f;
-                auto object = HmlPhysics::Object::createBox({ -10, 60, 10 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 8 }, glm::vec3{0,1,0});
-                // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(1,0,0));
-
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.6f, 1.0f, 0.6f}));
-                entities.back()->modelMatrix = object.modelMatrix();
-
-                const auto id = hmlPhysics->registerObject(std::move(object));
-                physicsIdToEntity[id] = entities.back();
-            }
-#endif
-        }
-
-        { // Arbitrary Entities
-            // PHONY with a texture
-            {
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
-                auto modelMatrix = glm::mat4(1.0f);
-                modelMatrix = glm::translate(modelMatrix, { 0.0f, 50.0f, -200.0f });
-                modelMatrix = glm::scale(modelMatrix, glm::vec3(150.0f));
-                modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 0.0, 1.0));
-                entities.back()->modelMatrix = modelMatrix;
-            }
-            { // back side
-                entities.push_back(std::make_shared<HmlRenderer::Entity>(phonyModel));
-                auto modelMatrix = glm::mat4(1.0f);
-                modelMatrix = glm::translate(modelMatrix, { 0.0f, 50.0f, -200.0f - 0.001f });
-                modelMatrix = glm::scale(modelMatrix, glm::vec3(150.0f));
-                modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 0.0, 1.0));
-                modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0, 1.0, 0.0));
-                entities.back()->modelMatrix = modelMatrix;
-            }
-
-            entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
-            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 35.0f, 30.0f});
-
-            entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.8f, 0.2f, 0.5f }));
-            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 60.0f});
-
-            entities.push_back(std::make_shared<HmlRenderer::Entity>(planeModel, glm::vec3{ 0.2f, 0.2f, 0.9f }));
-            entities.back()->modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3{0.0f, 45.0f, 90.0f});
-
-            // Flat surface with a tree
-            // { // #1
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 0.0f, 0.0f, 0.0f }));
-            //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f, 0.0f });
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
-            //     modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f + 180.0f), glm::vec3(1, 0, 0));
-            //     entities.back()->modelMatrix = modelMatrix;
-            // }
-            // { // #1 back side
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 0.0f, 0.0f, 0.0f }));
-            //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, { 0.0f, 40.0f - 0.001f, 0.0f });
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
-            //     modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(1, 0, 0));
-            //     entities.back()->modelMatrix = modelMatrix;
-            // }
-            // { // $2
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
-            //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, { 0.0f, 60.0f, -20.0f });
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
-            //     // modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(0, 0, 1));
-            //     entities.back()->modelMatrix = modelMatrix;
-            // }
-            // { // $2 back side
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(flatModel, glm::vec3{ 1.0f, 1.0f, 1.0f }));
-            //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, { 0.0f, 60.0f, -20.0f - 0.001f });
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(40.0f));
-            //     modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(1, 0, 0));
-            //     entities.back()->modelMatrix = modelMatrix;
-            // }
-            // {
-            //     entities.push_back(std::make_shared<HmlRenderer::Entity>(treeModel2));
-            //     const auto pos = glm::vec3{ 0, 40, 0 };
-            //     const float scale = 7.0f;
-            //     auto modelMatrix = glm::mat4(1.0f);
-            //     modelMatrix = glm::translate(modelMatrix, pos);
-            //     modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
-            //     entities.back()->modelMatrix = std::move(modelMatrix);
-            // }
-            // entities.push_back(std::make_shared<HmlRenderer::Entity>(vikingModel));
-            // entities.back()->modelMatrix = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0, 10.0, 10.0)), glm::vec3{40.0f, 30.0f, 70.0f});
-
-#if 0
-            { // Test comparing to static Entities
-                // NOTE We don't need the Color component of Entity
-                const size_t amount = 500;
-                for (size_t i = 0; i < amount; i++) {
-                    // TODO utilize world height access
-                    const auto pos = glm::vec3{
-                        hml::getRandomUniformFloat(world->start.x, world->finish.x),
-                        60.0f,
-                        hml::getRandomUniformFloat(world->start.y, world->finish.y),
-                    };
-                    const float scale = 10.0f;
-                    auto modelMatrix = glm::mat4(1.0f);
-                    modelMatrix = glm::translate(modelMatrix, pos);
-                    modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
-                    modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
-
-                    entities.push_back(std::make_shared<HmlRenderer::Entity>(treeModel));
-                    entities.back()->modelMatrix = modelMatrix;
-                }
-            }
-#endif
-
-            // XXX We rely on it being last in update() XXX
-            entities.push_back(std::make_shared<HmlRenderer::Entity>(carModel, glm::vec3{ 0.2f, 0.7f, 0.4f }));
-            entities.back()->modelMatrix = car->getModelMatrix();
-
-
-            hmlRenderer->specifyEntitiesToRender(entities);
-        }
-
-        { // Static Entities
-            // NOTE We don't need the Color component of Entity
-            const size_t amount = 1000;
-            staticEntities.reserve(amount);
-            for (size_t i = 0; i < amount; i++) {
-                const auto x = hml::getRandomUniformFloat(world->start.x, world->finish.x);
-                const auto z = hml::getRandomUniformFloat(world->start.y, world->finish.y);
-                const auto y = world->heightAt({ x, z });
-                const auto pos = glm::vec3{ x, y, z };
-                const float scale = 7.0f;
-                auto modelMatrix = glm::mat4(1.0f);
-                modelMatrix = glm::translate(modelMatrix, pos);
-                modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
-                // modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
-
-                staticEntities.emplace_back((i % 2) ? treeModel : treeModel2, modelMatrix);
-            }
-
-            hmlRenderer->specifyStaticEntitiesToRender(staticEntities);
-        }
+    return true;
+}
+
+
+bool Himmel::initModels() noexcept {
+    { // 2D plane of a girl picture
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        vertices.push_back(HmlSimpleModel::Vertex{
+            .pos = {-0.5f, -0.5f, 0.0f},
+            .texCoord = {1.0f, 0.0f},
+            .normal = {0.0f, 0.0f, 1.0f},
+        });
+        vertices.push_back(HmlSimpleModel::Vertex{
+            .pos = {0.5f, -0.5f, 0.0f},
+            .texCoord = {0.0f, 0.0f},
+            .normal = {0.0f, 0.0f, 1.0f},
+        });
+        vertices.push_back(HmlSimpleModel::Vertex{
+            .pos = {0.5f, 0.5f, 0.0f},
+            .texCoord = {0.0f, 1.0f},
+            .normal = {0.0f, 0.0f, 1.0f},
+        });
+        vertices.push_back(HmlSimpleModel::Vertex{
+            .pos = {-0.5f, 0.5f, 0.0f},
+            .texCoord = {1.0f, 1.0f},
+            .normal = {0.0f, 0.0f, 1.0f},
+        });
+
+        std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.phony = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/girl.png", VK_FILTER_LINEAR);
     }
 
+    { // Just a 2D plane
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        vertices.push_back(HmlSimpleModel::Vertex{
+            .pos = {-0.5f, -0.5f, 0.0f},
+            .texCoord = {1.0f, 0.0f},
+            .normal = {0.0f, 0.0f, 1.0f},
+        });
+        vertices.push_back(HmlSimpleModel::Vertex{
+            .pos = {0.5f, -0.5f, 0.0f},
+            .texCoord = {0.0f, 0.0f},
+            .normal = {0.0f, 0.0f, 1.0f},
+        });
+        vertices.push_back(HmlSimpleModel::Vertex{
+            .pos = {0.5f, 0.5f, 0.0f},
+            .texCoord = {0.0f, 1.0f},
+            .normal = {0.0f, 0.0f, 1.0f},
+        });
+        vertices.push_back(HmlSimpleModel::Vertex{
+            .pos = {-0.5f, 0.5f, 0.0f},
+            .texCoord = {1.0f, 1.0f},
+            .normal = {0.0f, 0.0f, 1.0f},
+        });
 
-    if (!prepareResources()) return false;
+        std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.flat = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+    }
 
+    { // A viking kitchen box
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        std::vector<uint32_t> indices;
+        if (!HmlSimpleModel::load("../models/viking_room.obj", vertices, indices)) return false;
 
-    successfulInit = true;
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.viking = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/viking_room.png", VK_FILTER_LINEAR);
+    }
+
+    { // Plane
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        std::vector<uint32_t> indices;
+        if (!HmlSimpleModel::load("../models/plane.obj", vertices, indices)) return false;
+
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.plane = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+    }
+
+    { // Car
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        std::vector<uint32_t> indices;
+        if (!HmlSimpleModel::load("../models/my_car.obj", vertices, indices)) return false;
+
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.car = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+    }
+
+    { // Tree#1
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        std::vector<uint32_t> indices;
+        if (!HmlSimpleModel::load("../models/tree/basic_tree.obj", vertices, indices)) return false;
+
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.tree1 = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/tree/basic_tree.png", VK_FILTER_LINEAR);
+    }
+    { // Tree#2
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        std::vector<uint32_t> indices;
+        if (!HmlSimpleModel::load("../models/tree/basic_tree_2.obj", vertices, indices)) return false;
+
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.tree2 = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices, "../models/tree/basic_tree_2.png", VK_FILTER_LINEAR);
+    }
+
+    { // Sphere
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        std::vector<uint32_t> indices;
+        if (!HmlSimpleModel::load("../models/isosphere.obj", vertices, indices)) return false;
+
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.sphere = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+    }
+
+    { // Cube
+        std::vector<HmlSimpleModel::Vertex> vertices;
+        std::vector<uint32_t> indices;
+        if (!HmlSimpleModel::load("../models/cube.obj", vertices, indices)) return false;
+
+        const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
+        modelStorage.cube = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+    }
+
     return true;
+}
+
+
+bool Himmel::initPhysics() noexcept {
+    hmlPhysics = std::make_unique<HmlPhysics>();
+
+    initPhysicsTestbench();
+
+    return true;
+}
+
+
+void Himmel::initPhysicsTestbench() noexcept {
+    testbenchBoxWithObjects();
+}
+
+
+void Himmel::testbenchBoxWithObjects() noexcept {
+    const float halfSide = 50.0f;
+    const float baseHeight = 50.0f;
+    const float halfHeight = halfSide;
+    const float wallThickness = 2.0f;
+#if 1
+    { // Bottom
+        auto object = HmlPhysics::Object::createBox({ 0, baseHeight, 0 }, { halfSide, wallThickness, halfSide });
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.7f, 1.0f, 0.7f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+    { // Up
+        auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 2 * halfHeight, 0 }, { halfSide, wallThickness, halfSide });
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.8f, 0.8f, 0.8f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+    { // Far
+        auto object = HmlPhysics::Object::createBox({ 0, baseHeight + halfHeight, -halfSide }, { halfSide, halfHeight, wallThickness });
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.7f, 0.7f, 1.0f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+    { // Left
+        auto object = HmlPhysics::Object::createBox({ -halfSide, baseHeight + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 1.0f, 0.7f, 0.7f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+    { // Right
+        auto object = HmlPhysics::Object::createBox({ +halfSide, baseHeight + halfHeight, 0 }, { wallThickness, halfHeight, halfSide });
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.8f, 0.8f, 0.8f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+    { // Near
+        auto object = HmlPhysics::Object::createBox({ 0, baseHeight + halfHeight, +halfSide }, { halfSide, halfHeight, wallThickness });
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.8f, 0.8f, 0.8f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+#endif
+
+
+#if 1
+    { // Platform
+        auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 0.8f*halfHeight, 0 },
+                { 0.35f*halfSide, 0.6f*wallThickness, 0.35f*halfSide });
+        object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.2f, glm::vec3(0,0,1));
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.1f, 0.1f, 0.1f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+#endif
+
+
+    const float density = 4.0f;
+    const size_t boxesCount = 30;
+    const size_t spheresCount = 30;
+    const float maxSpeed = 7.0f;
+#if 1
+    for (size_t i = 0; i < boxesCount; i++) {
+        const auto pos = glm::vec3{
+            hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
+            baseHeight + 1.3f * halfHeight,
+            // hml::getRandomUniformFloat(55, 65),
+            hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
+        };
+        const auto velocity = glm::vec3{
+            hml::getRandomUniformFloat(-maxSpeed, maxSpeed),
+            0.0f,
+            hml::getRandomUniformFloat(-maxSpeed, maxSpeed)
+        };
+        const auto color = glm::vec3{
+            hml::getRandomUniformFloat(0.0f, 1.0f),
+            hml::getRandomUniformFloat(0.0f, 1.0f),
+            hml::getRandomUniformFloat(0.0f, 1.0f)
+        };
+        const auto halfDimensions = glm::vec3{
+            hml::getRandomUniformFloat(0.4f, 2.0f),
+            // hml::getRandomUniformFloat(0.2f, 2.0f),
+            2.0f,
+            hml::getRandomUniformFloat(0.4f, 2.0f)
+        };
+
+        const float volume = 8 * halfDimensions.x * halfDimensions.y * halfDimensions.z;
+        const float mass = volume * density;
+        auto object = HmlPhysics::Object::createBox(pos, halfDimensions, mass, velocity, glm::vec3{0,0,0});
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, color));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+#endif
+#if 1
+    for (size_t i = 0; i < spheresCount; i++) {
+        const auto pos = glm::vec3{
+            hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f),
+            baseHeight + 1.3f * halfHeight,
+            // hml::getRandomUniformFloat(55, 65),
+            hml::getRandomUniformFloat(-halfSide*0.8f, halfSide*0.8f)
+        };
+        const auto velocity = glm::vec3{
+            hml::getRandomUniformFloat(-maxSpeed, maxSpeed),
+            0.0f,
+            hml::getRandomUniformFloat(-maxSpeed, maxSpeed)
+        };
+        const auto color = glm::vec3{
+            hml::getRandomUniformFloat(0.0f, 1.0f),
+            hml::getRandomUniformFloat(0.0f, 1.0f),
+            hml::getRandomUniformFloat(0.0f, 1.0f)
+        };
+
+        const float radius = hml::getRandomUniformFloat(0.4f, 2.0f);
+        const float volume = 4.0f / 3.0f * glm::pi<float>() * radius * radius * radius;
+        const float mass = volume * density;
+        auto object = HmlPhysics::Object::createSphere(pos, radius, mass, velocity, glm::vec3{});
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.sphere, color));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+#endif
+}
+
+
+void Himmel::testbenchImpulse() noexcept {
+#if 0
+    { // Dyn wall 1
+        auto object = HmlPhysics::Object::createBox(
+            { 5, baseHeight + 1.2f * halfHeight, 0 }, { 0.8f, 4, 0.8f }, 6, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+        object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.5f, glm::vec3(0,0,1));
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.9f, 0.9f, 0.9f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+        debugId = id;
+    }
+    // { // Dyn wall 2
+    //     const float halfHeight = 2.0f;
+    //     auto object = HmlPhysics::Object::createBox({ -10, 59, 25 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+    //     // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 0.3f, glm::vec3(1,0,0));
+    //
+    //     entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.6f, 1.0f, 0.6f}));
+    //     entities.back()->modelMatrix = object.modelMatrix();
+    //
+    //     const auto id = hmlPhysics->registerObject(std::move(object));
+    //     physicsIdToEntity[id] = entities.back();
+    // }
+#endif
+#if 0
+    { // Dyn wall 3
+        const float halfHeight = 4.0f;
+        auto object = HmlPhysics::Object::createBox({ -6.5f, 61, 5.7f }, { 1, halfHeight, 1 }, 5, glm::vec3{ 0, 0, 0 }, glm::vec3{0,0,0});
+        // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(0,1,0));
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.9f, 0.9f, 0.9f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+    { // Dyn wall 4
+        const float halfHeight = 2.0f;
+        auto object = HmlPhysics::Object::createBox({ -10, 60, 10 }, { 6, halfHeight, 4 }, 5, glm::vec3{ 0, 0, 8 }, glm::vec3{0,1,0});
+        // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(1,0,0));
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.6f, 1.0f, 0.6f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+#endif
+}
+
+
+void Himmel::testbenchContactPoints() noexcept {
+
+}
+
+
+void Himmel::testbenchFriction() noexcept {
+
 }
 
 

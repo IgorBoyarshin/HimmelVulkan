@@ -278,7 +278,17 @@ struct Himmel {
 
 
     // NOTE Later it will probably be a hashmap from model name
-    std::vector<std::shared_ptr<HmlModelResource>> models;
+    struct ModelStorage {
+        std::shared_ptr<HmlModelResource> phony;
+        std::shared_ptr<HmlModelResource> flat;
+        std::shared_ptr<HmlModelResource> viking;
+        std::shared_ptr<HmlModelResource> plane;
+        std::shared_ptr<HmlModelResource> car;
+        std::shared_ptr<HmlModelResource> tree1;
+        std::shared_ptr<HmlModelResource> tree2;
+        std::shared_ptr<HmlModelResource> sphere;
+        std::shared_ptr<HmlModelResource> cube;
+    } modelStorage;
 
     std::vector<std::shared_ptr<HmlRenderer::Entity>> entities;
     // NOTE Since it's really a bad performance thing to have an array of pointers,
@@ -288,6 +298,17 @@ struct Himmel {
     bool successfulInit = false;
 
     bool init() noexcept;
+    bool initContext() noexcept;
+    bool initRenderers(const char* heightmapFile) noexcept;
+    bool initLights() noexcept;
+    bool initModels() noexcept;
+    bool initPhysics() noexcept;
+    bool initEntities() noexcept;
+    void initPhysicsTestbench() noexcept;
+    void testbenchBoxWithObjects() noexcept;
+    void testbenchImpulse() noexcept;
+    void testbenchContactPoints() noexcept;
+    void testbenchFriction() noexcept;
     bool run() noexcept;
     void updateForDt(float dt, float sinceStart) noexcept;
     void updateForImage(uint32_t imageIndex) noexcept;

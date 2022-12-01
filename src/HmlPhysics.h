@@ -345,77 +345,46 @@ struct HmlPhysics {
             const glm::vec3& linePoint1, const glm::vec3& linePoint2,
             const glm::vec3& planePoint, const glm::vec3& planeDir) noexcept;
     static bool pointInsideRect(const glm::vec3& P, const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) noexcept;
+    // ========================================================================
+    // ============== AVX/SSE
+    // ========================================================================
+    static void findContactPointsBoxes(
+        std::span<const glm::vec3> psFrom,
+        std::span<const glm::vec3> psOnto,
+        const Object::Box::OrientationData& orientationDataOnto,
+        std::vector<glm::vec3>& contactPoints) noexcept;
+    static void findContactPointsBoxesAvxCompact(
+        std::span<const glm::vec3> psFrom,
+        std::span<const glm::vec3> psOnto,
+        const Object::Box::OrientationData& orientationDataOnto,
+        std::vector<glm::vec3>& contactPoints) noexcept;
+    static void findContactPointsBoxesAvxFastest(
+        const std::array<glm::vec3, 2 * 8>& psPacked,
+        const std::array<Object::Box::OrientationData, 2>& orientationDataPacked,
+        std::vector<glm::vec3>& contactPoints) noexcept;
 
     static void edgeFaceIntersection6Comp(
-            const hml::vec3_256& edgePointA,
-            const hml::vec3_256& edgePointB,
-            const hml::vec3_256& planePointA,
-            const hml::vec3_256& planePointB,
-            const hml::vec3_256& planePointC,
-            const hml::vec3_256& planeDir,
-            bool foundIntersection_ptr[8],
-            float I_xs_ptr[8],
-            float I_ys_ptr[8],
-            float I_zs_ptr[8]
-            ) noexcept;
+        const hml::vec3_256& edgePointA,
+        const hml::vec3_256& edgePointB,
+        const hml::vec3_256& planePointA,
+        const hml::vec3_256& planePointB,
+        const hml::vec3_256& planePointC,
+        const hml::vec3_256& planeDir,
+        bool foundIntersection_ptr[8],
+        float I_xs_ptr[8],
+        float I_ys_ptr[8],
+        float I_zs_ptr[8]) noexcept;
     static void edgeFaceIntersection8vec3(
-            const hml::vec3_256& edgePointA,
-            const hml::vec3_256& edgePointB,
-            const hml::vec3_256& planePointA,
-            const hml::vec3_256& planePointB,
-            const hml::vec3_256& planePointC,
-            const hml::vec3_256& planeDir,
-            float foundIntersection_ptr[8],
-            float I_xs_ptr[8],
-            float I_ys_ptr[8],
-            float I_zs_ptr[8]
-            ) noexcept;
-    static void edgeFaceIntersection8(
-            const float edgePointA_xs_ptr[8],
-            const float edgePointA_ys_ptr[8],
-            const float edgePointA_zs_ptr[8],
-            const float edgePointB_xs_ptr[8],
-            const float edgePointB_ys_ptr[8],
-            const float edgePointB_zs_ptr[8],
-            const float planePointA_xs_ptr[8],
-            const float planePointA_ys_ptr[8],
-            const float planePointA_zs_ptr[8],
-            const float planePointB_xs_ptr[8],
-            const float planePointB_ys_ptr[8],
-            const float planePointB_zs_ptr[8],
-            const float planePointC_xs_ptr[8],
-            const float planePointC_ys_ptr[8],
-            const float planePointC_zs_ptr[8],
-            const float planeDir_xs_ptr[8],
-            const float planeDir_ys_ptr[8],
-            const float planeDir_zs_ptr[8],
-            bool foundIntersection_ptr[8],
-            float I_xs_ptr[8],
-            float I_ys_ptr[8],
-            float I_zs_ptr[8]) noexcept;
-    static void edgeFaceIntersection4(
-            const float edgePointA_xs_ptr[4],
-            const float edgePointA_ys_ptr[4],
-            const float edgePointA_zs_ptr[4],
-            const float edgePointB_xs_ptr[4],
-            const float edgePointB_ys_ptr[4],
-            const float edgePointB_zs_ptr[4],
-            const float planePointA_xs_ptr[4],
-            const float planePointA_ys_ptr[4],
-            const float planePointA_zs_ptr[4],
-            const float planePointB_xs_ptr[4],
-            const float planePointB_ys_ptr[4],
-            const float planePointB_zs_ptr[4],
-            const float planePointC_xs_ptr[4],
-            const float planePointC_ys_ptr[4],
-            const float planePointC_zs_ptr[4],
-            const float planeDir_xs_ptr[4],
-            const float planeDir_ys_ptr[4],
-            const float planeDir_zs_ptr[4],
-            bool foundIntersection_ptr[4],
-            float I_xs_ptr[4],
-            float I_ys_ptr[4],
-            float I_zs_ptr[4]) noexcept;
+        const hml::vec3_256& edgePointA,
+        const hml::vec3_256& edgePointB,
+        const hml::vec3_256& planePointA,
+        const hml::vec3_256& planePointB,
+        const hml::vec3_256& planePointC,
+        const hml::vec3_256& planeDir,
+        float foundIntersection_ptr[8],
+        float I_xs_ptr[8],
+        float I_ys_ptr[8],
+        float I_zs_ptr[8]) noexcept;
 };
 
 

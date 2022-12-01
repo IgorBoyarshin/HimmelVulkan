@@ -452,7 +452,8 @@ bool Himmel::init() noexcept {
 
 #if 1
             { // Platform
-                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 0.8f*halfHeight, 0 }, { 0.35f*halfSide, 0.6f*wallThickness, 0.35f*halfSide });
+                auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 0.8f*halfHeight, 0 },
+                        { 0.35f*halfSide, 0.6f*wallThickness, 0.35f*halfSide });
                 object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 2 * 0.2f, glm::vec3(0,0,1));
 
                 entities.push_back(std::make_shared<HmlRenderer::Entity>(cubeModel, glm::vec3{ 0.1f, 0.1f, 0.1f}));

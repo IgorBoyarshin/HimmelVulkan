@@ -168,6 +168,7 @@ struct HmlPhysics {
             OrientationData orientationDataNormalized() const noexcept;
             OrientationData orientationDataUnnormalized() const noexcept;
             std::array<glm::vec3, 8> toPoints() const noexcept;
+            void toPointsAt(float* ptr) const noexcept;
             AABB aabb() const noexcept;
             glm::mat3 rotationalInertiaTensor(float mass) const noexcept;
 
@@ -353,6 +354,18 @@ struct HmlPhysics {
             const hml::vec3_256& planePointC,
             const hml::vec3_256& planeDir,
             bool foundIntersection_ptr[8],
+            float I_xs_ptr[8],
+            float I_ys_ptr[8],
+            float I_zs_ptr[8]
+            ) noexcept;
+    static void edgeFaceIntersection8vec3(
+            const hml::vec3_256& edgePointA,
+            const hml::vec3_256& edgePointB,
+            const hml::vec3_256& planePointA,
+            const hml::vec3_256& planePointB,
+            const hml::vec3_256& planePointC,
+            const hml::vec3_256& planeDir,
+            float foundIntersection_ptr[8],
             float I_xs_ptr[8],
             float I_ys_ptr[8],
             float I_zs_ptr[8]

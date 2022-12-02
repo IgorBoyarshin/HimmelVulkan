@@ -1,6 +1,17 @@
 #include "HmlCamera.h"
 
 
+void HmlCameraFreeFly::setDir(float newPitch, float newYaw) noexcept {
+    rotateDir(-pitch + newPitch, -yaw + newYaw);
+}
+
+
+void HmlCameraFreeFly::setPos(const glm::vec3& newPos) noexcept {
+    pos = newPos;
+    cachedView = std::nullopt;
+}
+
+
 void HmlCameraFreeFly::rotateDir(float dPitch, float dYaw) noexcept {
     static const float MIN_PITCH = -89.9f;
     static const float MAX_PITCH = +89.9f;

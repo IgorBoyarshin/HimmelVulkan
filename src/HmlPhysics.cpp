@@ -275,6 +275,10 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
     const float j = nom / denom;
     const auto impulse = j * dir;
 
+    const float frictionCoeff = 50.0f;
+    glm::vec3 friction = frictionCoeff * extent * glm::normalize(relativeV);
+    friction = glm::vec3{0};
+
     // std::cout << "Impulse = " << impulse << '\n';
     // std::cout << "Dir = " << dir << " J = " << j << " denom = " << denom << " nom = " << nom << std::endl;
     // std::cout << "RAP = " << rap << " RBP = " << rbp << " a = " << a << " b = " << b << std::endl;
@@ -308,14 +312,14 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
             .idOther         = obj2.id,
             .position        = - positionAdjustment,
             .velocity        = - impulse * obj1DP.invMass,
-            .angularMomentum = - glm::cross(rap, impulse) * obj1DP.invRotationalInertiaTensor,
+            .angularMomentum = - glm::cross(rap, impulse - friction) * obj1DP.invRotationalInertiaTensor,
         },
         obj2.isStationary() ? ObjectAdjustment{} : ObjectAdjustment{
             .id              = obj2.id,
             .idOther         = obj1.id,
             .position        = + positionAdjustment,
             .velocity        = + impulse * obj2DP.invMass,
-            .angularMomentum = + glm::cross(rbp, impulse) * obj2DP.invRotationalInertiaTensor,
+            .angularMomentum = + glm::cross(rbp, impulse - friction) * obj2DP.invRotationalInertiaTensor,
         }
     );
 }
@@ -403,11 +407,11 @@ void HmlPhysics::step(float dt) noexcept {
             object.dynamicProperties->velocity += dt * F; // NOTE * object.dynamicProperties->invMass;
 
             // World-space inverse inertia tensor
-            // const auto I =
-            //     quatToMat3(object.orientation) *
-            //     object.dynamicProperties->invRotationalInertiaTensor *
-            //     quatToMat3(glm::conjugate(object.orientation));
-            const auto I = object.dynamicProperties->invRotationalInertiaTensor;
+            const auto I =
+                quatToMat3(object.orientation) *
+                object.dynamicProperties->invRotationalInertiaTensor *
+                quatToMat3(glm::conjugate(object.orientation));
+            // const auto I = object.dynamicProperties->invRotationalInertiaTensor;
             const auto angularVelocity = I * object.dynamicProperties->angularMomentum;
             object.orientation += dt * glm::cross(glm::quat(0, angularVelocity), object.orientation);
             // const auto torque = glm::cross(cp, Ft);

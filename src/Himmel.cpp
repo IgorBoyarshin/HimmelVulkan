@@ -520,7 +520,8 @@ bool Himmel::initPhysics() noexcept {
 
 
 void Himmel::initPhysicsTestbench() noexcept {
-    testbenchBoxWithObjects();
+    // testbenchBoxWithObjects();
+    testbenchFriction();
 }
 
 
@@ -735,7 +736,33 @@ void Himmel::testbenchContactPoints() noexcept {
 
 
 void Himmel::testbenchFriction() noexcept {
+    hmlCamera = std::make_unique<HmlCameraFreeFly>(glm::vec3{ 5, 55, 25 });
+    dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->setDir(0, 0);
+    // dynamic_cast<HmlCameraFreeFly*>(hmlCamera.get())->setPos();
 
+    const float halfSide = 50.0f;
+    const float baseHeight = 50.0f;
+    const float wallThickness = 2.0f;
+    { // Bottom
+        auto object = HmlPhysics::Object::createBox({ 0, baseHeight, 0 }, { halfSide, wallThickness, halfSide });
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.7f, 1.0f, 0.7f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
+
+    { // Box
+        auto object = HmlPhysics::Object::createBox({ 0, baseHeight + 5.1f, 0 }, { 1, 3, 1 }, 5, glm::vec3{ 1, 0, 0 }, glm::vec3{0,0,0});
+        // object.orientation = glm::rotate(glm::quat(1, glm::vec3{}), 1.0f, glm::vec3(0,1,0));
+
+        entities.push_back(std::make_shared<HmlRenderer::Entity>(modelStorage.cube, glm::vec3{ 0.1f, 0.2f, 0.9f}));
+        entities.back()->modelMatrix = object.modelMatrix();
+
+        const auto id = hmlPhysics->registerObject(std::move(object));
+        physicsIdToEntity[id] = entities.back();
+    }
 }
 
 
@@ -1178,7 +1205,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + globalLightDir, glm::vec3{0, 1, 0});
         static float near = 300.0f;
         static float far = 1100.0f;
-        static float yaw = 210.0f;
+        static float yaw = 25.0f;
         static float pitch = 30.0f;
         const float minDepth = 0.1f;
         const float maxDepth = 1200.0f;

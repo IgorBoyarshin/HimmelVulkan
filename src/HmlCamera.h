@@ -57,13 +57,15 @@ struct HmlCameraFreeFly : HmlCamera {
     inline HmlCameraFreeFly* asFreeFly() noexcept override { return dynamic_cast<HmlCameraFreeFly*>(this); }
 
     // Will override
-    glm::mat4 view() noexcept override; 
+    glm::mat4 view() noexcept override;
     void handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, float dt, bool ignore) noexcept override;
 
     std::optional<glm::mat4> cachedView = std::nullopt;
     inline void invalidateCache() noexcept { cachedView = std::nullopt; }
     void recacheView() noexcept;
 
+    void setDir(float pitch, float yaw) noexcept;
+    void setPos(const glm::vec3& newPos) noexcept;
     void rotateDir(float dPitch, float dYaw) noexcept;
     void forward(float length) noexcept;
     void right(float length) noexcept;
@@ -75,7 +77,7 @@ struct HmlCameraFollow : HmlCamera {
     inline HmlCameraFollow* asFollow() noexcept override { return dynamic_cast<HmlCameraFollow*>(this); }
 
     // Will override
-    glm::mat4 view() noexcept override; 
+    glm::mat4 view() noexcept override;
     void handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, float dt, bool ignore) noexcept override;
 
     void rotateDir(float dPitch, float dYaw) noexcept;

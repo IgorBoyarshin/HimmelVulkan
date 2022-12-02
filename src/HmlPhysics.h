@@ -14,6 +14,9 @@
 #include <chrono>
 #include <span>
 #include <immintrin.h>
+#include <atomic>
+#include <mutex>
+#include <thread>
 
 #include "HmlMath.h"
 
@@ -65,7 +68,13 @@ std::ostream& operator<<(std::ostream& stream, const AxisAngle& aa);
 glm::mat3 quatToMat3(const glm::quat& q) noexcept;
 
 
-struct HmlPhysics {
+class HmlPhysics {
+    public:
+
+    enum class Mode {
+        SameThread, SameThreadAndHelperThreads, AnotherThread, AnotherThreadAndHelperThreads
+    } mode;
+
     struct Object {
         // ============================================================
         // ============== Member types
@@ -115,7 +124,7 @@ struct HmlPhysics {
         // ============================================================
         // ============== Object
         // ============================================================
-        inline Object(Type type) : type(type), id(generateId()) {}
+        inline Object(Type type) : type(type), id(INVALID_ID) {}
 
 
         const glm::mat4& modelMatrix() const noexcept;
@@ -189,6 +198,8 @@ struct HmlPhysics {
     // ============================================================
     // ============= Collisions
     // ============================================================
+    private:
+
     struct Detection {
         glm::vec3 dir;
         float extent;
@@ -258,9 +269,6 @@ struct HmlPhysics {
     static std::optional<Detection> gjk(const Object::Box& b1, const Object::Box& b2) noexcept;
     static std::optional<Detection> epa(const Simplex& simplex, const auto& ps1, const auto& ps2) noexcept;
     // ========================================================================
-    void updateForDt(float dt) noexcept;
-    void step(float dt) noexcept;
-    // ========================================================================
     struct Bucket {
         inline static constexpr float SIZE = 9.0f;
 
@@ -308,15 +316,33 @@ struct HmlPhysics {
     static Bucket::Bounding boundingBucketsForObject(const Object& object) noexcept;
     void checkForAndHandleCollisions() noexcept;
     void removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept;
-    void printStats() const noexcept;
-
-    Object::Id registerObject(Object&& object) noexcept;
-    // Object& getObject(Object::Id id) noexcept;
-
     // ========================================================================
-    ctpl::thread_pool thread_pool;
+    ctpl::thread_pool threadPool;
     bool firstUpdateAfterLastRegister = true;
     std::vector<Bucket::Bounding> allBoundingBucketsBefore; // for each non-stationary object; from previous frame
+
+    struct ThreadedData {
+        static constexpr float MAX_ALLOWED_LAG_SECONDS = 0.1f;
+        std::atomic<float> accumulatedDt = 0.0f;
+
+        std::vector<Object> objectsToRegister;
+        std::mutex objectsToRegisterMutex;
+        std::atomic<bool> hasNewObjectsToRegister = false;
+
+        std::vector<std::pair<Object::Id, glm::mat4>> modelMatrices;
+        std::mutex modelMatricesMutex;
+
+        std::atomic<uint64_t> internalUpdatesCount = 0;
+        uint64_t              externalUpdatesCount = 0;
+
+        std::atomic<bool> terminate = false;
+    } threadedData;
+
+    std::thread thread;
+
+    struct ThreadedStats {
+        float internalToExternalRatio;
+    };
 
     std::vector<Object> objects;
     std::unordered_map<Object::Id, size_t> objectIndexFromId;
@@ -385,6 +411,24 @@ struct HmlPhysics {
         float I_xs_ptr[8],
         float I_ys_ptr[8],
         float I_zs_ptr[8]) noexcept;
+    // ========================================================================
+    void internalUpdate(float dt) noexcept;
+    void internalRegisterObject(const Object& object) noexcept;
+    void step(float dt) noexcept;
+    // ========================================================================
+    public:
+        HmlPhysics(Mode mode) noexcept;
+        ~HmlPhysics() noexcept;
+        inline bool hasSelfThread()    const noexcept { return mode == Mode::AnotherThread              || mode == Mode::AnotherThreadAndHelperThreads; }
+        inline bool hasHelperThreads() const noexcept { return mode == Mode::SameThreadAndHelperThreads || mode == Mode::AnotherThreadAndHelperThreads; }
+        void updateForDt(float dt) noexcept;
+        Object::Id registerObject(Object&& object) noexcept;
+        void printStats() const noexcept;
+        std::optional<ThreadedStats> getThreadedStats() const noexcept;
+        std::vector<std::pair<Object::Id, glm::mat4>> getModelMatrices() noexcept;
+        void terminate() noexcept;
+        void threadFunc() noexcept;
+        // Object& getObject(Object::Id id) noexcept;
 };
 
 

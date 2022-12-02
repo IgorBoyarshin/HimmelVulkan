@@ -511,7 +511,9 @@ bool Himmel::initModels() noexcept {
 
 
 bool Himmel::initPhysics() noexcept {
-    hmlPhysics = std::make_unique<HmlPhysics>();
+    // hmlPhysics = std::make_unique<HmlPhysics>(HmlPhysics::Mode::SameThread);
+    // hmlPhysics = std::make_unique<HmlPhysics>(HmlPhysics::Mode::SameThreadAndHelperThreads);
+    hmlPhysics = std::make_unique<HmlPhysics>(HmlPhysics::Mode::AnotherThread);
 
     initPhysicsTestbench();
 
@@ -520,8 +522,8 @@ bool Himmel::initPhysics() noexcept {
 
 
 void Himmel::initPhysicsTestbench() noexcept {
-    // testbenchBoxWithObjects();
-    testbenchFriction();
+    testbenchBoxWithObjects();
+    // testbenchFriction();
 }
 
 
@@ -1045,11 +1047,15 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
     // Upload data from physics to entities
     {
+        for (const auto& [id, mm] : hmlPhysics->getModelMatrices()) {
+            physicsIdToEntity[id]->modelMatrix = mm;
+        }
+
         // const auto startTime = std::chrono::high_resolution_clock::now();
-        for (const auto& object : hmlPhysics->objects) {
+        // for (const auto& object : hmlPhysics->objects) {
             // const glm::vec3 start{-55, 45, -55};
             // const glm::vec3 end{ 55, 55 + 100, 55 };
-            physicsIdToEntity[object.id]->modelMatrix = object.modelMatrix();
+            // physicsIdToEntity[object.id]->modelMatrix = object.modelMatrix();
             // assert(object->position < end && start < object->position);
             // if (!(object->position < end && start < object->position)) {
             //     std::cout
@@ -1068,7 +1074,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
                 //     << "  AM=" << object->dynamicProperties->angularMomentum
                 //     << '\n';
             // }
-        }
+        // }
 
 
 #if 0

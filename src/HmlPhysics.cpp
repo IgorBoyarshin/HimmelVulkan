@@ -1,4 +1,82 @@
 #include "HmlPhysics.h"
+    
+
+void HmlPhysics::threadFunc() noexcept {
+    while (!threadedData.terminate.load()) {
+        const bool hasNewObjectsToRegister = threadedData.hasNewObjectsToRegister.exchange(false);
+        if (hasNewObjectsToRegister) {
+            const std::lock_guard<std::mutex> lock(threadedData.objectsToRegisterMutex);
+            assert(!threadedData.objectsToRegister.empty() && "Empty register vector even though the flag indicated otherwise");
+            for (const auto& object : threadedData.objectsToRegister) {
+                internalRegisterObject(object);
+            }
+        }
+
+        threadedData.accumulatedDt.wait(0.0f); // wait until not 0.0f
+
+        float dt = threadedData.accumulatedDt.exchange(0.0f);
+        assert(dt > 0.0f && "Returned from wait() with 0.0f");
+        if (dt > ThreadedData::MAX_ALLOWED_LAG_SECONDS) {
+            const float extra = dt - ThreadedData::MAX_ALLOWED_LAG_SECONDS;
+            dt = ThreadedData::MAX_ALLOWED_LAG_SECONDS;
+            threadedData.accumulatedDt += extra;
+        }
+
+        threadedData.internalUpdatesCount++;
+        internalUpdate(dt);
+
+        { // Update the up-to-date modelMatrices array for use by outside world
+            const std::lock_guard<std::mutex> lock(threadedData.modelMatricesMutex);
+            threadedData.modelMatrices.clear();
+            for (const auto& object : objects) threadedData.modelMatrices.push_back(std::make_pair(object.id, object.modelMatrix()));
+        }
+    }
+    if constexpr (LOG_INFO) std::cout << ":> Physics thread terminated!\n";
+}
+
+
+HmlPhysics::HmlPhysics(Mode mode) noexcept : mode(mode) {
+    switch (mode) {
+        case Mode::SameThread:
+            if constexpr (LOG_INFO) std::cout << ":> Starting HmlPhysics in the same thread.\n";
+            break;
+        case Mode::SameThreadAndHelperThreads:
+            if constexpr (LOG_INFO) std::cout << ":> Starting HmlPhysics in the same thread and using thread pool with helper threads.\n";
+            break;
+        case Mode::AnotherThread:
+            if constexpr (LOG_INFO) std::cout << ":> Starting HmlPhysics in another thread.\n";
+            break;
+        case Mode::AnotherThreadAndHelperThreads:
+            if constexpr (LOG_INFO) std::cout << ":> Starting HmlPhysics in another thread and using thread pool with helper threads.\n";
+            break;
+        default: assert(false && "Unhandled Mode");
+    }
+
+    if (hasHelperThreads()) {
+        constexpr size_t THREAD_POOL_SIZE = 5;
+        threadPool.resize(THREAD_POOL_SIZE);
+    }
+
+    if (hasSelfThread()) {
+        thread = std::thread(&HmlPhysics::threadFunc, this);
+    }
+}
+
+
+HmlPhysics::~HmlPhysics() noexcept {
+    if (!hasSelfThread()) return;
+    if (!threadedData.terminate.load()) terminate(); // if has not been terminated yet
+}
+
+
+void HmlPhysics::terminate() noexcept {
+    if (!hasSelfThread()) return;
+    if constexpr (LOG_INFO) std::cout << ":> Waiting for physics thread to finish...\n";
+    threadedData.accumulatedDt.store(314.1f); // something big
+    threadedData.accumulatedDt.notify_one();
+    threadedData.terminate.store(true);
+    thread.join();
+}
 // ============================================================================
 // ========================== Abstract detectors ==============================
 // ============================================================================
@@ -349,7 +427,7 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
 // }
 
 
-void HmlPhysics::updateForDt(float dt) noexcept {
+void HmlPhysics::internalUpdate(float dt) noexcept {
     if (firstUpdateAfterLastRegister) {
         firstUpdateAfterLastRegister = false;
 
@@ -361,10 +439,21 @@ void HmlPhysics::updateForDt(float dt) noexcept {
     }
 
     const uint8_t SUBSTEPS = 1;
-    // const float simulationSppedFactor = 0.5f;
-    const float simulationSppedFactor = 1.0f;
-    const float subDt = dt / SUBSTEPS * simulationSppedFactor;
+    // const float simulationSpeedFactor = 0.5f;
+    const float simulationSpeedFactor = 1.0f;
+    const float subDt = dt / SUBSTEPS * simulationSpeedFactor;
     for (uint8_t i = 0; i < SUBSTEPS; i++) step(subDt);
+}
+
+
+void HmlPhysics::updateForDt(float dt) noexcept {
+    if (hasSelfThread()) {
+        threadedData.accumulatedDt += dt;
+        threadedData.accumulatedDt.notify_one();
+        threadedData.externalUpdatesCount++;
+    } else {
+        internalUpdate(dt);
+    }
 }
 
 
@@ -466,13 +555,9 @@ void HmlPhysics::step(float dt) noexcept {
 void HmlPhysics::checkForAndHandleCollisions() noexcept {
     assert(adjustments.empty()); // because it has been exhausted during adjustment application traversal
 
-    for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
-        const auto& [_bucket, ids] = *it;
-        if (ids.empty()) {
-            it = objectsInBuckets.erase(it);
-            continue;
-        }
-
+    const auto traverseBucket = [this](
+            std::span<const Object::Id> ids,
+            Adjustments& adjustments) {
         for (size_t i = 0; i < ids.size(); i++) {
             const auto& obj1 = objects[objectIndexFromId[ids[i]]];
 
@@ -499,71 +584,91 @@ void HmlPhysics::checkForAndHandleCollisions() noexcept {
                 adjustments.insert(adj2);
             }
         }
+    };
 
-        ++it;
+    if (hasHelperThreads()) {
+        // Get rid of empty buckets to improve traversal speed
+        for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
+            const auto& [_bucket, objects] = *it;
+            if (objects.empty()) {
+                it = objectsInBuckets.erase(it);
+                continue;
+            }
+            ++it;
+        }
+
+        // Divide the work between threads and launch them
+        const size_t poolSize = threadPool.size();
+        const auto count = objectsInBuckets.size();
+        const auto chunk = count / threadPool.size();
+        std::vector<std::future<Adjustments>> results(poolSize);
+        for (size_t threadIndex = 0; threadIndex < poolSize; threadIndex++) {
+            const bool lastThread = threadIndex + 1 == poolSize;
+            const auto startIt = std::next(objectsInBuckets.cbegin(), threadIndex * chunk);
+            const auto endIt = lastThread ? objectsInBuckets.cend() : std::next(objectsInBuckets.cbegin(), (threadIndex + 1) * chunk);
+            results[threadIndex] = threadPool.push([this, startIt, endIt, &traverseBucket](int){
+                Adjustments adjustments;
+                for (auto it = startIt; it != endIt; ++it) {
+                    const auto& [_bucket, ids] = *it;
+                    traverseBucket(ids, adjustments);
+                }
+                return adjustments;
+            });
+        }
+
+        // Wait on results and collect sub-adjustments
+        for (size_t threadIndex = 0; threadIndex < poolSize; threadIndex++) {
+            adjustments.merge(results[threadIndex].get());
+        }
+    } else {
+        for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
+            const auto& [_bucket, ids] = *it;
+            if (ids.empty()) {
+                it = objectsInBuckets.erase(it);
+                continue;
+            }
+
+            traverseBucket(ids, adjustments);
+            ++it;
+        }
     }
-
-    // const size_t thread_count = 1;
-    // const auto count = objectsInBuckets.size();
-    // const auto chunk = count / thread_count;
-    // thread_pool.resize(thread_count);
-    // std::vector<std::future<Adjustments>> results(thread_count);
-    // for (size_t threadIndex = 0; threadIndex < thread_count; threadIndex++) {
-    //     const bool lastThread = threadIndex + 1 == thread_count;
-    //     const auto startIt = std::next(objectsInBuckets.cbegin(), threadIndex * chunk);
-    //     const auto endIt = lastThread ? objectsInBuckets.cend() : std::next(objectsInBuckets.cbegin(), (threadIndex + 1) * chunk);
-    //     results[threadIndex] = thread_pool.push([=](int){
-    //         Adjustments adjustments;
-    //         for (auto it = startIt; it != endIt; ++it) {
-    //             const auto& [_bucket, objects] = *it;
-    //
-    //             for (size_t i = 0; i < objects.size(); i++) {
-    //                 const auto& obj1 = objects[i];
-    //
-    //                 // For each object, test it against all other objects in current bucket
-    //                 for (size_t j = i + 1; j < objects.size(); j++) {
-    //                     const auto& obj2 = objects[j];
-    //                     if (obj1->isStationary() && obj2->isStationary()) continue;
-    //
-    //                     const auto [adj1, adj2] = process(*obj1, *obj2);
-    //                     adjustments.insert(adj1);
-    //                     adjustments.insert(adj2);
-    //                 }
-    //             }
-    //         }
-    //         return adjustments;
-    //     });
-    // }
-    // for (size_t threadIndex = 0; threadIndex < thread_count; threadIndex++) {
-    //     adjustments.merge(results[threadIndex].get()); // wait on results
-    // }
-
-    // Get rid of empty buckets to improve traversal speed
-    // for (auto it = objectsInBuckets.begin(); it != objectsInBuckets.end();) {
-    //     const auto& [_bucket, objects] = *it;
-    //     if (objects.empty()) {
-    //         it = objectsInBuckets.erase(it);
-    //         continue;
-    //     }
-    //     ++it;
-    // }
 }
 // ============================================================================
 // =================== Register/remove/get ====================================
 // ============================================================================
-HmlPhysics::Object::Id HmlPhysics::registerObject(Object&& object) noexcept {
-    firstUpdateAfterLastRegister = true;
-    const auto id = object.id;
+void HmlPhysics::internalRegisterObject(const Object& object) noexcept {
     const auto bounds = boundingBucketsForObject(object);
-    objectIndexFromId[id] = objects.size();
-    objects.push_back(std::move(object));
     for (Bucket::Coord x = bounds.first.x; x <= bounds.second.x; x++) {
         for (Bucket::Coord y = bounds.first.y; y <= bounds.second.y; y++) {
             for (Bucket::Coord z = bounds.first.z; z <= bounds.second.z; z++) {
                 const Bucket bucket{ .x = x, .y = y, .z = z };
-                objectsInBuckets[bucket].push_back(id);
+                objectsInBuckets[bucket].push_back(object.id);
             }
         }
+    }
+
+    if (!object.isStationary()) allBoundingBucketsBefore.push_back(bounds);
+    objectIndexFromId[object.id] = objects.size();
+    objects.push_back(object);
+}
+
+
+HmlPhysics::Object::Id HmlPhysics::registerObject(Object&& object) noexcept {
+    assert(object.id == Object::INVALID_ID && "Trying to register an object with an already-set id");
+
+    // NOTE Is probably thread-safe because we only do this (interaction with IDs)
+    // from the main thread and never from the internal thread
+    const auto id = Object::generateId();
+    object.id = id;
+
+    if (hasSelfThread()) {
+        // NOTE It is unlikely that internal thread will be using objectsToRegister
+        // for long, so we don't mind waiting a little (if at all) to acquire the lock.
+        const std::lock_guard<std::mutex> lock(threadedData.objectsToRegisterMutex);
+        threadedData.objectsToRegister.push_back(std::move(object));
+        threadedData.hasNewObjectsToRegister.store(true);
+    } else {
+        internalRegisterObject(std::move(object));
     }
 
     return id;
@@ -597,6 +702,21 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
 //     assert(false && "::> No Object with provided Id found.");
 //     return objects[Bucket()][0]; // stub
 // }
+
+
+std::vector<std::pair<HmlPhysics::Object::Id, glm::mat4>> HmlPhysics::getModelMatrices() noexcept {
+    if (hasSelfThread()) {
+        const std::lock_guard<std::mutex> lock(threadedData.modelMatricesMutex);
+        const std::vector<std::pair<Object::Id, glm::mat4>> copy = threadedData.modelMatrices;
+        return copy;
+    } else {
+        std::vector<std::pair<Object::Id, glm::mat4>> modelMatrices;
+        modelMatrices.reserve(objects.size());
+        for (const auto& object : objects) modelMatrices.push_back(std::make_pair(object.id, object.modelMatrix()));
+        return modelMatrices;
+    }
+
+}
 // ============================================================================
 // =================== BoundingBuckets ========================================
 // ============================================================================
@@ -642,6 +762,21 @@ void HmlPhysics::printStats() const noexcept {
     }
 
     std::cout << "Min size=" << min << "; Max size=" << max << "; Avg in bucket=" << (avg / objectsInBuckets.size()) << "\n";
+}
+
+
+std::optional<HmlPhysics::ThreadedStats> HmlPhysics::getThreadedStats() const noexcept {
+    if (!hasSelfThread()) return std::nullopt;
+
+    float ratio = 1.0f;
+    if (threadedData.externalUpdatesCount) {
+        ratio = static_cast<float>(threadedData.internalUpdatesCount.load())
+              / static_cast<float>(threadedData.externalUpdatesCount);
+    }
+
+    return { ThreadedStats {
+        .internalToExternalRatio = ratio
+    }};
 }
 // ============================================================================
 // ======================== Geometry helpers ==================================

@@ -606,8 +606,8 @@ void Himmel::testbenchBoxWithObjects() noexcept {
 
 
     const float density = 4.0f;
-    const size_t boxesCount = 20;
-    const size_t spheresCount = 300;
+    const size_t boxesCount = 40;
+    const size_t spheresCount = 60;
     const float maxSpeed = 6.0f;
 #if 1
     for (size_t i = 0; i < boxesCount; i++) {
@@ -805,7 +805,6 @@ bool Himmel::run() noexcept {
             static float showedElapsedMicrosGpu = 0;
 #endif
             static float showedElapsedMicrosPhysics = 0;
-            // static float showedPhysicsRatio = 0;
             static float showedPhysicsSubsteps = 0;
             ImGui::SetNextWindowBgAlpha(0.5f);
             ImGuiWindowFlags window_flags =
@@ -829,7 +828,6 @@ bool Himmel::run() noexcept {
                     showedElapsedMicrosPhysics = frameStats.elapsedMicrosPhysics;
                     {
                         const auto stats = hmlPhysics->getThreadedStats();
-                        // if (stats) showedPhysicsRatio = stats->internalToExternalRatio;
                         if (stats) showedPhysicsSubsteps = stats->substeps;
                     }
 
@@ -839,7 +837,6 @@ bool Himmel::run() noexcept {
                 ImGui::Separator();
                 ImGui::Text("CPU Physics = %.0f mks", showedElapsedMicrosPhysics);
                 if (hmlPhysics->hasSelfThread()) {
-                    // ImGui::Text("CPU Physics ratio = %.0f", showedPhysicsRatio);
                     ImGui::Text("Physics substeps = %.0f", showedPhysicsSubsteps);
                 }
                 ImGui::Text("CPU WaitNextInFlightFrame = %.0f mks", showedElapsedMicrosWaitNextInFlightFrame);
@@ -1075,61 +1072,8 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 
     // Upload data from physics to entities
-    {
-        for (const auto& [id, mm] : hmlPhysics->getModelMatrices()) {
-            physicsIdToEntity[id]->modelMatrix = mm;
-        }
-
-        // const auto startTime = std::chrono::high_resolution_clock::now();
-        // for (const auto& object : hmlPhysics->objects) {
-            // const glm::vec3 start{-55, 45, -55};
-            // const glm::vec3 end{ 55, 55 + 100, 55 };
-            // physicsIdToEntity[object.id]->modelMatrix = object.modelMatrix();
-            // assert(object->position < end && start < object->position);
-            // if (!(object->position < end && start < object->position)) {
-            //     std::cout
-            //         << "P=" << object->position
-            //         << "  V=" << object->dynamicProperties->velocity
-            //         << "  O=" << object->orientation << " = " << quatToAxisAngle(object->orientation)
-            //         << "  AM=" << object->dynamicProperties->angularMomentum
-            //         << std::endl;
-            //         assert(false);
-            // }
-            // if (object->id == debugId) {
-                // std::cout
-                //     // << "P=" << object->position
-                //     // << "  V=" << object->dynamicProperties->velocity
-                //     << "  O=" << object->orientation << " = " << quatToAxisAngle(object->orientation)
-                //     << "  AM=" << object->dynamicProperties->angularMomentum
-                //     << '\n';
-            // }
-        // }
-
-
-#if 0
-        for (auto& [id, entity] : physicsIdToEntity) {
-            auto& object = hmlPhysics->getObject(id);
-            if (object.isSphere()) {
-                const auto s = object.asSphere();
-                auto modelMatrix = glm::mat4(1.0f);
-                modelMatrix = glm::translate(modelMatrix, s.center);
-                modelMatrix = glm::scale(modelMatrix, glm::vec3(s.radius));
-                entity->modelMatrix = modelMatrix;
-            } else if (object.isBox()) {
-                const auto b = object.asBox();
-                auto modelMatrix = glm::mat4(1.0f);
-                modelMatrix = glm::translate(modelMatrix, b.center);
-                modelMatrix = glm::scale(modelMatrix, b.halfDimensions);
-                entity->modelMatrix = modelMatrix;
-            } else {
-                // TODO
-            }
-        }
-#endif
-        // const auto newMark = std::chrono::high_resolution_clock::now();
-        // const auto sinceStart = std::chrono::duration_cast<std::chrono::microseconds>(newMark - startTime).count();
-        // const float sinceStartMks = static_cast<float>(sinceStart);
-        // std::cout << "UPD = " << sinceStartMks << " mks" << '\n';
+    for (const auto& [id, mm] : hmlPhysics->getModelMatrices()) {
+        physicsIdToEntity[id]->modelMatrix = mm;
     }
 
 
@@ -1227,7 +1171,6 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         // const float sinceStartMksSeconds = static_cast<float>(sinceStart);
         // std::cout << "UPD = " << sinceStartMksSeconds << '\n';
     }
-
 }
 
 

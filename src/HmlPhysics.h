@@ -332,9 +332,6 @@ class HmlPhysics {
         std::vector<std::pair<Object::Id, glm::mat4>> modelMatrices;
         std::mutex modelMatricesMutex;
 
-        std::atomic<uint64_t> internalUpdatesCount = 0;
-        uint64_t              externalUpdatesCount = 0;
-
         std::atomic<bool> terminate = false;
         int substeps = 1;
     } threadedData;
@@ -342,7 +339,6 @@ class HmlPhysics {
     std::thread thread;
 
     struct ThreadedStats {
-        float internalToExternalRatio;
         int substeps;
     };
 

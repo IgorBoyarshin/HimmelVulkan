@@ -309,7 +309,7 @@ void HmlRenderer::specifyStaticEntitiesToRender(std::span<const Entity> staticEn
 HmlRenderer::TextureUpdateData HmlRenderer::prepareTextureUpdateData(std::span<const EntitiesData> entitiesData) noexcept {
     // NOTE Setting the rest of indices to a dummy texture is done only because
     // the validation layer complains that corresponding textures are not set,
-    // although supposedly being used in shared.
+    // although supposedly being used in shader.
     // In reality, however, the logic is solid and they are not used.
 
     std::array<VkSampler,   MAX_TEXTURES_COUNT> samplers;

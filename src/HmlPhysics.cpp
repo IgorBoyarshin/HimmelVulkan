@@ -39,7 +39,6 @@ void HmlPhysics::threadFunc() noexcept {
         for (int i = 0; i < threadedData.substeps; i++) {
             step(dt / threadedData.substeps);
         }
-        threadedData.internalUpdatesCount += threadedData.substeps;
 
         { // Update the up-to-date modelMatrices array for use by outside world
             const std::lock_guard<std::mutex> lock(threadedData.modelMatricesMutex);
@@ -447,7 +446,6 @@ void HmlPhysics::updateForDt(float dt) noexcept {
     if (hasSelfThread()) {
         threadedData.accumulatedDt += dt;
         threadedData.accumulatedDt.notify_one();
-        threadedData.externalUpdatesCount++;
     } else {
         // const float simulationSpeedFactor = 0.5f;
         const float simulationSpeedFactor = 1.0f;
@@ -779,14 +777,7 @@ void HmlPhysics::printStats() const noexcept {
 std::optional<HmlPhysics::ThreadedStats> HmlPhysics::getThreadedStats() const noexcept {
     if (!hasSelfThread()) return std::nullopt;
 
-    float ratio = 1.0f;
-    if (threadedData.externalUpdatesCount) {
-        ratio = static_cast<float>(threadedData.internalUpdatesCount.load())
-              / static_cast<float>(threadedData.externalUpdatesCount);
-    }
-
     return { ThreadedStats {
-        .internalToExternalRatio = ratio,
         .substeps = threadedData.substeps
     }};
 }

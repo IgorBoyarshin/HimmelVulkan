@@ -14,7 +14,7 @@ classFiles = HmlResourceManager HmlModel HmlCamera HmlCommands HmlSwapchain HmlD
 # justHeaderFiles = renderer settings
 # Compilation flags
 COMPILER = g++
-OPTIMIZATION_FLAG = -O3
+OPTIMIZATION_FLAG = -O0
 LANGUAGE_LEVEL = -std=c++20
 COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-ignored-attributes -I$(VULKAN_SDK_PATH_INCLUDE) -mavx -mavx2
 LINKER_FLAGS = -L$(VULKAN_SDK_PATH_LIB) `pkg-config --static --libs glfw3` -lvulkan -lpthread

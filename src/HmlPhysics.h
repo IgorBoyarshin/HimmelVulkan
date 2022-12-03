@@ -336,12 +336,14 @@ class HmlPhysics {
         uint64_t              externalUpdatesCount = 0;
 
         std::atomic<bool> terminate = false;
+        int substeps = 1;
     } threadedData;
 
     std::thread thread;
 
     struct ThreadedStats {
         float internalToExternalRatio;
+        int substeps;
     };
 
     std::vector<Object> objects;
@@ -412,7 +414,6 @@ class HmlPhysics {
         float I_ys_ptr[8],
         float I_zs_ptr[8]) noexcept;
     // ========================================================================
-    void internalUpdate(float dt) noexcept;
     void internalRegisterObject(const Object& object) noexcept;
     void step(float dt) noexcept;
     // ========================================================================

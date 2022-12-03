@@ -606,8 +606,8 @@ void Himmel::testbenchBoxWithObjects() noexcept {
 
 
     const float density = 4.0f;
-    const size_t boxesCount = 30;
-    const size_t spheresCount = 30;
+    const size_t boxesCount = 40;
+    const size_t spheresCount = 40;
     const float maxSpeed = 7.0f;
 #if 1
     for (size_t i = 0; i < boxesCount; i++) {
@@ -805,6 +805,8 @@ bool Himmel::run() noexcept {
             static float showedElapsedMicrosGpu = 0;
 #endif
             static float showedElapsedMicrosPhysics = 0;
+            // static float showedPhysicsRatio = 0;
+            static float showedPhysicsSubsteps = 0;
             ImGui::SetNextWindowBgAlpha(0.5f);
             ImGuiWindowFlags window_flags =
                 // ImGuiWindowFlags_NoDecoration |
@@ -825,11 +827,21 @@ bool Himmel::run() noexcept {
                     showedElapsedMicrosGpu = frameStats.elapsedMicrosGpu;
 #endif
                     showedElapsedMicrosPhysics = frameStats.elapsedMicrosPhysics;
+                    {
+                        const auto stats = hmlPhysics->getThreadedStats();
+                        // if (stats) showedPhysicsRatio = stats->internalToExternalRatio;
+                        if (stats) showedPhysicsSubsteps = stats->substeps;
+                    }
+
                 }
                 ImGui::Text("FPS = %.0f", showedFps);
                 ImGui::Text("Delta = %.1fms", showedDeltaMillis);
                 ImGui::Separator();
                 ImGui::Text("CPU Physics = %.0f mks", showedElapsedMicrosPhysics);
+                if (hmlPhysics->hasSelfThread()) {
+                    // ImGui::Text("CPU Physics ratio = %.0f", showedPhysicsRatio);
+                    ImGui::Text("Physics substeps = %.0f", showedPhysicsSubsteps);
+                }
                 ImGui::Text("CPU WaitNextInFlightFrame = %.0f mks", showedElapsedMicrosWaitNextInFlightFrame);
                 ImGui::Text("CPU Acquire = %.0f mks", showedElapsedMicrosAcquire);
                 ImGui::Text("CPU WaitSwapchainImage = %.0f mks", showedElapsedMicrosWaitSwapchainImage);

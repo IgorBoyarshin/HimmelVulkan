@@ -1,5 +1,5 @@
 #include "HmlPhysics.h"
-    
+
 
 void HmlPhysics::threadFunc() noexcept {
     while (!threadedData.terminate.load()) {
@@ -12,18 +12,33 @@ void HmlPhysics::threadFunc() noexcept {
             }
         }
 
-        threadedData.accumulatedDt.wait(0.0f); // wait until not 0.0f
+        const float check = threadedData.accumulatedDt.load();
+        if (check == 0.0f) {
+            // We are too fast
+            threadedData.accumulatedDt.wait(0.0f); // wait until not 0.0f
+            // Adjust our speed
+            threadedData.substeps++;
+        } else {
+            // We are a little slow
+            if (threadedData.substeps > 1) threadedData.substeps--;
+        }
 
         float dt = threadedData.accumulatedDt.exchange(0.0f);
         assert(dt > 0.0f && "Returned from wait() with 0.0f");
         if (dt > ThreadedData::MAX_ALLOWED_LAG_SECONDS) {
+            std::cout << "SLOW" << std::endl;
+            // We are VERY slow
             const float extra = dt - ThreadedData::MAX_ALLOWED_LAG_SECONDS;
             dt = ThreadedData::MAX_ALLOWED_LAG_SECONDS;
             threadedData.accumulatedDt += extra;
+            // Adjust our speed
+            if (threadedData.substeps > 1) threadedData.substeps /= 2;
         }
 
-        threadedData.internalUpdatesCount++;
-        internalUpdate(dt);
+        for (int i = 0; i < threadedData.substeps; i++) {
+            step(dt / threadedData.substeps);
+        }
+        threadedData.internalUpdatesCount += threadedData.substeps;
 
         { // Update the up-to-date modelMatrices array for use by outside world
             const std::lock_guard<std::mutex> lock(threadedData.modelMatricesMutex);
@@ -427,32 +442,17 @@ HmlPhysics::ProcessResult HmlPhysics::process(const Object& obj1, const Object& 
 // }
 
 
-void HmlPhysics::internalUpdate(float dt) noexcept {
-    if (firstUpdateAfterLastRegister) {
-        firstUpdateAfterLastRegister = false;
-
-        allBoundingBucketsBefore.clear();
-        for (const auto& object : objects) {
-            if (object.isStationary()) continue;
-            allBoundingBucketsBefore.push_back(boundingBucketsForObject(object));
-        }
-    }
-
-    const uint8_t SUBSTEPS = 1;
-    // const float simulationSpeedFactor = 0.5f;
-    const float simulationSpeedFactor = 1.0f;
-    const float subDt = dt / SUBSTEPS * simulationSpeedFactor;
-    for (uint8_t i = 0; i < SUBSTEPS; i++) step(subDt);
-}
-
-
 void HmlPhysics::updateForDt(float dt) noexcept {
     if (hasSelfThread()) {
         threadedData.accumulatedDt += dt;
         threadedData.accumulatedDt.notify_one();
         threadedData.externalUpdatesCount++;
     } else {
-        internalUpdate(dt);
+        // const float simulationSpeedFactor = 0.5f;
+        const float simulationSpeedFactor = 1.0f;
+        const uint8_t SUBSTEPS = 1;
+        const float subDt = dt / SUBSTEPS * simulationSpeedFactor;
+        for (uint8_t i = 0; i < SUBSTEPS; i++) step(subDt);
     }
 }
 
@@ -542,7 +542,7 @@ void HmlPhysics::step(float dt) noexcept {
     const auto mark3 = std::chrono::high_resolution_clock::now();
 
     static int stepTimer = 0;
-    if (true && ++stepTimer == 100) {
+    if (false && ++stepTimer == 100) {
         stepTimer = 0;
         const auto step1Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark2 - mark1).count();
         const auto step2Mks = std::chrono::duration_cast<std::chrono::microseconds>(mark3 - mark2).count();
@@ -775,7 +775,8 @@ std::optional<HmlPhysics::ThreadedStats> HmlPhysics::getThreadedStats() const no
     }
 
     return { ThreadedStats {
-        .internalToExternalRatio = ratio
+        .internalToExternalRatio = ratio,
+        .substeps = threadedData.substeps
     }};
 }
 // ============================================================================

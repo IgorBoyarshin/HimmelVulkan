@@ -10,6 +10,7 @@ void HmlPhysics::threadFunc() noexcept {
             for (const auto& object : threadedData.objectsToRegister) {
                 internalRegisterObject(object);
             }
+            threadedData.objectsToRegister.clear();
         }
 
         const float check = threadedData.accumulatedDt.load();
@@ -26,6 +27,7 @@ void HmlPhysics::threadFunc() noexcept {
         float dt = threadedData.accumulatedDt.exchange(0.0f);
         assert(dt > 0.0f && "Returned from wait() with 0.0f");
         if (dt > ThreadedData::MAX_ALLOWED_LAG_SECONDS) {
+            std::cout << ":> VERY SLOW\n";
             // We are VERY slow
             const float extra = dt - ThreadedData::MAX_ALLOWED_LAG_SECONDS;
             dt = ThreadedData::MAX_ALLOWED_LAG_SECONDS;
@@ -687,6 +689,10 @@ void HmlPhysics::removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucke
             return;
         }
     }
+    std::cout << size << '\n';
+    std::cout << bucket.x << " " << bucket.y << " " << bucket.z << std::endl;
+    const auto& object = objects[objectIndexFromId[id]];
+    std::cout << object.position << std::endl;
     assert(false && "::> There was no such Object in the Bucket");
 }
 

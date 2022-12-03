@@ -270,7 +270,7 @@ class HmlPhysics {
     static std::optional<Detection> epa(const Simplex& simplex, const auto& ps1, const auto& ps2) noexcept;
     // ========================================================================
     struct Bucket {
-        inline static constexpr float SIZE = 9.0f;
+        inline static constexpr float SIZE = 8.0f;
 
         using Coord = int16_t;
         using Hash = uint64_t;
@@ -322,7 +322,7 @@ class HmlPhysics {
     std::vector<Bucket::Bounding> allBoundingBucketsBefore; // for each non-stationary object; from previous frame
 
     struct ThreadedData {
-        static constexpr float MAX_ALLOWED_LAG_SECONDS = 0.1f;
+        static constexpr float MAX_ALLOWED_LAG_SECONDS = 0.05f;
         std::atomic<float> accumulatedDt = 0.0f;
 
         std::vector<Object> objectsToRegister;

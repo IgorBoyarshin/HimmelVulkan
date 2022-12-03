@@ -606,9 +606,9 @@ void Himmel::testbenchBoxWithObjects() noexcept {
 
 
     const float density = 4.0f;
-    const size_t boxesCount = 40;
-    const size_t spheresCount = 40;
-    const float maxSpeed = 7.0f;
+    const size_t boxesCount = 20;
+    const size_t spheresCount = 300;
+    const float maxSpeed = 6.0f;
 #if 1
     for (size_t i = 0; i < boxesCount; i++) {
         const auto pos = glm::vec3{

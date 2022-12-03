@@ -346,6 +346,8 @@ class HmlPhysics {
         int substeps;
     };
 
+    glm::vec3 gravity = glm::vec3{0, -9.8f, 0};
+
     std::vector<Object> objects;
     std::unordered_map<Object::Id, size_t> objectIndexFromId;
     std::unordered_map<Bucket, std::vector<Object::Id>, BucketHasher> objectsInBuckets;
@@ -429,6 +431,7 @@ class HmlPhysics {
         std::vector<std::pair<Object::Id, glm::mat4>> getModelMatrices() noexcept;
         void terminate() noexcept;
         void threadFunc() noexcept;
+        void setGravity(const glm::vec3& newGravity) noexcept;
         // Object& getObject(Object::Id id) noexcept;
 };
 

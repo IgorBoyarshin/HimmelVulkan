@@ -26,7 +26,6 @@ void HmlPhysics::threadFunc() noexcept {
         float dt = threadedData.accumulatedDt.exchange(0.0f);
         assert(dt > 0.0f && "Returned from wait() with 0.0f");
         if (dt > ThreadedData::MAX_ALLOWED_LAG_SECONDS) {
-            std::cout << "SLOW" << std::endl;
             // We are VERY slow
             const float extra = dt - ThreadedData::MAX_ALLOWED_LAG_SECONDS;
             dt = ThreadedData::MAX_ALLOWED_LAG_SECONDS;
@@ -487,10 +486,11 @@ void HmlPhysics::step(float dt) noexcept {
         }
         // ======================== Advance state ========================
         {
-            static constexpr glm::vec3 F {0,-9.8,0};
+            // static constexpr glm::vec3 F {0,-9.8,0};
             // static constexpr glm::vec3 F {0,0,0};
             // static constexpr glm::vec3 cp{1,0,0};
             // static constexpr glm::vec3 Ft{0,0,0};
+            const auto F = gravity;
 
             object.position += dt * object.dynamicProperties->velocity;
             object.dynamicProperties->velocity += dt * F; // NOTE * object.dynamicProperties->invMass;
@@ -716,6 +716,11 @@ std::vector<std::pair<HmlPhysics::Object::Id, glm::mat4>> HmlPhysics::getModelMa
         return modelMatrices;
     }
 
+}
+
+
+void HmlPhysics::setGravity(const glm::vec3& newGravity) noexcept {
+    gravity = newGravity;
 }
 // ============================================================================
 // =================== BoundingBuckets ========================================

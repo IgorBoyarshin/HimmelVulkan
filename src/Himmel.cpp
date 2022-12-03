@@ -1024,6 +1024,23 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
     }
 
+    { // Set gravity
+        const auto key = GLFW_KEY_G;
+        static bool pressed = false;
+        if (!pressed && glfwGetKey(hmlContext->hmlWindow->window, key) == GLFW_PRESS) {
+            pressed = true;
+
+            const float mag = 10.0f;
+            hmlPhysics->setGravity(glm::vec3{
+                hml::getRandomUniformFloat(-mag, mag),
+                hml::getRandomUniformFloat(-mag, mag),
+                hml::getRandomUniformFloat(-mag, mag)
+            });
+        } else if (pressed && glfwGetKey(hmlContext->hmlWindow->window, key) == GLFW_RELEASE) {
+            pressed = false;
+        }
+    }
+
     // NOTE allow cursor position update and only disable camera rotation reaction
     // in order not to have the camera jump on re-acquiring control from the ui
     // due to the cursor (pointer) position change that will have happened.

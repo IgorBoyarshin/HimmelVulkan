@@ -50,6 +50,7 @@ struct HmlDispatcher {
     struct StageCreateInfo {
         std::optional<std::function<void(bool, const HmlFrameData& frameData)>> preFunc;
         std::vector<std::shared_ptr<HmlDrawer>> drawers;
+        std::optional<VkExtent2D> differentExtent;
         // std::vector<HmlRenderPass::ColorAttachment> inputAttachments;
         std::vector<HmlRenderPass::ColorAttachment> colorAttachments;
         std::optional<HmlRenderPass::DepthStencilAttachment> depthAttachment;

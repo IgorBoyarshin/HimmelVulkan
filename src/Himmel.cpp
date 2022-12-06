@@ -1203,9 +1203,25 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             //                            0.0f, 0.0f, 0.5f, 1.0f);
             // const float near = 0.1f;
             // const float far = 1000.0f;
-            const float width = hmlContext->hmlSwapchain->extent().width;
-            const float height = hmlContext->hmlSwapchain->extent().height;
-            const float f = 0.2f;
+            // const float width = shadowmapExtent.width; // hmlContext->hmlSwapchain->extent().width;
+            // const float height = shadowmapExtent.height; // hmlContext->hmlSwapchain->extent().height;
+
+            // NOTE Width and height are calculated in such a way as to contain
+            // without cut-offs the biggest object in the scene, which happens
+            // to be the World.
+            static constexpr float sqrt2 = std::sqrt(2.0f);
+            const float width = world->finish.x;
+            const float height = world->finish.y;
+            // NOTE should theoretically produce better result for small pitch values,
+            // however in practice doesn't give noticable benefit to justify more
+            // complex calculation.
+            // NOTE However, this complex calculation results in height being more
+            // precise than width, which makes the benefit pretty useless...
+            // const float tallestObjectHeight = (50.0f + 75.0f); // girl
+            // const float tallestObjectHeight = world->height; // skrew the girl, care only about the World
+            // const float height = std::clamp(world->finish.y * std::sqrt(1.0f * pitch / maxPitch), tallestObjectHeight / sqrt2, 11111.1f);
+
+            const float f = sqrt2;
             glm::mat4 proj = glm::ortho(-width*f, width*f, -height*f, height*f, near, far);
             // glm::mat4 proj = glm::perspective(glm::radians(45.0f), hmlContext->hmlSwapchain->extentAspect(), near, far);
             proj[1][1] *= -1; // fix the inverted Y axis of GLM
@@ -1292,7 +1308,7 @@ bool Himmel::prepareResources() noexcept {
         brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         mainTextures[i]               = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         hmlDepthResources[i]          = hmlContext->hmlResourceManager->newDepthResource(extent);
-        hmlShadows[i]                 = hmlContext->hmlResourceManager->newShadowResource(extent, VK_FORMAT_D32_SFLOAT);
+        hmlShadows[i]                 = hmlContext->hmlResourceManager->newShadowResource(shadowmapExtent, VK_FORMAT_D32_SFLOAT);
         if (!gBufferPositions[i])           return false;
         if (!gBufferNormals[i])             return false;
         if (!gBufferColors[i])              return false;
@@ -1339,6 +1355,7 @@ bool Himmel::prepareResources() noexcept {
             hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
         },
         .drawers = { hmlTerrainRenderer, hmlRenderer },
+        .differentExtent = { shadowmapExtent },
         .colorAttachments = {},
         .depthAttachment = {
             HmlRenderPass::DepthStencilAttachment{
@@ -1361,6 +1378,7 @@ bool Himmel::prepareResources() noexcept {
             hmlRenderer->setMode(HmlRenderer::Mode::Regular);
         },
         .drawers = { hmlTerrainRenderer, hmlRenderer },
+        .differentExtent = std::nullopt,
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferPositions,
@@ -1405,6 +1423,7 @@ bool Himmel::prepareResources() noexcept {
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
         .preFunc = std::nullopt,
         .drawers = { hmlDeferredRenderer },
+        .differentExtent = std::nullopt,
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = mainTextures,
@@ -1451,6 +1470,7 @@ bool Himmel::prepareResources() noexcept {
             , hmlTerrainRenderer
 #endif
         },
+        .differentExtent = std::nullopt,
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = mainTextures,
@@ -1500,6 +1520,7 @@ bool Himmel::prepareResources() noexcept {
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
         .preFunc = std::nullopt,
         .drawers = { hmlBloomRenderer },
+        .differentExtent = std::nullopt,
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = hmlContext->hmlSwapchain->imageResources,
@@ -1534,6 +1555,7 @@ bool Himmel::prepareResources() noexcept {
             if (!prepPhase) hmlContext->hmlImgui->finilize(frameData.currentFrameIndex, frameData.frameInFlightIndex);
         },
         .drawers = { hmlUiRenderer, hmlImguiRenderer },
+        .differentExtent = std::nullopt,
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = hmlContext->hmlSwapchain->imageResources,

@@ -297,7 +297,7 @@ bool HmlDispatcher::addStage(StageCreateInfo&& stageCreateInfo) noexcept {
     std::shared_ptr<HmlRenderPass> hmlRenderPass = HmlRenderPass::create(hmlContext->hmlDevice, hmlContext->hmlCommands, HmlRenderPass::Config{
         .colorAttachments = std::move(stageCreateInfo.colorAttachments),
         .depthStencilAttachment = stageCreateInfo.depthAttachment,
-        .extent = hmlContext->hmlSwapchain->extent(),
+        .extent = stageCreateInfo.differentExtent ? *stageCreateInfo.differentExtent : hmlContext->hmlSwapchain->extent(),
         .subpassDependencies = std::move(stageCreateInfo.subpassDependencies),
     });
 

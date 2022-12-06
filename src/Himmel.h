@@ -203,6 +203,9 @@ struct Himmel {
         glm::vec3 cameraPos;
     };
 
+    static constexpr VkExtent2D shadowmapExtent = VkExtent2D{ 4096, 4096 };
+    // static constexpr VkExtent2D shadowmapExtent = VkExtent2D{ 8192, 8192 };
+
     std::vector<HmlLightRenderer::PointLight> pointLightsStatic;
     std::vector<HmlLightRenderer::PointLight> pointLightsDynamic;
 

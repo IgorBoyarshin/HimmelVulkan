@@ -361,6 +361,15 @@ bool Himmel::initLights() noexcept {
         });
     }
     {
+        // Sun
+        const float SUN_SIZE = 25.0f;
+        pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
+            .color = glm::vec3(1.0, 0.6, 0.0),
+            .intensity = 10.0f,
+            .position = {},
+            .radius = SUN_SIZE,
+        });
+
         pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(1.0, 0.0, 0.0),
             .intensity = 5000.0f,
@@ -930,13 +939,17 @@ bool Himmel::run() noexcept {
 
 
 void Himmel::updateForDt(float dt, float sinceStart) noexcept {
-    const float unit = 40.0f;
-    for (size_t i = 0; i < pointLightsDynamic.size(); i++) {
+    { // Sun
+        sun.updateForDt(dt);
+        pointLightsDynamic[0].position = sun.calculatePosNorm() * sun.renderRadius;
+    }
+    for (size_t i = 1; i < pointLightsDynamic.size(); i++) {
+        const float unit = 40.0f;
         glm::mat4 model(1.0);
         switch (i) {
-            case 0: model = glm::translate(model, glm::vec3(0.0, unit, 2*unit)); break;
-            case 1: model = glm::translate(model, glm::vec3(3*unit, unit, 0.0)); break;
-            case 2: model = glm::translate(model, glm::vec3(-2*unit, unit, -3*unit)); break;
+            case 1: model = glm::translate(model, glm::vec3(0.0, unit, 2*unit)); break;
+            case 2: model = glm::translate(model, glm::vec3(3*unit, unit, 0.0)); break;
+            case 3: model = glm::translate(model, glm::vec3(-2*unit, unit, -3*unit)); break;
             default: model = glm::translate(model, glm::vec3(i * unit, unit, -i*unit));
         }
         model = glm::rotate(model, (i+1) * 0.7f * sinceStart + i * 1.0f, glm::vec3(0.0, 1.0, 0.0));
@@ -1146,7 +1159,6 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     ImGui::End();
 #endif
 
-
     hmlContext->hmlImgui->updateForDt(dt);
 
     {
@@ -1183,29 +1195,22 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + globalLightDir, glm::vec3{0, 1, 0});
         static float near = 300.0f;
         static float far = 1100.0f;
-        static float yaw = 25.0f;
-        static float pitch = 30.0f;
         const float minDepth = 0.1f;
         const float maxDepth = 1200.0f;
+#define FROM_SUN 1
+#if FROM_SUN // from Sun position
+        const auto globalLightPos = sun.calculatePosNorm() * sun.shadowCalcRadius;
+#else // manually
+        static float yaw = 25.0f;
+        static float pitch = 30.0f;
         const float minYaw = 0.0f;
         const float maxYaw = 360.0f;
         const float minPitch = 0.0f;
         const float maxPitch = 90.0f;
-        const float distanceFromCenter = 700.0f;
-        // const auto globalLightPos = glm::vec3(-330, 150, 400);
-        const auto globalLightPos = HmlCamera::calcDirForward(pitch, yaw) * distanceFromCenter;
+        const auto globalLightPos = HmlCamera::calcDirForward(pitch, yaw) * sun.shadowCalcRadius;
+#endif
         const auto globalLightView = glm::lookAt(globalLightPos, glm::vec3{0,0,0}, glm::vec3{0, 1, 0});
-        // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + calcDirForward(-18.15f, 42.4f), glm::vec3{0, 1, 0});
         const auto globalLightProj = [&](){
-            // glm::mat4 clip = glm::mat4(1.0f, 0.0f, 0.0f, 0.0f,
-            //                            0.0f,-1.0f, 0.0f, 0.0f,
-            //                            0.0f, 0.0f, 0.5f, 0.0f,
-            //                            0.0f, 0.0f, 0.5f, 1.0f);
-            // const float near = 0.1f;
-            // const float far = 1000.0f;
-            // const float width = shadowmapExtent.width; // hmlContext->hmlSwapchain->extent().width;
-            // const float height = shadowmapExtent.height; // hmlContext->hmlSwapchain->extent().height;
-
             // NOTE Width and height are calculated in such a way as to contain
             // without cut-offs the biggest object in the scene, which happens
             // to be the World.
@@ -1227,7 +1232,8 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             proj[1][1] *= -1; // fix the inverted Y axis of GLM
             return proj;
         }();
-        const auto globalLightDir = HmlCamera::calcDirForward(-pitch, yaw + 180.0f);
+        // const auto globalLightDir = HmlCamera::calcDirForward(-pitch, yaw + 180.0f);
+        const auto globalLightDir = -glm::normalize(globalLightPos);
         GeneralUbo generalUbo{
             .view = hmlCamera->view(),
             .proj = proj,
@@ -1250,8 +1256,10 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         ImGui::Begin("Shadowmap", nullptr, window_flags);
         ImGui::DragScalar("near", ImGuiDataType_Float, &near, 0.1f, &minDepth, &maxDepth, "%f");
         ImGui::DragScalar("far", ImGuiDataType_Float, &far, 1.0f, &minDepth, &maxDepth, "%f");
+#if !FROM_SUN
         ImGui::DragScalar("yaw", ImGuiDataType_Float, &yaw, 0.5f, &minYaw, &maxYaw, "%f");
         ImGui::DragScalar("pitch", ImGuiDataType_Float, &pitch, 0.3f, &minPitch, &maxPitch, "%f");
+#endif
         ImGui::Text("Sun position [%.2f;%.2f;%.2f]", globalLightPos.x, globalLightPos.y, globalLightPos.z);
         ImGui::End();
 #endif

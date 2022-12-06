@@ -216,6 +216,30 @@ struct Himmel {
         uint32_t count;
     };
 
+    struct Sun {
+        float t = 0.0f;
+        const float renderRadius = 550.0f;
+        const float shadowCalcRadius = 700.0f;
+        // Periodic shift from the z=0 plane
+        const float shift = 0.3f;
+
+        inline void updateForDt(float dt) noexcept {
+            static constexpr float SPEED = 0.2f;
+            t += SPEED * dt;
+        }
+
+        inline glm::vec3 calculatePosNorm() const noexcept {
+            const float x = -std::cos(t);
+            const float y =  std::sin(t);
+            const float z =  std::sin(t) * shift;
+            return glm::normalize(glm::vec3(x, y, z));
+        }
+
+        // inline Sun() noexcept {}
+        // inline Sun(float t, float R, float shift) noexcept : t(t), R(R), shift(shift) {}
+    };
+    Sun sun;
+
     struct Weather {
         glm::vec3 fogColor;
         float fogDensity;

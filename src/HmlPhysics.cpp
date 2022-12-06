@@ -3,10 +3,11 @@
 
 void HmlPhysics::threadFunc() noexcept {
     while (!threadedData.terminate.load()) {
+        if (objects.empty()) threadedData.hasNewObjectsToRegister.wait(false); // wait until not false
         const bool hasNewObjectsToRegister = threadedData.hasNewObjectsToRegister.exchange(false);
         if (hasNewObjectsToRegister) {
             const std::lock_guard<std::mutex> lock(threadedData.objectsToRegisterMutex);
-            assert(!threadedData.objectsToRegister.empty() && "Empty register vector even though the flag indicated otherwise");
+            assert((!threadedData.objectsToRegister.empty() || threadedData.terminate.load()) && "Empty register vector even though the flag indicated otherwise");
             for (const auto& object : threadedData.objectsToRegister) {
                 internalRegisterObject(object);
             }
@@ -87,9 +88,16 @@ HmlPhysics::~HmlPhysics() noexcept {
 void HmlPhysics::terminate() noexcept {
     if (!hasSelfThread()) return;
     if constexpr (LOG_INFO) std::cout << ":> Waiting for physics thread to finish...\n";
-    threadedData.accumulatedDt.store(314.1f); // something big
-    threadedData.accumulatedDt.notify_one();
+
+    // Do this first so that once we've unblocked the thread it could already see the new status
     threadedData.terminate.store(true);
+
+    // Notify (awake) all places that may be hanged due to waiting
+    threadedData.accumulatedDt.store(1.0f); // because we wait for not 0
+    threadedData.accumulatedDt.notify_one();
+    threadedData.hasNewObjectsToRegister.store(true); // because we wait for not false
+    threadedData.hasNewObjectsToRegister.notify_one();
+
     thread.join();
 }
 // ============================================================================
@@ -667,6 +675,7 @@ HmlPhysics::Object::Id HmlPhysics::registerObject(Object&& object) noexcept {
         const std::lock_guard<std::mutex> lock(threadedData.objectsToRegisterMutex);
         threadedData.objectsToRegister.push_back(std::move(object));
         threadedData.hasNewObjectsToRegister.store(true);
+        threadedData.hasNewObjectsToRegister.notify_one();
     } else {
         internalRegisterObject(std::move(object));
     }

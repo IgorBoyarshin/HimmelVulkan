@@ -90,11 +90,13 @@ void main() {
     vec2 shadowmapStep = 1.0 / shadowmapSize;
     vec2 shadowmapCoord = lightSpacePos.xy * 0.5 + 0.5;
     const int PCF = 1; // [0..]
-    const float BIAS = 0.001;
+    const float MIN_BIAS = 0.0005;
+    const float MAX_BIAS = 0.003;
+    float bias = max(MAX_BIAS * (1.0 - dot(normal, -uboGeneral.globalLightDir)), MIN_BIAS);
     for (int y = -PCF; y <= PCF; y++) {
         for (int x = -PCF; x <= PCF; x++) {
             float shadowDepth = texture(texSamplers[G_SHADOWMAP], shadowmapCoord + vec2(x, y) * shadowmapStep).r;
-            shadowFactor += (lightSpacePos.z - BIAS > shadowDepth) ? 0.0 : 1.0; // reversed value to simplify clamp logic understanding
+            shadowFactor += (lightSpacePos.z - bias > shadowDepth) ? 0.0 : 1.0; // reversed value to simplify clamp logic understanding
         }
     }
     shadowFactor /= (PCF * 2 + 1) * (PCF * 2 + 1);

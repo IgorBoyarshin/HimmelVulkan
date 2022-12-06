@@ -1177,7 +1177,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 void Himmel::updateForImage(uint32_t imageIndex) noexcept {
     {
         // NOTE cannot use hmlCamera.somethingHasChanged because we have multiple UBOs (per image)
-        const auto globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)); // NOTE probably unused
+        // const auto globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)); // NOTE probably unused
         // const auto DST = 4.0f;
         // const auto globalLightPos = glm::vec3(DST * world->start.x, DST * world->height, DST * world->finish.y);
         // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + globalLightDir, glm::vec3{0, 1, 0});
@@ -1227,6 +1227,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             proj[1][1] *= -1; // fix the inverted Y axis of GLM
             return proj;
         }();
+        const auto globalLightDir = HmlCamera::calcDirForward(-pitch, yaw + 180.0f);
         GeneralUbo generalUbo{
             .view = hmlCamera->view(),
             .proj = proj,

@@ -85,13 +85,20 @@ void main() {
     }
 
     // Global diffuse from shadowmap
+    float shadowFactor = 0.0;
+    vec2 shadowmapSize = textureSize(texSamplers[G_SHADOWMAP], 0);
+    vec2 shadowmapStep = 1.0 / shadowmapSize;
     vec2 shadowmapCoord = lightSpacePos.xy * 0.5 + 0.5;
-    float shadowDepth = texture(texSamplers[G_SHADOWMAP], shadowmapCoord).r;
-    if (lightSpacePos.z > shadowDepth) {
-        light *= 0.6;
-        /* outColor = vec4(light, 1.0); */
-        /* return; */
+    const int PCF = 1; // [0..]
+    for (int y = -PCF; y <= PCF; y++) {
+        for (int x = -PCF; x <= PCF; x++) {
+            float shadowDepth = texture(texSamplers[G_SHADOWMAP], shadowmapCoord + vec2(x, y) * shadowmapStep).r;
+            shadowFactor += (lightSpacePos.z - 0.001 > shadowDepth) ? 0.0 : 1.0; // reversed value to simplify clamp logic understanding
+        }
     }
+    shadowFactor /= (PCF * 2 + 1) * (PCF * 2 + 1);
+    shadowFactor = clamp(shadowFactor, 0.3, 1.0);
+    light *= shadowFactor;
 
     // Apply simple fog
     if (uboGeneral.fogDensity > 0) {

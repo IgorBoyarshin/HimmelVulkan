@@ -361,15 +361,6 @@ bool Himmel::initLights() noexcept {
         });
     }
     {
-        // Sun
-        const float SUN_SIZE = 25.0f;
-        pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
-            .color = glm::vec3(1.0, 0.6, 0.0),
-            .intensity = 10.0f,
-            .position = {},
-            .radius = SUN_SIZE,
-        });
-
         pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(1.0, 0.0, 0.0),
             .intensity = 5000.0f,
@@ -531,7 +522,7 @@ bool Himmel::initPhysics() noexcept {
 
 
 void Himmel::initPhysicsTestbench() noexcept {
-    testbenchBoxWithObjects();
+    // testbenchBoxWithObjects();
     // testbenchFriction();
 }
 
@@ -939,17 +930,15 @@ bool Himmel::run() noexcept {
 
 
 void Himmel::updateForDt(float dt, float sinceStart) noexcept {
-    { // Sun
-        sun.updateForDt(dt);
-        pointLightsDynamic[0].position = sun.calculatePosNorm() * sun.renderRadius;
-    }
-    for (size_t i = 1; i < pointLightsDynamic.size(); i++) {
+    sun.updateForDt(dt);
+
+    for (size_t i = 0; i < pointLightsDynamic.size(); i++) {
         const float unit = 40.0f;
         glm::mat4 model(1.0);
         switch (i) {
-            case 1: model = glm::translate(model, glm::vec3(0.0, unit, 2*unit)); break;
-            case 2: model = glm::translate(model, glm::vec3(3*unit, unit, 0.0)); break;
-            case 3: model = glm::translate(model, glm::vec3(-2*unit, unit, -3*unit)); break;
+            case 0: model = glm::translate(model, glm::vec3(0.0, unit, 2*unit)); break;
+            case 1: model = glm::translate(model, glm::vec3(3*unit, unit, 0.0)); break;
+            case 2: model = glm::translate(model, glm::vec3(-2*unit, unit, -3*unit)); break;
             default: model = glm::translate(model, glm::vec3(i * unit, unit, -i*unit));
         }
         model = glm::rotate(model, (i+1) * 0.7f * sinceStart + i * 1.0f, glm::vec3(0.0, 1.0, 0.0));
@@ -1245,6 +1234,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             .fogColor = weather.fogColor,
             .fogDensity = weather.fogDensity,
             .cameraPos = hmlCamera->pos,
+            .dayNightCycleT = sun.regularT()
         };
         viewProjUniformBuffers[imageIndex]->update(&generalUbo);
 #ifdef WITH_IMGUI
@@ -1636,7 +1626,7 @@ Himmel::~Himmel() noexcept {
     // vkDeviceWaitIdle(hmlDevice->device);
 
     if (!successfulInit) {
-        std::cerr << "::> Himmel init has not finished successfully, so no proper cleanup is node.\n";
+        std::cerr << "::> Himmel init has not finished successfully, so no proper cleanup is done.\n";
         return;
     }
 

@@ -9,31 +9,31 @@ std::optional<std::pair<std::vector<VkShaderModule>, std::vector<VkPipelineShade
     if (hmlShaders.vertex) {
         if (auto shaderModule = createShaderModule(readFile(hmlShaders.vertex)); shaderModule) {
             shaderModules.push_back(shaderModule);
-            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_VERTEX_BIT, shaderModule));
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_VERTEX_BIT, shaderModule, hmlShaders.vertexSpecializationInfo));
         } else return std::nullopt;
     }
     if (hmlShaders.tessellationControl) {
         if (auto shaderModule = createShaderModule(readFile(hmlShaders.tessellationControl)); shaderModule) {
             shaderModules.push_back(shaderModule);
-            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, shaderModule));
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, shaderModule, hmlShaders.tessellationControlSpecializationInfo));
         } else return std::nullopt;
     }
     if (hmlShaders.tessellationEvaluation) {
         if (auto shaderModule = createShaderModule(readFile(hmlShaders.tessellationEvaluation)); shaderModule) {
             shaderModules.push_back(shaderModule);
-            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, shaderModule));
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, shaderModule, hmlShaders.tessellationEvaluationSpecializationInfo));
         } else return std::nullopt;
     }
     if (hmlShaders.geometry) {
         if (auto shaderModule = createShaderModule(readFile(hmlShaders.geometry)); shaderModule) {
             shaderModules.push_back(shaderModule);
-            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_GEOMETRY_BIT, shaderModule));
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_GEOMETRY_BIT, shaderModule, hmlShaders.geometrySpecializationInfo));
         } else return std::nullopt;
     }
     if (hmlShaders.fragment) {
         if (auto shaderModule = createShaderModule(readFile(hmlShaders.fragment)); shaderModule) {
             shaderModules.push_back(shaderModule);
-            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_FRAGMENT_BIT, shaderModule));
+            shaderStages.push_back(createShaderStageInfo(VK_SHADER_STAGE_FRAGMENT_BIT, shaderModule, hmlShaders.fragmentSpecializationInfo));
         } else return std::nullopt;
     }
 
@@ -278,14 +278,14 @@ HmlPipeline::~HmlPipeline() noexcept {
 }
 
 
-VkPipelineShaderStageCreateInfo HmlPipeline::createShaderStageInfo(VkShaderStageFlagBits stage, VkShaderModule shaderModule) noexcept {
+VkPipelineShaderStageCreateInfo HmlPipeline::createShaderStageInfo(VkShaderStageFlagBits stage,
+        VkShaderModule shaderModule, const std::optional<VkSpecializationInfo>& specializationInfoOpt) noexcept {
     VkPipelineShaderStageCreateInfo shaderStageInfo = {};
     shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStageInfo.stage = stage;
     shaderStageInfo.module = shaderModule;
     shaderStageInfo.pName = "main";
-    // pSpecializationInfo member can be used to set constants, which is
-    // more efficient than doing so at render time
+    shaderStageInfo.pSpecializationInfo = specializationInfoOpt ? &(*specializationInfoOpt) : nullptr;
     return shaderStageInfo;
 }
 

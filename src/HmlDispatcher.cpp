@@ -307,8 +307,8 @@ bool HmlDispatcher::addStage(StageCreateInfo&& stageCreateInfo) noexcept {
     }
 
 
-    // NOTE This is done here to allow HmlDrawer re-configuration in-between addStages
-    // NOTE there is no valid frame data for the prep stage, and funcs should not
+    // NOTE This is done here to allow HmlDrawer re-configuration in-between addStages.
+    // NOTE There is no valid frame data for the prep stage, and funcs should not
     // use that data in prep stage anyway.
     HmlFrameData frameData = {};
     if (stageCreateInfo.preFunc) (*stageCreateInfo.preFunc)(true, frameData);

@@ -28,7 +28,7 @@ void HmlPhysics::threadFunc() noexcept {
         float dt = threadedData.accumulatedDt.exchange(0.0f);
         assert(dt > 0.0f && "Returned from wait() with 0.0f");
         if (dt > ThreadedData::MAX_ALLOWED_LAG_SECONDS) {
-            std::cout << ":> VERY SLOW\n";
+            // std::cout << ":> VERY SLOW\n";
             // We are VERY slow
             const float extra = dt - ThreadedData::MAX_ALLOWED_LAG_SECONDS;
             dt = ThreadedData::MAX_ALLOWED_LAG_SECONDS;

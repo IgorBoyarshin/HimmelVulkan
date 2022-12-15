@@ -11,6 +11,7 @@ layout(set = 0, binding = 0) uniform GeneralUbo {
     vec3 fogColor;
     float fogDensity;
     vec3 cameraPos;
+    float dayNightCycleT;
 } uboGeneral;
 const float fogGradient = 2.0;
 

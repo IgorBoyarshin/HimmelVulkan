@@ -201,6 +201,7 @@ struct Himmel {
         glm::vec3 fogColor;
         float fogDensity;
         glm::vec3 cameraPos;
+        float dayNightCycleT;
     };
 
     // static constexpr VkExtent2D shadowmapExtent = VkExtent2D{ 2048, 2048 };
@@ -217,7 +218,9 @@ struct Himmel {
     };
 
     struct Sun {
+        static constexpr float FULL_CYCLE = 2.0f * glm::pi<float>();
         float t = 0.0f;
+
         const float renderRadius = 550.0f;
         const float shadowCalcRadius = 700.0f;
         // Periodic shift from the z=0 plane
@@ -226,6 +229,9 @@ struct Himmel {
         inline void updateForDt(float dt) noexcept {
             static constexpr float SPEED = 0.2f;
             t += SPEED * dt;
+            // t = 3.2f;
+
+            while (t > FULL_CYCLE) t -= FULL_CYCLE;
         }
 
         inline glm::vec3 calculatePosNorm() const noexcept {
@@ -235,8 +241,11 @@ struct Himmel {
             return glm::normalize(glm::vec3(x, y, z));
         }
 
-        // inline Sun() noexcept {}
-        // inline Sun(float t, float R, float shift) noexcept : t(t), R(R), shift(shift) {}
+        // [0;1]: 0 = night, 1 = day
+        inline float regularT() const noexcept {
+            const float x = t / FULL_CYCLE;
+            return (0.5f + 2*x) + (1.0f - 4*x) * (x > 0.25f) + (-3.0f + 4*x) * (x > 0.75f);
+        }
     };
     Sun sun;
 

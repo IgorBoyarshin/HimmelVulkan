@@ -17,30 +17,44 @@ struct HmlShaders {
     const char* tessellationControl    = nullptr;
     const char* tessellationEvaluation = nullptr;
     const char* geometry               = nullptr;
-    // const char* compute;
+    std::optional<VkSpecializationInfo> vertexSpecializationInfo;
+    std::optional<VkSpecializationInfo> fragmentSpecializationInfo;
+    std::optional<VkSpecializationInfo> tessellationControlSpecializationInfo;
+    std::optional<VkSpecializationInfo> tessellationEvaluationSpecializationInfo;
+    std::optional<VkSpecializationInfo> geometrySpecializationInfo;
 
-    inline HmlShaders& addVertex(const char* fileNameSpv) noexcept {
+    inline HmlShaders& addVertex(const char* fileNameSpv,
+            std::optional<VkSpecializationInfo> specializationInfo = std::nullopt) noexcept {
         vertex = fileNameSpv;
+        vertexSpecializationInfo = specializationInfo;
         return *this;
     }
 
-    inline HmlShaders& addTessellationControl(const char* fileNameSpv) noexcept {
+    inline HmlShaders& addTessellationControl(const char* fileNameSpv,
+            std::optional<VkSpecializationInfo> specializationInfo = std::nullopt) noexcept {
         tessellationControl = fileNameSpv;
+        tessellationControlSpecializationInfo = specializationInfo;
         return *this;
     }
 
-    inline HmlShaders& addTessellationEvaluation(const char* fileNameSpv) noexcept {
+    inline HmlShaders& addTessellationEvaluation(const char* fileNameSpv,
+            std::optional<VkSpecializationInfo> specializationInfo = std::nullopt) noexcept {
         tessellationEvaluation = fileNameSpv;
+        tessellationEvaluationSpecializationInfo = specializationInfo;
         return *this;
     }
 
-    inline HmlShaders& addGeometry(const char* fileNameSpv) noexcept {
+    inline HmlShaders& addGeometry(const char* fileNameSpv,
+            std::optional<VkSpecializationInfo> specializationInfo = std::nullopt) noexcept {
         geometry = fileNameSpv;
+        geometrySpecializationInfo = specializationInfo;
         return *this;
     }
 
-    inline HmlShaders& addFragment(const char* fileNameSpv) noexcept {
+    inline HmlShaders& addFragment(const char* fileNameSpv,
+            std::optional<VkSpecializationInfo> specializationInfo = std::nullopt) noexcept {
         fragment = fileNameSpv;
+        fragmentSpecializationInfo = specializationInfo;
         return *this;
     }
 };
@@ -99,7 +113,8 @@ struct HmlPipeline {
 
     std::optional<std::pair<std::vector<VkShaderModule>, std::vector<VkPipelineShaderStageCreateInfo>>>
         createShaders(const HmlShaders& hmlShaders) noexcept;
-    static VkPipelineShaderStageCreateInfo createShaderStageInfo(VkShaderStageFlagBits stage, VkShaderModule shaderModule) noexcept;
+    static VkPipelineShaderStageCreateInfo createShaderStageInfo(VkShaderStageFlagBits stage,
+        VkShaderModule shaderModule, const std::optional<VkSpecializationInfo>& specializationInfoOpt) noexcept;
     VkShaderModule createShaderModule(std::vector<char>&& code) noexcept;
     static std::vector<char> readFile(const char* fileName) noexcept;
 };

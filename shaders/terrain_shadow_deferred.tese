@@ -12,6 +12,7 @@ layout(set = 0, binding = 0) uniform GeneralUbo {
     vec4 globalLightDir_ambientStrength;
     vec4 fogColor_density;
     vec3 cameraPos;
+    float dayNightCycleT;
 } uboGeneral;
 
 // XXX Sync with other shaders

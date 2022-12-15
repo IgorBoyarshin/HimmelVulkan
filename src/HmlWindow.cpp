@@ -40,6 +40,7 @@ std::pair<uint32_t, uint32_t> HmlWindow::getFramebufferSize() const noexcept {
 void HmlWindow::resizeCallback(GLFWwindow* window, int width, int height) noexcept {
 #if LOG_INFO
     std::cout << ":> Resize request triggered through GLFW callback.\n";
+    std::cout << ":> New Window size is (" << width << ";" << height << ").\n";
 #endif
     auto app = reinterpret_cast<HmlWindow*>(glfwGetWindowUserPointer(window));
     app->framebufferResizeRequested = true;

@@ -30,7 +30,6 @@ struct HmlDeferredRenderer : HmlDrawer {
 
     static constexpr uint32_t G_COUNT = 5; // XXX must match the shader
 
-
     std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlDeferredRenderer> create(
@@ -38,6 +37,7 @@ struct HmlDeferredRenderer : HmlDrawer {
         VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept;
     ~HmlDeferredRenderer() noexcept;
     void specify(const std::array<std::vector<std::shared_ptr<HmlImageResource>>, G_COUNT>& resources) noexcept;
+    static std::pair<float, float> calculateSphereYawPitch(float aspect_w_h, float cameraFov) noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
 };
 

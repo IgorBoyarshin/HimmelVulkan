@@ -36,6 +36,7 @@ struct HmlCamera {
     float yaw   = 0.0f; /* [0; 360) */
 
     static glm::vec3 calcDirForward(float pitch, float yaw) noexcept;
+    glm::vec3 calcDirForward() const noexcept;
     glm::vec3 calcDirRight() const noexcept;
     std::pair<float, float> getCursorDeltaAndUpdateState(std::shared_ptr<HmlWindow> hmlWindow) noexcept;
     std::pair<int32_t, int32_t> cursor;

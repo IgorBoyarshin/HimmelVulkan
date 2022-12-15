@@ -22,7 +22,7 @@ void HmlCameraFreeFly::rotateDir(float dPitch, float dYaw) noexcept {
     if (pitch > MAX_PITCH) pitch = MAX_PITCH;
 
     yaw += dYaw;
-    while (yaw < 0.0f)       yaw += YAW_PERIOD;
+    while (yaw < 0.0f)        yaw += YAW_PERIOD;
     while (YAW_PERIOD <= yaw) yaw -= YAW_PERIOD;
 
     cachedView = std::nullopt;
@@ -58,8 +58,13 @@ glm::vec3 HmlCamera::calcDirForward(float pitch, float yaw) noexcept {
 }
 
 
+glm::vec3 HmlCamera::calcDirForward() const noexcept {
+    return calcDirForward(pitch, yaw);
+}
+
+
 glm::vec3 HmlCamera::calcDirRight() const noexcept {
-    return glm::normalize(glm::cross(calcDirForward(pitch, yaw), dirUp));
+    return calcDirForward(0.0f, yaw + 90.0f);
 }
 
 std::pair<float, float> HmlCamera::getCursorDeltaAndUpdateState(std::shared_ptr<HmlWindow> hmlWindow) noexcept {
@@ -79,9 +84,28 @@ void HmlCamera::printStats() const noexcept {
     std::cout << "Camera: [" << pos.x << ";" << pos.y << ";" << pos.z << "] pitch=" << pitch << " yaw =" << yaw << "\n";
 }
 
+
+static glm::mat4 calculateView(const glm::vec3& pos, const glm::vec3& forwardNorm, const glm::vec3& rightNorm) {
+    const glm::vec3 upNorm = glm::cross(rightNorm, forwardNorm);
+
+    glm::vec3 zaxis = forwardNorm;
+    const glm::vec3 xaxis = glm::cross(zaxis, upNorm);
+    const glm::vec3 yaxis = glm::cross(xaxis, zaxis);
+    zaxis *= -1.0f;
+
+    const glm::mat4 viewMatrix {
+        xaxis.x, yaxis.x, zaxis.x, 0,
+        xaxis.y, yaxis.y, zaxis.y, 0,
+        xaxis.z, yaxis.z, zaxis.z, 0,
+        -glm::dot(xaxis, pos), -glm::dot(yaxis, pos), -glm::dot(zaxis, pos), 1
+    };
+
+    return viewMatrix;
+}
+
+
 void HmlCameraFreeFly::recacheView() noexcept {
-    // From where, to where, up
-    cachedView = { glm::lookAt(pos, pos + calcDirForward(pitch, yaw), dirUp) };
+    cachedView = { calculateView(pos, calcDirForward(), calcDirRight()) };
 }
 
 void HmlCameraFreeFly::handleInput(const std::shared_ptr<HmlWindow>& hmlWindow, float dt, bool ignore) noexcept {

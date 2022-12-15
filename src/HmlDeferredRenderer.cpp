@@ -6,12 +6,44 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlDeferredRenderer::createPipelines(
     std::vector<std::unique_ptr<HmlPipeline>> pipelines;
 
     {
+        // NOTE These need to live until the config has been used up
+        const std::array<VkSpecializationMapEntry, 3> specializationMapEntries = {
+            VkSpecializationMapEntry{
+                .constantID = 0,
+                .offset = 0 * sizeof(float),
+                .size   = 1 * sizeof(float),
+            },
+            VkSpecializationMapEntry{
+                .constantID = 1,
+                .offset = 1 * sizeof(float),
+                .size   = 1 * sizeof(float),
+            },
+            VkSpecializationMapEntry{
+                .constantID = 2,
+                .offset = 2 * sizeof(float),
+                .size   = 1 * sizeof(float),
+            }
+        };
+        const float fov = 45.0f;
+        const float aspect_w_h = hmlContext->hmlSwapchain->extentAspect();
+        const auto [y, p] = calculateSphereYawPitch(aspect_w_h, fov);
+        const float sphereX = glm::sin(y) * glm::cos(p);
+        const float sphereY = glm::sin(p);
+        const float sphereZ = glm::cos(y) * glm::cos(p);
+
+        const std::array<float, 3> byteData = { sphereX, -sphereY, sphereZ };
+
         HmlGraphicsPipelineConfig config{
             .bindingDescriptions   = {},
             .attributeDescriptions = {},
             .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
             .hmlShaders = HmlShaders()
-                .addVertex("../shaders/out/deferred.vert.spv")
+                .addVertex("../shaders/out/deferred.vert.spv", { VkSpecializationInfo{
+                    .mapEntryCount = specializationMapEntries.size(),
+                    .pMapEntries = specializationMapEntries.data(),
+                    .dataSize = byteData.size() * sizeof(byteData[0]),
+                    .pData = byteData.data(),
+                }})
                 .addFragment("../shaders/out/deferred.frag.spv"),
             .renderPass = hmlRenderPass->renderPass,
             .extent = hmlRenderPass->extent,
@@ -101,6 +133,39 @@ void HmlDeferredRenderer::specify(const std::array<std::vector<std::shared_ptr<H
         HmlDescriptorSetUpdater(descriptorSet_textures_1_perImage[imageIndex])
             .textureArrayAt(0, samplers, views).update(hmlContext->hmlDevice);
     }
+}
+
+
+std::pair<float, float> HmlDeferredRenderer::calculateSphereYawPitch(float aspect_w_h, float cameraFov) noexcept {
+    assert(cameraFov == 45.0f && "The logic for FOV!=45 has not been implemented.");
+
+    // We need to satisfy the following two equations:
+    // 1) A = sin(y) * ctg(p)  ==>  p = acot(A / sin(y))
+    static const auto pitch1 = [](float A, float yDegrees){
+        return glm::atan(glm::sin(glm::radians(yDegrees)) / A);
+    };
+    // 2) p = 22.55 * cos(y / 59.1)  [for fov=45]
+    static const auto pitch2 = [](float yDegrees){
+        return glm::radians(22.55) * (glm::cos((yDegrees / 59.1)));
+    };
+
+    const float A = aspect_w_h;
+    static constexpr float accuracy = 0.01f;
+    float boundMin = 0.0f;
+    float boundMax = 90.0f;
+    while (true) {
+        const float yDegrees = 0.5f * (boundMin + boundMax);
+        const float p1 = pitch1(A, yDegrees);
+        const float p2 = pitch2(yDegrees);
+        if (p1 > p2) boundMax = yDegrees;
+        else         boundMin = yDegrees;
+
+        if (boundMax - boundMin < accuracy) break;
+    }
+
+    const float yaw = 0.5f * (boundMin + boundMax);
+    const float pitch = pitch2(yaw);
+    return std::make_pair(glm::radians(yaw), pitch);
 }
 
 

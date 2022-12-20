@@ -58,6 +58,24 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
 
     // Once we know what image we work with...
 
+    // NOTE This is left here only to be able to measure and confirm performance drop.
+    // NOTE Otherwise just delete this (and the variable in header).
+    // // ... but before the final update: wait on previous frame to finish so that
+    // // the collected data is valid.
+    // const auto startWaitPreviousFrameFinish = std::chrono::high_resolution_clock::now();
+    // // NOTE XXX Hurts performance drastically! Should really wait granuarly.
+    // // Wait only if this is not the first frame
+    // if (previousFrameInFlightIndex < hmlContext->maxFramesInFlight) {
+    //     // TODO Should actually wait not for everything (finishedLastStageOf), but only the piece that we need.
+    //     // So need to introduce new granular fences.
+    //     // vkWaitForFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[previousFrameInFlightIndex], VK_TRUE, UINT64_MAX);
+    // }
+    // previousFrameInFlightIndex = frameInFlightIndex;
+    // const auto endWaitPreviousFrameFinish = std::chrono::high_resolution_clock::now();
+    // const auto igorek = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endWaitPreviousFrameFinish - startWaitPreviousFrameFinish).count()) / 1.0f;
+    // std::cout << igorek << '\n';
+
+
     updateForImage(imageIndex);
 // ============================================================================
     const auto doStagesResult = doStages(HmlFrameData{
@@ -111,21 +129,24 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
 
 
 std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFrameData& frameData) noexcept {
-#if MERGE_CMD_SUBMITS || MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-    std::vector<VkCommandBuffer> primaryCommandBuffers;
-#endif
+    std::vector<VkCommandBuffer> batchCommandBuffers;
+
+    bool batchStartedUsingSwapchainImage = false;
+    bool batchFinishedUsingSwapchainImage = false;
     const auto startRecord = std::chrono::high_resolution_clock::now();
     for (size_t stageIndex = 0; stageIndex < stages.size(); stageIndex++) {
         const auto& stage = stages[stageIndex];
 
-        // ================ Pre-stage funcs ================
-        if (stage.preFunc) (*stage.preFunc)(false, frameData);
+        // ================ Pre-stage func ================
+        if (stage.preFunc) (*stage.preFunc)(*this, false, frameData);
 
-        // ================ Submit ================
+        // ================ Start recording primary command buffer ================
+        const auto primaryCommandBuffer = stage.commandBuffers[frameData.swapchainImageIndex];
+        hmlContext->hmlCommands->beginRecordingPrimaryOnetime(primaryCommandBuffer);
+
+        // ======== Record and execute secondary command buffers ========
         {
-            // ======== Record secondary command buffers ========
-            const auto commandBuffer = stage.commandBuffers[frameData.swapchainImageIndex];
-            stage.renderPass->begin(commandBuffer, frameData.swapchainImageIndex);
+            stage.renderPass->begin(primaryCommandBuffer, frameData.swapchainImageIndex);
             {
                 // NOTE These are parallelizable
                 std::vector<VkCommandBuffer> secondaryCommandBuffers;
@@ -133,22 +154,32 @@ std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFr
                     drawer->selectRenderPass(stage.renderPass);
                     secondaryCommandBuffers.push_back(drawer->draw(frameData));
                 }
-                vkCmdExecuteCommands(commandBuffer, secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
+                vkCmdExecuteCommands(primaryCommandBuffer, secondaryCommandBuffers.size(), secondaryCommandBuffers.data());
             }
-            stage.renderPass->end(commandBuffer);
+            stage.renderPass->end(primaryCommandBuffer);
+        }
 
+        // ================ Post-stage funcs ================
+        if (stage.postFunc) (*stage.postFunc)(false, frameData, primaryCommandBuffer);
 
-#if MERGE_CMD_SUBMITS || MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-            primaryCommandBuffers.push_back(commandBuffer);
-#endif
-#if !MERGE_CMD_SUBMITS || MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-            // ======== Submit primary command buffer ========
+        // ================ Finish recording primary command buffer ================
+        hmlContext->hmlCommands->endRecording(primaryCommandBuffer);
+
+        batchStartedUsingSwapchainImage  |= stage.flags & STAGE_FLAG_FIRST_USAGE_OF_SWAPCHAIN_IMAGE;
+        batchFinishedUsingSwapchainImage |= stage.flags & STAGE_FLAG_LAST_USAGE_OF_SWAPCHAIN_IMAGE;
+        batchCommandBuffers.push_back(primaryCommandBuffer);
+
+        // ======== Submit batch of primary command buffers if needed ========
+        const bool lastStage = stageIndex == stages.size() - 1;
+        const bool stageFinishSignalRequested = stage.flags & STAGE_FLAG_SIGNAL_WHEN_DONE;
+        assert(!(lastStage && stageFinishSignalRequested) && "Last stage signal request not supported for now");
+        const bool mustSubmit = lastStage || stageFinishSignalRequested;
+        if (mustSubmit) {
             std::vector<VkPipelineStageFlags> waitStages;
             std::vector<VkSemaphore> waitSemaphores;
             std::vector<VkSemaphore> signalSemaphores;
 
-            const bool waitForSwapchainImage = stage.flags & STAGE_FLAG_FIRST_USAGE_OF_SWAPCHAIN_IMAGE;
-            if (waitForSwapchainImage) {
+            if (batchStartedUsingSwapchainImage) {
                 // Before starting to write into the swapchain image (so at
                 // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT), wait for it
                 // to become available.
@@ -156,109 +187,58 @@ std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFr
                 waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
             }
 
-            const bool signalSwapchainImageReady = stage.flags & STAGE_FLAG_LAST_USAGE_OF_SWAPCHAIN_IMAGE;
-            if (signalSwapchainImageReady) {
+            if (batchFinishedUsingSwapchainImage) {
                 // Use this semaphore to tell the presentation engine when we have finished rendering into the swapchain image
                 signalSemaphores.push_back(renderToSwapchainImageFinished[frameData.frameInFlightIndex]);
             }
 
-            VkFence signalFence = VK_NULL_HANDLE;
-            const bool lastStage = stageIndex == stages.size() - 1;
+            VkFence signalFence;
             if (lastStage) {
                 // Use this fence to know when we can start dispatching a new frame in flight
-                vkResetFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[frameData.frameInFlightIndex]);
                 signalFence = finishedLastStageOf[frameData.frameInFlightIndex];
-            }
+            } else if (stageFinishSignalRequested) {
+                signalFence = fenceForStageFinish[stage.name];
+            } else assert(false && "Should've had a fence to signal");
+            vkResetFences(hmlContext->hmlDevice->device, 1, &signalFence);
 
-#if MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-            if (waitForSwapchainImage || signalSwapchainImageReady || lastStage) {
-#endif // MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-                VkSubmitInfo submitInfo{
-                    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                    .pNext = nullptr,
-                    .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
-                    .pWaitSemaphores = waitSemaphores.data(),
-                    .pWaitDstStageMask = waitStages.data(),
-#if MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-                    .commandBufferCount = primaryCommandBuffers.size(),
-                    .pCommandBuffers = primaryCommandBuffers.data(),
-#else
-                    .commandBufferCount = 1,
-                    .pCommandBuffers = &commandBuffer,
-#endif // MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-                    .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
-                    .pSignalSemaphores = signalSemaphores.data(),
-                };
+            VkSubmitInfo submitInfo{
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
+                .pWaitSemaphores = waitSemaphores.data(),
+                .pWaitDstStageMask = waitStages.data(),
+                .commandBufferCount = static_cast<uint32_t>(batchCommandBuffers.size()),
+                .pCommandBuffers = batchCommandBuffers.data(),
+                .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
+                .pSignalSemaphores = signalSemaphores.data(),
+            };
 
 
-                if (vkQueueSubmit(hmlContext->hmlDevice->graphicsQueue, 1, &submitInfo, signalFence) != VK_SUCCESS) {
-                    std::cerr << "::> HmlDispatcher: failed to submit command buffer for stage "
-                        << stageIndex << "/" << (stages.size() - 1) << ".\n";
+            if (vkQueueSubmit(hmlContext->hmlDevice->graphicsQueue, 1, &submitInfo, signalFence) != VK_SUCCESS) {
+                std::cerr << "::> HmlDispatcher: failed to submit command buffer for stage "
+                    << stage.name << "(" << (stageIndex + 1) << "/" << stages.size() << ").\n";
 #if EXIT_ON_ERROR
-                    // To quickly crash the application and not wait for it to un-hang
-                    exit(-1);
+                // To quickly crash the application and not wait for it to un-hang
+                exit(-1);
 #endif
-                    return std::nullopt;
-                }
-
-#if MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-                primaryCommandBuffers.clear();
+                return std::nullopt;
             }
-#endif // MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-#endif // !MERGE_CMD_SUBMITS || MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE
-        }
 
-        // ================ Post-stage funcs ================
-        if (stage.postFunc) (*stage.postFunc)(frameData);
+            // ======== Clear batch state ========
+            batchCommandBuffers.clear();
+            batchStartedUsingSwapchainImage = false;
+            batchFinishedUsingSwapchainImage = false;
+        }
     }
     const auto endRecord = std::chrono::high_resolution_clock::now();
 
-    const auto startSubmit = std::chrono::high_resolution_clock::now();
-#if MERGE_CMD_SUBMITS
-    // ======== Submit primary command buffer ========
-    std::vector<VkPipelineStageFlags> waitStages;
-    std::vector<VkSemaphore> waitSemaphores;
-    std::vector<VkSemaphore> signalSemaphores;
-
-    // Before starting to write into the swapchain image (so at
-    // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT), wait for it
-    // to become available.
-    waitSemaphores.push_back(swapchainImageAvailable[frameData.frameInFlightIndex]);
-    waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-
-    // Use this semaphore to tell the presentation engine when we have finished rendering into the swapchain image
-    signalSemaphores.push_back(renderToSwapchainImageFinished[frameData.frameInFlightIndex]);
-
-    // Use this fence to know when we can start dispatching a new frame in flight
-    vkResetFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[frameData.frameInFlightIndex]);
-    VkFence signalFence = finishedLastStageOf[frameData.frameInFlightIndex];
-
-    VkSubmitInfo submitInfo{
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = nullptr,
-        .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
-        .pWaitSemaphores = waitSemaphores.data(),
-        .pWaitDstStageMask = waitStages.data(),
-        .commandBufferCount = static_cast<uint32_t>(primaryCommandBuffers.size()),
-        .pCommandBuffers = primaryCommandBuffers.data(),
-        .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
-        .pSignalSemaphores = signalSemaphores.data(),
-    };
-
-    if (vkQueueSubmit(hmlContext->hmlDevice->graphicsQueue, 1, &submitInfo, signalFence) != VK_SUCCESS) {
-        std::cerr << "::> HmlDispatcher: failed to submit command buffer.\n";
-#if EXIT_ON_ERROR
-        // To quickly crash the application and not wait for it to un-hang
-        exit(-1);
-#endif
-        return std::nullopt;
-    }
-#endif // MERGE_CMD_SUBMITS
-    const auto endSubmit = std::chrono::high_resolution_clock::now();
+    // const auto startSubmit = std::chrono::high_resolution_clock::now();
+    // const auto endSubmit = std::chrono::high_resolution_clock::now();
 
     return { DoStagesResult{
         .elapsedMicrosRecord = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endRecord - startRecord).count()) / 1.0f,
-        .elapsedMicrosSubmit = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endSubmit - startSubmit).count()) / 1.0f,
+        // .elapsedMicrosSubmit = static_cast<float>(std::chrono::duration_cast<std::chrono::microseconds>(endSubmit - startSubmit).count()) / 1.0f,
+        .elapsedMicrosSubmit = 0.0f,
     }};
 }
 
@@ -311,7 +291,7 @@ bool HmlDispatcher::addStage(StageCreateInfo&& stageCreateInfo) noexcept {
     // NOTE There is no valid frame data for the prep stage, and funcs should not
     // use that data in prep stage anyway.
     HmlFrameData frameData = {};
-    if (stageCreateInfo.preFunc) (*stageCreateInfo.preFunc)(true, frameData);
+    if (stageCreateInfo.preFunc) (*stageCreateInfo.preFunc)(*this, true, frameData);
     for (auto& drawer : stageCreateInfo.drawers) {
         if (!clearedDrawers.contains(drawer)) {
             clearedDrawers.insert(drawer);
@@ -319,11 +299,27 @@ bool HmlDispatcher::addStage(StageCreateInfo&& stageCreateInfo) noexcept {
         }
         drawer->addRenderPass(hmlRenderPass);
     }
-    if (stageCreateInfo.postFunc) (*stageCreateInfo.postFunc)(frameData);
+    if (stageCreateInfo.postFunc) (*stageCreateInfo.postFunc)(true, frameData, VK_NULL_HANDLE);
+
+    const bool mustSignalFinish = stageCreateInfo.flags & STAGE_FLAG_SIGNAL_WHEN_DONE;
+    if (mustSignalFinish) {
+        VkFence fence = VK_NULL_HANDLE;
+        VkFenceCreateInfo fenceInfo = {};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        if (vkCreateFence(hmlContext->hmlDevice->device, &fenceInfo, nullptr, &fence) != VK_SUCCESS) {
+            std::cerr << "::> Failed to create VkFence when registering stage (" << stageCreateInfo.name << ").\n";
+            return false;
+        }
+
+        fenceForStageFinish[stageCreateInfo.name] = fence;
+    }
+
 
     const auto count = hmlContext->imageCount();
     const auto pool = hmlContext->hmlCommands->commandPoolOnetimeFrames;
     stages.push_back(Stage{
+        .name = std::move(stageCreateInfo.name),
         .drawers = std::move(stageCreateInfo.drawers),
         .commandBuffers = hmlContext->hmlCommands->allocatePrimary(count, pool),
         .renderPass = std::move(hmlRenderPass),
@@ -331,6 +327,7 @@ bool HmlDispatcher::addStage(StageCreateInfo&& stageCreateInfo) noexcept {
         .preFunc = std::move(stageCreateInfo.preFunc),
         .postFunc = std::move(stageCreateInfo.postFunc),
         .flags = stageCreateInfo.flags,
+        // .stageFinishFence = stageFinishFence,
     });
 
     // We need (stagesCount - 1) batches of semaphores, so skip the first one

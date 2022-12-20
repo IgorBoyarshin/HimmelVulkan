@@ -34,6 +34,7 @@ struct HmlImageResource {
 
     bool blockingTransitionLayoutTo(VkImageLayout newLayout, std::shared_ptr<HmlCommands> hmlCommands) noexcept;
     bool transitionLayoutTo(VkImageLayout newLayout, VkCommandBuffer commandBuffer) noexcept;
+    bool barrier(VkCommandBuffer commandBuffer, VkAccessFlags srcAccess, VkAccessFlags dstAccess, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage, VkImageLayout newLayout = VK_IMAGE_LAYOUT_UNDEFINED) noexcept;
     bool hasStencilComponent() const noexcept;
 
     ~HmlImageResource() noexcept;
@@ -42,7 +43,7 @@ struct HmlImageResource {
 
 struct HmlBuffer {
     enum class Type {
-        STAGING, UNIFORM, STORAGE, VERTEX, INDEX
+        STAGING_FROM_HOST, STAGING_TO_HOST, UNIFORM, STORAGE, VERTEX, INDEX
     } type;
 
     struct Pack {
@@ -62,6 +63,7 @@ struct HmlBuffer {
     bool unmap() noexcept;
     bool update(const void* newData) noexcept;
     bool update(const void* newData, VkDeviceSize customUpdateSizeBytes) noexcept;
+    bool download(void* dst) const noexcept ;
     HmlBuffer(bool mappable) noexcept;
     ~HmlBuffer() noexcept;
 
@@ -134,7 +136,8 @@ struct HmlResourceManager {
         std::shared_ptr<HmlCommands> hmlCommands) noexcept;
     ~HmlResourceManager() noexcept;
     // TODO consistency between new and create
-    std::unique_ptr<HmlBuffer> createStagingBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createStagingBufferFromHost(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createStagingBufferToHost(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createUniformBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createStorageBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createVertexBuffer(VkDeviceSize sizeBytes) const noexcept;
@@ -143,6 +146,7 @@ struct HmlResourceManager {
     std::unique_ptr<HmlBuffer> createIndexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlImageResource> newShadowResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newRenderTargetImageResource(VkExtent2D extent, VkFormat format) noexcept;
+    std::unique_ptr<HmlImageResource> newReadableRenderable(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newTextureResourceFromData(uint32_t width, uint32_t height, uint32_t componentsCount, unsigned char* data, VkFormat format, std::optional<VkFilter> filter) noexcept;
     std::unique_ptr<HmlImageResource> newTextureResource(const char* fileName, uint32_t componentsCount, VkFormat format, VkFilter filter) noexcept;
     std::unique_ptr<HmlImageResource> newImageResource(VkExtent2D extent) noexcept;
@@ -150,7 +154,7 @@ struct HmlResourceManager {
     std::vector<std::shared_ptr<HmlImageResource>> wrapSwapchainImagesIntoImageResources(
         std::vector<VkImage>&& images, VkFormat format, VkExtent2D extent) noexcept;
     std::unique_ptr<HmlImageResource> newBlankImageResource(
-        VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlagBits aspect) noexcept;
+        VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlagBits aspect, VkMemoryPropertyFlags memoryType) noexcept;
     // Model with color
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) noexcept;
     // Model with texture
@@ -227,6 +231,7 @@ struct HmlResourceManager {
     // ========================================================================
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) const noexcept;
     void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D extent) const noexcept;
+    void copyImageToBuffer(VkImage image, VkBuffer buffer, VkExtent2D extent, VkCommandBuffer commandBuffer) const noexcept;
 };
 
 #endif

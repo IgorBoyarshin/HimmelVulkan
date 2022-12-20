@@ -1,6 +1,9 @@
 #include "HmlRenderer.h"
 
 
+HmlRenderer::Entity::Id HmlRenderer::Entity::nextFreeId = HmlRenderer::Entity::Id{} + 1;
+
+
 std::vector<std::unique_ptr<HmlPipeline>> HmlRenderer::createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
     std::vector<std::unique_ptr<HmlPipeline>> pipelines;
@@ -379,6 +382,7 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
                     .model = entity->modelMatrix,
                     .color = glm::vec4(entity->color, 1.0f),
                     .textureIndex = model->textureResource ? textureIndexFor[modelId] : NO_TEXTURE_MARK,
+                    .id = entity->id,
                 };
                 vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
                     hmlPipeline->pushConstantsStages, 0, sizeof(PushConstantRegular), &pushConstant);

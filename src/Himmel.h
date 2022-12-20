@@ -281,10 +281,13 @@ struct Himmel {
     std::vector<std::shared_ptr<HmlImageResource>> gBufferNormals;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferColors;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferLightSpacePositions;
+    std::vector<std::shared_ptr<HmlImageResource>> gBufferIds;
     std::vector<std::shared_ptr<HmlImageResource>> brightness1Textures;
     std::vector<std::shared_ptr<HmlImageResource>> mainTextures;
     std::vector<std::shared_ptr<HmlImageResource>> hmlDepthResources;
     std::vector<std::shared_ptr<HmlImageResource>> hmlShadows;
+
+    std::shared_ptr<HmlBuffer> idsBuffer;
 
 
     // Physics

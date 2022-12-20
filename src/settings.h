@@ -16,8 +16,5 @@
 
 #define WITH_IMGUI 1
 
-#define MERGE_CMD_SUBMITS 1
-#define MERGE_CMD_SUBMITS_BUT_SPLIT_ACQUIRE 0
-
 
 #endif

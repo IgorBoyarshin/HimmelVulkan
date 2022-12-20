@@ -22,19 +22,12 @@
 // swapchain recreation by recreating the whole Renderer object.
 // NOTE
 struct HmlRenderer : HmlDrawer {
-    struct PushConstantRegular {
-        alignas(16) glm::mat4 model;
-        glm::vec4 color;
-        int32_t textureIndex;
-    };
-
-    struct PushConstantInstanced {
-        int32_t textureIndex;
-        float time;
-    };
-
-
     struct Entity {
+        using Id = uint16_t;
+        static const Id INVALID_ID = 0;
+        Id id = INVALID_ID;
+        static Id nextFreeId; // is initted in cpp
+
         // NOTE We prefer to access the modelResource via a pointer rather than by
         // id because it allows for O(1) access speed.
         std::shared_ptr<HmlModelResource> modelResource;
@@ -44,11 +37,24 @@ struct HmlRenderer : HmlDrawer {
 
 
         inline Entity(std::shared_ptr<HmlModelResource> modelResource)
-            : modelResource(modelResource) {}
+            : id(nextFreeId++), modelResource(modelResource) {}
         inline Entity(std::shared_ptr<HmlModelResource> modelResource, const glm::vec3& color)
-            : modelResource(modelResource), color(color) {}
+            : id(nextFreeId++), modelResource(modelResource), color(color) {}
         inline Entity(std::shared_ptr<HmlModelResource> modelResource, const glm::mat4& modelMatrix)
-            : modelResource(modelResource), modelMatrix(modelMatrix) {}
+            : id(nextFreeId++), modelResource(modelResource), modelMatrix(modelMatrix) {}
+    };
+
+
+    struct PushConstantRegular {
+        alignas(16) glm::mat4 model;
+        glm::vec4 color;
+        int32_t textureIndex;
+        Entity::Id id;
+    };
+
+    struct PushConstantInstanced {
+        int32_t textureIndex;
+        float time;
     };
 
 

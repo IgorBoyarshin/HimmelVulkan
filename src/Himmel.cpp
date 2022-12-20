@@ -1176,6 +1176,21 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 
 void Himmel::updateForImage(uint32_t imageIndex) noexcept {
+    // NOTE Do a direct access (rather than download the whole buffer) because
+    // we are only interested in one value.
+    static uint32_t prev = 0;
+    auto [cursor_x, cursor_y] = hmlContext->hmlWindow->getCursor();
+    const uint32_t width = hmlContext->hmlSwapchain->extent().width;
+    const uint32_t height = hmlContext->hmlSwapchain->extent().height;
+    cursor_x = std::clamp(uint32_t(cursor_x), 0u, width);
+    cursor_y = std::clamp(uint32_t(cursor_y), 0u, height);
+    // const uint32_t idValue = static_cast<uint32_t*>(idsBuffer->mappedPtr)[cursor_x * height + cursor_y];
+    const uint32_t idValue = static_cast<uint32_t*>(idsBuffer->mappedPtr)[cursor_y * width + cursor_x];
+    if (idValue != prev) {
+        std::cout << "Cursor is at object with id = " << idValue << '\n';
+    }
+    prev = idValue;
+
     {
         // NOTE cannot use hmlCamera.somethingHasChanged because we have multiple UBOs (per image)
         // const auto globalLightDir = glm::normalize(glm::vec3(0.5f, -1.0f, -1.0f)); // NOTE probably unused
@@ -1292,6 +1307,7 @@ bool Himmel::prepareResources() noexcept {
     gBufferNormals.resize(count);
     gBufferColors.resize(count);
     gBufferLightSpacePositions.resize(count);
+    gBufferIds.resize(count);
     brightness1Textures.resize(count);
     mainTextures.resize(count);
     hmlDepthResources.resize(count);
@@ -1304,6 +1320,7 @@ bool Himmel::prepareResources() noexcept {
         gBufferColors[i]              = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
         gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
+        gBufferIds[i]                 = hmlContext->hmlResourceManager->newReadableRenderable(extent, VK_FORMAT_R32_UINT);
         brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         mainTextures[i]               = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         hmlDepthResources[i]          = hmlContext->hmlResourceManager->newDepthResource(extent);
@@ -1312,11 +1329,21 @@ bool Himmel::prepareResources() noexcept {
         if (!gBufferNormals[i])             return false;
         if (!gBufferColors[i])              return false;
         if (!gBufferLightSpacePositions[i]) return false;
+        if (!gBufferIds[i])                 return false;
         if (!brightness1Textures[i])        return false;
         if (!mainTextures[i])               return false;
         if (!hmlDepthResources[i]) return false;
         if (!hmlShadows[i]) return false;
     }
+
+    size_t idsBufferSizeBytes;
+    switch (gBufferIds[0]->format) {
+        case VK_FORMAT_R32_UINT: idsBufferSizeBytes = gBufferIds[0]->width * gBufferIds[0]->height * 32; break;
+        case VK_FORMAT_R16_UINT: idsBufferSizeBytes = gBufferIds[0]->width * gBufferIds[0]->height * 16; break;
+        default: std::cerr << "::> Unimplemented format for idsBuffer. Provide size calculation.\n"; return false;
+    }
+    idsBuffer = hmlContext->hmlResourceManager->createStagingBufferToHost(idsBufferSizeBytes);
+    idsBuffer->map();
 
 
     hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, hmlShadows });
@@ -1332,24 +1359,34 @@ bool Himmel::prepareResources() noexcept {
         VkCommandBuffer commandBuffer = hmlContext->hmlCommands->beginSingleTimeCommands();
 
         // NOTE oldLayout is correct for the moment because the resources have just been created with correct layouts specified
-        for (auto res : hmlShadows) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
-        for (auto res : mainTextures) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
-        for (auto res : brightness1Textures) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
-        for (auto res : gBufferPositions) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
-        for (auto res : gBufferColors) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
-        for (auto res : gBufferNormals) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : hmlShadows)                 res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : mainTextures)               res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : brightness1Textures)        res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : gBufferPositions)           res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : gBufferColors)              res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : gBufferNormals)             res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
         for (auto res : gBufferLightSpacePositions) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        // for (auto res : gBufferIds)                 res->transitionLayoutTo(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, commandBuffer); // no need because already created in this layout
         for (auto res : hmlContext->hmlSwapchain->imageResources) res->transitionLayoutTo(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
 
         hmlContext->hmlCommands->endSingleTimeCommands(commandBuffer);
     }
 
+    static const auto STAGE_NAME_SHADOW_PASS   = "Shadow pass";
+    static const auto STAGE_NAME_GEOMETRY_PASS = "Geometry pass";
+    static const auto STAGE_NAME_DEFERRED_PASS = "Deferred pass";
+    static const auto STAGE_NAME_AFTER_PASS    = "After pass";
+    static const auto STAGE_NAME_BLOOM_PASS    = "Bloom pass";
+    static const auto STAGE_NAME_UI_PASS       = "UI pass";
     const float VERY_FAR = 10000.0f;
     bool allGood = true;
+    // TODO Use a Builder pattern to create the Dispatcher and seal it at the end,
+    // thus allowing it to check itself for correctness.
     // ================================= PASS =================================
     // ======== Render shadow-casting geometry into shadow map ========
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase, const HmlFrameData& frameData){
+        .name = STAGE_NAME_SHADOW_PASS,
+        .preFunc = [&](HmlDispatcher& dispatcher, bool prepPhase, const HmlFrameData& frameData){
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Shadowmap);
             hmlRenderer->setMode(HmlRenderer::Mode::Shadowmap);
         },
@@ -1372,9 +1409,22 @@ bool Himmel::prepareResources() noexcept {
     // ================================= PASS =================================
     // ======== Renders main geometry into the GBuffer ========
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase, const HmlFrameData& frameData){
+        .name = STAGE_NAME_GEOMETRY_PASS,
+        .preFunc = [&](HmlDispatcher& dispatcher, bool prepPhase, const HmlFrameData& frameData){
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Regular);
             hmlRenderer->setMode(HmlRenderer::Mode::Regular);
+
+            if (!prepPhase) {
+                // const auto startWait = std::chrono::high_resolution_clock::now();
+                const auto fence = dispatcher.getFenceForStageFinish(STAGE_NAME_GEOMETRY_PASS);
+                assert(fence && "Fence signal for stage is not set up");
+                vkWaitForFences(hmlContext->hmlDevice->device, 1, &(*fence), VK_TRUE, UINT64_MAX);
+                // const auto endWait = std::chrono::high_resolution_clock::now();
+                // const auto elapsedMicros = static_cast<float>(std::chrono::duration_cast
+                //     <std::chrono::microseconds>(endWait - startWait).count()) / 1.0f;
+                // std::cout << "Wait for Fence for cursor data from previous frame took " << elapsedMicros << "mks.\n";
+                // TODO dispatcher.registerStats("Waiting for stage from previous frame", begin, end);
+            }
         },
         .drawers = { hmlTerrainRenderer, hmlRenderer },
         .differentExtent = std::nullopt,
@@ -1403,6 +1453,12 @@ bool Himmel::prepareResources() noexcept {
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
+            HmlRenderPass::ColorAttachment{
+                .imageResources = gBufferIds,
+                .loadColor = HmlRenderPass::LoadColor::Clear({ 0 }),
+                .preLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .postLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            },
         },
         .depthAttachment = {
             HmlRenderPass::DepthStencilAttachment{
@@ -1413,13 +1469,43 @@ bool Himmel::prepareResources() noexcept {
                 .postLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             }
         },
-        .subpassDependencies = {},
-        .postFunc = std::nullopt,
-        .flags = HmlDispatcher::STAGE_NO_FLAGS,
+        .subpassDependencies = {
+            VkSubpassDependency{
+                .srcSubpass = 0,
+                .dstSubpass = VK_SUBPASS_EXTERNAL,
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .dependencyFlags = 0,
+            }
+        },
+        .postFunc = [&](bool prepPhase, const HmlFrameData& frameData, VkCommandBuffer commandBuffer){
+            if (!prepPhase) {
+                // Transition layout and specify a dependency between output finish and transfer start
+                auto& imageResource = gBufferIds[frameData.swapchainImageIndex];
+                // NOTE I think we achieve the same thing via subpass dependency
+                // imageResource->barrier(commandBuffer,
+                //     VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                //     VK_ACCESS_TRANSFER_READ_BIT,
+                //     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                //     VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+                // Perform the actual transfer
+                VkExtent2D extent{
+                    .width = imageResource->width,
+                    .height = imageResource->height,
+                };
+                hmlContext->hmlResourceManager->copyImageToBuffer(imageResource->image, idsBuffer->buffer, extent, commandBuffer);
+            }
+        },
+        .flags = HmlDispatcher::STAGE_FLAG_SIGNAL_WHEN_DONE,
+        // .flags = HmlDispatcher::STAGE_NO_FLAGS,
     });
     // ================================= PASS =================================
     // ======== Renders a 2D texture using the GBuffer ========
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .name = STAGE_NAME_DEFERRED_PASS,
         .preFunc = std::nullopt,
         .drawers = { hmlDeferredRenderer },
         .differentExtent = std::nullopt,
@@ -1455,7 +1541,8 @@ bool Himmel::prepareResources() noexcept {
     // ======== Renders on top of the deferred texture using the depth info from the prep pass ========
     // Input: ---
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase, const HmlFrameData& frameData){
+        .name = STAGE_NAME_AFTER_PASS,
+        .preFunc = [&](HmlDispatcher& dispatcher, bool prepPhase, const HmlFrameData& frameData){
 #if DEBUG_TERRAIN
             hmlTerrainRenderer->setMode(HmlTerrainRenderer::Mode::Debug);
 #endif
@@ -1517,6 +1604,7 @@ bool Himmel::prepareResources() noexcept {
     // TODO write description
     // Input: mainTexture, brightness1Textures
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .name = STAGE_NAME_BLOOM_PASS,
         .preFunc = std::nullopt,
         .drawers = { hmlBloomRenderer },
         .differentExtent = std::nullopt,
@@ -1550,7 +1638,8 @@ bool Himmel::prepareResources() noexcept {
     // ======== Renders multiple 2D textures on top of everything ========
     // Input: shadowmap, all gBuffers
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
-        .preFunc = [&](bool prepPhase, const HmlFrameData& frameData){
+        .name = STAGE_NAME_UI_PASS,
+        .preFunc = [&](HmlDispatcher& dispatcher, bool prepPhase, const HmlFrameData& frameData){
             if (!prepPhase) hmlContext->hmlImgui->finilize(frameData.currentFrameIndex, frameData.frameInFlightIndex);
         },
         .drawers = { hmlUiRenderer, hmlImguiRenderer },

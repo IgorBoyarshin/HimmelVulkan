@@ -12,6 +12,7 @@ layout(location = 0) out vec4 gPosition;
 layout(location = 1) out vec4 gNormal;
 layout(location = 2) out vec4 gColor;
 layout(location = 3) out vec4 gLightSpacePosition;
+layout(location = 4) out uint gIds;
 
 void main() {
     vec4 heightColor = vec4(texture(heightmap, inTexCoord).rrr, 1.0);
@@ -20,4 +21,5 @@ void main() {
     gPosition = vec4(inPosition, 1.0);
     gNormal = vec4(normalize(inNormal), 1.0);
     gLightSpacePosition = vec4(inLightSpacePosition, 1.0);
+    gIds = 0; // TODO
 }

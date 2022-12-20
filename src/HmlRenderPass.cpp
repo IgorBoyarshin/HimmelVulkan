@@ -2,7 +2,7 @@
 
 
 void HmlRenderPass::begin(VkCommandBuffer commandBuffer, uint32_t imageIndex) const noexcept {
-    hmlCommands->beginRecordingPrimaryOnetime(commandBuffer);
+    // hmlCommands->beginRecordingPrimaryOnetime(commandBuffer);
 
     VkRenderPassBeginInfo renderPassInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -25,7 +25,7 @@ void HmlRenderPass::begin(VkCommandBuffer commandBuffer, uint32_t imageIndex) co
 
 void HmlRenderPass::end(VkCommandBuffer commandBuffer) const noexcept {
     vkCmdEndRenderPass(commandBuffer);
-    hmlCommands->endRecording(commandBuffer);
+    // hmlCommands->endRecording(commandBuffer);
 }
 
 

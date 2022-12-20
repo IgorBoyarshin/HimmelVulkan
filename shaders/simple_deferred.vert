@@ -17,6 +17,7 @@ layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 color;
     int textureIndex;
+    int id;
 } push;
 
 layout(location = 0) in vec3 inPosition;

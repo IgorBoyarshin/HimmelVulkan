@@ -105,7 +105,9 @@ bool Himmel::init() noexcept {
 
     if (!initLights()) return false;
     if (!initModels()) return false;
+#if WITH_PHYSICS
     if (!initPhysics()) return false;
+#endif
     if (!initEntities()) return false; // NOTE must be after Physics because is expected to set the last entity
 
     if (!prepareResources()) return false;
@@ -142,8 +144,10 @@ bool Himmel::initContext() noexcept {
     hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, 2 * hmlContext->imageCount());
     if (!hmlContext->hmlQueries) return false;
 
+#if WITH_IMGUI
     hmlContext->hmlImgui = HmlImgui::create(hmlContext->hmlWindow, hmlContext->hmlResourceManager, hmlContext->maxFramesInFlight);
     if (!hmlContext->hmlImgui) return false;
+#endif
 
     return true;
 }
@@ -165,9 +169,11 @@ bool Himmel::initRenderers(const char* heightmapFile) noexcept {
     hmlBloomRenderer = HmlBloomRenderer::create(hmlContext);
     if (!hmlBloomRenderer) return false;
 
+#if WITH_IMGUI
     // NOTE specify buffers explicitly, even though we have context already, to highlight this dependency
     hmlImguiRenderer = HmlImguiRenderer::create(hmlContext->hmlImgui->vertexBuffers, hmlContext->hmlImgui->indexBuffers, hmlContext);
     if (!hmlImguiRenderer) return false;
+#endif
 
 
 #if SNOW_IS_ON
@@ -776,7 +782,10 @@ bool Himmel::run() noexcept {
         // if (hmlContext->currentFrame) hmlCamera.invalidateCache();
 
         glfwPollEvents();
+
+#if WITH_IMGUI
         hmlContext->hmlImgui->beginFrame();
+#endif
 
         static auto mark = startTime;
         const auto newMark = std::chrono::high_resolution_clock::now();
@@ -804,8 +813,10 @@ bool Himmel::run() noexcept {
 #if USE_TIMESTAMP_QUERIES
             static float showedElapsedMicrosGpu = 0;
 #endif
+#if WITH_PHYSICS
             static float showedElapsedMicrosPhysics = 0;
             static float showedPhysicsSubsteps = 0;
+#endif
             ImGui::SetNextWindowBgAlpha(0.5f);
             ImGuiWindowFlags window_flags =
                 // ImGuiWindowFlags_NoDecoration |
@@ -825,20 +836,23 @@ bool Himmel::run() noexcept {
 #if USE_TIMESTAMP_QUERIES
                     showedElapsedMicrosGpu = frameStats.elapsedMicrosGpu;
 #endif
+#if WITH_PHYSICS
                     showedElapsedMicrosPhysics = frameStats.elapsedMicrosPhysics;
                     {
                         const auto stats = hmlPhysics->getThreadedStats();
                         if (stats) showedPhysicsSubsteps = stats->substeps;
                     }
-
+#endif
                 }
                 ImGui::Text("FPS = %.0f", showedFps);
                 ImGui::Text("Delta = %.1fms", showedDeltaMillis);
                 ImGui::Separator();
+#if WITH_PHYSICS
                 ImGui::Text("CPU Physics = %.0f mks", showedElapsedMicrosPhysics);
                 if (hmlPhysics->hasSelfThread()) {
                     ImGui::Text("Physics substeps = %.0f", showedPhysicsSubsteps);
                 }
+#endif
                 ImGui::Text("CPU WaitNextInFlightFrame = %.0f mks", showedElapsedMicrosWaitNextInFlightFrame);
                 ImGui::Text("CPU Acquire = %.0f mks", showedElapsedMicrosAcquire);
                 ImGui::Text("CPU WaitSwapchainImage = %.0f mks", showedElapsedMicrosWaitSwapchainImage);
@@ -948,7 +962,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
 
 
     static bool uiInFocus = false;
-#ifdef WITH_IMGUI
+#if WITH_IMGUI
     { // Imgui stuff
         static bool f1Pressed = false;
         if (!f1Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F1) == GLFW_PRESS) {
@@ -990,6 +1004,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
     }
 
+#if WITH_PHYSICS
     { // Print HmlPhysics stats
         static bool f3Pressed = false;
         if (!f3Pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_F3) == GLFW_PRESS) {
@@ -1039,6 +1054,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
             pressed = false;
         }
     }
+#endif
 
     // NOTE allow cursor position update and only disable camera rotation reaction
     // in order not to have the camera jump on re-acquiring control from the ui
@@ -1073,13 +1089,15 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     }
 
 
+#if WITH_PHYSICS
     // Upload data from physics to entities
     for (const auto& [id, mm] : hmlPhysics->getModelMatrices()) {
         physicsIdToEntity[id]->modelMatrix = mm;
     }
+#endif
 
 
-#ifdef WITH_IMGUI
+#if WITH_IMGUI
     ImGui::SetNextWindowBgAlpha(0.35f);
     ImGuiWindowFlags window_flags =
         ImGuiWindowFlags_NoDecoration |
@@ -1146,10 +1164,11 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         }
     }
     ImGui::End();
-#endif
 
     hmlContext->hmlImgui->updateForDt(dt);
+#endif // WITH_IMGUI
 
+#if WITH_PHYSICS
     {
         const auto startTime = std::chrono::high_resolution_clock::now();
         if (!physicsPaused) hmlPhysics->updateForDt(dt);
@@ -1158,6 +1177,7 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         const float sinceStartMks = static_cast<float>(sinceStart);
         frameStats.elapsedMicrosPhysics = sinceStartMks;
     }
+#endif
 
 
 #if SNOW_IS_ON
@@ -1199,8 +1219,11 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
         // const auto globalLightView = glm::lookAt(globalLightPos, globalLightPos + globalLightDir, glm::vec3{0, 1, 0});
         static float near = 300.0f;
         static float far = 1100.0f;
+#if WITH_IMGUI
         const float minDepth = 0.1f;
         const float maxDepth = 1200.0f;
+#endif
+
 #define FROM_SUN 1
 #if FROM_SUN // from Sun position
         const auto globalLightPos = sun.calculatePosNorm() * sun.shadowCalcRadius;
@@ -1252,7 +1275,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             .dayNightCycleT = sun.regularT()
         };
         viewProjUniformBuffers[imageIndex]->update(&generalUbo);
-#ifdef WITH_IMGUI
+#if WITH_IMGUI
         ImGuiWindowFlags window_flags =
             // ImGuiWindowFlags_NoDecoration |
             ImGuiWindowFlags_AlwaysAutoResize |
@@ -1640,9 +1663,16 @@ bool Himmel::prepareResources() noexcept {
     allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
         .name = STAGE_NAME_UI_PASS,
         .preFunc = [&](HmlDispatcher& dispatcher, bool prepPhase, const HmlFrameData& frameData){
+#if WITH_IMGUI
             if (!prepPhase) hmlContext->hmlImgui->finilize(frameData.currentFrameIndex, frameData.frameInFlightIndex);
+#endif
         },
-        .drawers = { hmlUiRenderer, hmlImguiRenderer },
+        .drawers = {
+            hmlUiRenderer
+#if WITH_IMGUI
+            , hmlImguiRenderer
+#endif
+        },
         .differentExtent = std::nullopt,
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{

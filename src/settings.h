@@ -15,6 +15,7 @@
 #define LOG_STATS 0 && USE_TIMESTAMP_QUERIES
 
 #define WITH_IMGUI 1
+#define WITH_PHYSICS 0
 
 
 #endif

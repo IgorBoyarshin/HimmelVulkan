@@ -123,7 +123,7 @@ bool Himmel::initContext() noexcept {
     hmlContext = std::make_shared<HmlContext>();
     hmlContext->maxFramesInFlight = 3;
 
-    hmlContext->hmlWindow = HmlWindow::create(1900, 1000, windowName);
+    hmlContext->hmlWindow = HmlWindow::create(1900, 1000, windowName, false);
     if (!hmlContext->hmlWindow) return false;
 
     hmlContext->hmlDevice = HmlDevice::create(hmlContext->hmlWindow);

@@ -1,7 +1,7 @@
 #include "HmlWindow.h"
 
 
-std::unique_ptr<HmlWindow> HmlWindow::create(uint32_t width, uint32_t height, const char* name) noexcept {
+std::unique_ptr<HmlWindow> HmlWindow::create(uint32_t width, uint32_t height, const char* name, bool fullscreen) noexcept {
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // disable OpenGL
@@ -10,7 +10,7 @@ std::unique_ptr<HmlWindow> HmlWindow::create(uint32_t width, uint32_t height, co
 
     HmlWindow* hmlWindow = new HmlWindow;
     hmlWindow->name = name;
-    hmlWindow->window = glfwCreateWindow(width, height, name, nullptr, nullptr);
+    hmlWindow->window = glfwCreateWindow(width, height, name, fullscreen ? glfwGetPrimaryMonitor() : nullptr, nullptr);
 
     // glfwSetWindowOpacity(hmlWindow->window, 0.7f);
     glfwSetWindowUserPointer(hmlWindow->window, hmlWindow); // to be used inside resizeCallback

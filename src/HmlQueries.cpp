@@ -20,6 +20,10 @@ std::unique_ptr<HmlQueries> HmlQueries::create(std::shared_ptr<HmlDevice> hmlDev
 
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(hmlDevice->physicalDevice, &properties);
+    if (!properties.limits.timestampComputeAndGraphics) {
+        std::cout << "::> The device does not support timestamp queries\n";
+        return {};
+    }
     const float timestampPeriod = properties.limits.timestampPeriod;
     hmlQueries->timestampPeriod = static_cast<uint64_t>(timestampPeriod);
 #endif
@@ -65,7 +69,8 @@ std::vector<std::optional<uint64_t>> HmlQueries::query(VkQueryPool pool) noexcep
     const auto flags = VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
     const auto device = hmlDevice->device;
     const auto sizeBytes = data.size() * sizeof(data[0]);
-    if (const auto result = vkGetQueryPoolResults(device, pool, 0, count, sizeBytes, data.data(), 0, flags);
+    const auto stride = 2 * sizeof(data[0]);
+    if (const auto result = vkGetQueryPoolResults(device, pool, 0, count, sizeBytes, data.data(), stride, flags);
             !(result == VK_SUCCESS || result == VK_NOT_READY)) {
         std::cout << "::> Unexpected result while trying to query a pool in HmlQueries: " << result << ".\n";
         return {};

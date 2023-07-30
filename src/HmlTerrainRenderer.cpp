@@ -290,6 +290,7 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+#if USE_TIMESTAMP_QUERIES
     if (mode == Mode::Regular) {
         hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw(r)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     } else if (mode == Mode::Debug) {
@@ -297,6 +298,7 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
     } else if (mode == Mode::Shadowmap) {
         hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw(s)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     }
+#endif
 
     assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlTerrainRenderer.\n");
     const auto& hmlPipeline = getCurrentPipelines()[0];
@@ -331,6 +333,7 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
         }
     }
 
+#if USE_TIMESTAMP_QUERIES
     if (mode == Mode::Regular) {
         hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", "T(r)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     } else if (mode == Mode::Debug) {
@@ -338,6 +341,7 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
     } else if (mode == Mode::Shadowmap) {
         hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", "T(s)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     }
+#endif
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }

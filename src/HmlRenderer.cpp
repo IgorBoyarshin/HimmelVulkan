@@ -349,11 +349,13 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
     assert(getCurrentPipelines().size() == 2 && "::> Expected two pipelines in HmlRenderer.\n");
 
     { // Regular Entities
+#if USE_TIMESTAMP_QUERIES
         if (mode == Mode::Regular) {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: begin regular entities", "Ew", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
         } else {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: begin regular entities", "Ew(s)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
         }
+#endif
         const auto& hmlPipeline = getCurrentPipelines()[0];
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
@@ -399,19 +401,23 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
                     instanceCount, firstIndex, offsetToAddToIndices, firstInstance);
             }
         }
+#if USE_TIMESTAMP_QUERIES
         if (mode == Mode::Regular) {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: end regular entities", "E", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
         } else {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: end regular entities", "E(s)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
         }
+#endif
     }
 
     if (!instancedCounts.empty()) { // Instanced (static Entities)
+#if USE_TIMESTAMP_QUERIES
         if (mode == Mode::Regular) {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: begin instanced entities", "EIw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
         } else {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: begin instanced entities", "EIw(s)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
         }
+#endif
         const auto& hmlPipeline = getCurrentPipelines()[1];
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
 
@@ -460,11 +466,13 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
             dispatchedInstancesCount += *instancedCountsIt;
             std::advance(instancedCountsIt, 1);
         }
+#if USE_TIMESTAMP_QUERIES
         if (mode == Mode::Regular) {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: end instanced entities", "EI", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
         } else {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: end instanced entities", "EI(s)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
         }
+#endif
     }
 
     hmlContext->hmlCommands->endRecording(commandBuffer);

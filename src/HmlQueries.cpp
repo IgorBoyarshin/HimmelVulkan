@@ -1,12 +1,12 @@
 #include "HmlQueries.h"
 
+#if USE_TIMESTAMP_QUERIES
 
 std::unique_ptr<HmlQueries> HmlQueries::create(std::shared_ptr<HmlDevice> hmlDevice, std::shared_ptr<HmlCommands> hmlCommands, uint32_t depth) noexcept {
     auto hmlQueries = std::make_unique<HmlQueries>();
     hmlQueries->hmlDevice = hmlDevice;
     hmlQueries->hmlCommands = hmlCommands;
 
-#if USE_TIMESTAMP_QUERIES
     const auto commandBuffer = hmlCommands->beginLongTermSingleTimeCommand();
     for (uint32_t i = 0; i < depth; i++) {
         auto pool = hmlQueries->createPool(QUERIES_IN_POOL);
@@ -26,7 +26,6 @@ std::unique_ptr<HmlQueries> HmlQueries::create(std::shared_ptr<HmlDevice> hmlDev
     }
     const float timestampPeriod = properties.limits.timestampPeriod;
     hmlQueries->timestampPeriod = static_cast<uint64_t>(timestampPeriod);
-#endif
 
     return hmlQueries;
 }
@@ -86,7 +85,6 @@ std::vector<std::optional<uint64_t>> HmlQueries::query(VkQueryPool pool) noexcep
 
 // TODO add support for static registrations
 void HmlQueries::registerEvent(std::string_view name, std::string_view shortName, VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage) noexcept {
-#if USE_TIMESTAMP_QUERIES
     if (!hasBegun) {
         std::cout << ":> HmlQueries: not registering " << name << " because the frame has not begun yet.\n";
         return;
@@ -102,33 +100,25 @@ void HmlQueries::registerEvent(std::string_view name, std::string_view shortName
 
     currentEventIndex++;
     usedQueriesInPool[pools.front()] = currentEventIndex;
-#endif
 }
 
 
 std::optional<HmlQueries::FrameStat> HmlQueries::popOldestFrameStat() noexcept {
-#if USE_TIMESTAMP_QUERIES
     if (frameStats.empty()) return std::nullopt;
 
     const auto el = frameStats.front();
     frameStats.pop();
-    return { el };
-#else
-    return std::nullopt;
-#endif
+    return { std::move(el) };
 }
 
 
 void HmlQueries::beginFrame() noexcept {
-#if USE_TIMESTAMP_QUERIES
     hasBegun = true;
     currentEventIndex = 0;
-#endif
 }
 
 
 void HmlQueries::endFrame(uint32_t currentFrame) noexcept {
-#if USE_TIMESTAMP_QUERIES
     hasBegun = false;
 
     if (currentEventIndex != layout->size()) {
@@ -151,7 +141,6 @@ void HmlQueries::endFrame(uint32_t currentFrame) noexcept {
         vkCmdResetQueryPool(commandBuffer, pools.front(), 0, queriesCount);
         hmlCommands->endLongTermSingleTimeCommand(commandBuffer);
     }
-#endif
 }
 
 
@@ -161,3 +150,5 @@ void HmlQueries::replaceLayout() noexcept {
     // Invalidate the rest of the layout, thus making it valid again
     layout->erase(layout->begin() + currentEventIndex, layout->end());
 }
+
+#endif // USE_TIMESTAMP_QUERIES

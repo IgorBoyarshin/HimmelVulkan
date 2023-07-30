@@ -96,10 +96,12 @@ void HmlLightRenderer::bake() noexcept {
             .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
         };
         hmlContext->hmlCommands->beginRecordingSecondary(commandBuffer, &inheritanceInfo);
+#if USE_TIMESTAMP_QUERIES
         // NOTE XXX we cannot use HmlQueries for baked commands because the
         // registration happens only once (is not baked. obviously). Maybe we
         // can come up with an alternatvie method, though...
         // hmlContext->hmlQueries->registerEvent("HmlLightRenderer: begin", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+#endif
 
         assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlLightRenderer.\n");
         const auto& hmlPipeline = getCurrentPipelines()[0];
@@ -117,7 +119,9 @@ void HmlLightRenderer::bake() noexcept {
         const uint32_t firstVertex = 0;
         vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
+#if USE_TIMESTAMP_QUERIES
         // hmlContext->hmlQueries->registerEvent("HmlLightRenderer: end", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+#endif
         hmlContext->hmlCommands->endRecording(commandBuffer);
     }
 }

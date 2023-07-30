@@ -141,8 +141,10 @@ bool Himmel::initContext() noexcept {
     hmlContext->hmlSwapchain = HmlSwapchain::create(hmlContext->hmlWindow, hmlContext->hmlDevice, hmlContext->hmlResourceManager, std::nullopt);
     if (!hmlContext->hmlSwapchain) return false;
 
+#if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries = HmlQueries::create(hmlContext->hmlDevice, hmlContext->hmlCommands, 2 * hmlContext->imageCount());
     if (!hmlContext->hmlQueries) return false;
+#endif
 
 #if WITH_IMGUI
     hmlContext->hmlImgui = HmlImgui::create(hmlContext->hmlWindow, hmlContext->hmlResourceManager, hmlContext->maxFramesInFlight);
@@ -777,7 +779,10 @@ void Himmel::testbenchFriction() noexcept {
 bool Himmel::run() noexcept {
     static auto startTime = std::chrono::high_resolution_clock::now();
     while (!hmlContext->hmlWindow->shouldClose()) {
+#if USE_TIMESTAMP_QUERIES
         hmlContext->hmlQueries->beginFrame();
+#endif
+
         // To force initial update of stuff
         // if (hmlContext->currentFrame) hmlCamera.invalidateCache();
 
@@ -884,7 +889,10 @@ bool Himmel::run() noexcept {
 
 
         hmlContext->hmlResourceManager->tickFrame(hmlContext->currentFrame);
+
+#if USE_TIMESTAMP_QUERIES
         hmlContext->hmlQueries->endFrame(hmlContext->currentFrame);
+#endif
 
 #if LOG_FPS
         const auto fps = 1.0 / deltaSeconds;
@@ -895,7 +903,7 @@ bool Himmel::run() noexcept {
 
 #if USE_TIMESTAMP_QUERIES
         const auto frameStatOpt = hmlContext->hmlQueries->popOldestFrameStat();
-#endif // USE_TIMESTAMP_QUERIES
+#endif
 
 #if LOG_STATS
         if (frameStatOpt) {

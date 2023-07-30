@@ -139,7 +139,9 @@ VkCommandBuffer HmlImguiRenderer::draw(const HmlFrameData& frameData) noexcept {
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+#if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlImguiRenderer: begin", "ImG(w)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+#endif
 
     assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlImguiRenderer.\n");
     const auto& hmlPipeline = getCurrentPipelines()[0];
@@ -194,7 +196,9 @@ VkCommandBuffer HmlImguiRenderer::draw(const HmlFrameData& frameData) noexcept {
         }
     }
 
+#if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlImguiRenderer: end", "ImG", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+#endif
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }

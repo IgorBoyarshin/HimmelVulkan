@@ -182,7 +182,9 @@ VkCommandBuffer HmlDeferredRenderer::draw(const HmlFrameData& frameData) noexcep
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+#if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlDeferredRenderer: begin", "Dw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+#endif
 
     assert(getCurrentPipelines().size() == 1 && "::> Expected only a single pipeline in HmlDeferredRenderer.\n");
     const auto& hmlPipeline = getCurrentPipelines()[0];
@@ -200,7 +202,9 @@ VkCommandBuffer HmlDeferredRenderer::draw(const HmlFrameData& frameData) noexcep
     const uint32_t firstVertex = 0;
     vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
+#if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlDeferredRenderer: end", "D", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+#endif
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }

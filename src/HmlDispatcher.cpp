@@ -7,6 +7,10 @@
  * So, its commandBuffer has been submitted, but has not finished yet.
  * */
 std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
+#if USE_DEBUG_LABELS
+    hml::DebugLabel debugLabel(hmlContext->hmlDevice->graphicsQueue, "Frame");
+#endif
+
     static uint32_t frameInFlightIndex = 0;
 
     // Wait for next-in-order frame to become rendered (for its commandBuffer
@@ -15,6 +19,9 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
     const auto startWaitNextInFlightFrame = std::chrono::high_resolution_clock::now();
     vkWaitForFences(hmlContext->hmlDevice->device, 1, &finishedLastStageOf[frameInFlightIndex], VK_TRUE, UINT64_MAX);
     const auto endWaitNextInFlightFrame = std::chrono::high_resolution_clock::now();
+#if USE_DEBUG_LABELS
+    debugLabel.insert("Waited next frame in flight");
+#endif
 
     // vkAcquireNextImageKHR only specifies which image will be made
     // available next, so that we can e.g. start recording command
@@ -40,6 +47,9 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
         return std::nullopt;
     }
     const auto endAcquire = std::chrono::high_resolution_clock::now();
+#if USE_DEBUG_LABELS
+    debugLabel.insert("Acquired swapchain image index");
+#endif
 
     const auto startWaitSwapchainImage = std::chrono::high_resolution_clock::now();
     if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) [[likely]] {
@@ -51,6 +61,9 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
         vkWaitForFences(hmlContext->hmlDevice->device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
     const auto endWaitSwapchainImage = std::chrono::high_resolution_clock::now();
+#if USE_DEBUG_LABELS
+    debugLabel.insert("Waited swapchain image");
+#endif
 
     // The image has at least finished being rendered.
     // Mark the image as now being in use by this frame
@@ -84,6 +97,9 @@ std::optional<HmlDispatcher::FrameResult> HmlDispatcher::doFrame() noexcept {
         .currentFrameIndex = hmlContext->currentFrame,
         .generalDescriptorSet_0 = generalDescriptorSet_0_perImage[imageIndex],
     });
+#if USE_DEBUG_LABELS
+    debugLabel.end();
+#endif
 // ============================================================================
     bool mustRecreateSwapchain = false;
     const auto startPresent = std::chrono::high_resolution_clock::now();

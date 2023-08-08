@@ -448,7 +448,12 @@ bool HmlDevice::loadVulkanFunctions(VkInstance instance) {
         "vkSubmitDebugUtilsMessageEXT",
 
         "vkCmdBeginDebugUtilsLabelEXT",
+        "vkCmdInsertDebugUtilsLabelEXT",
         "vkCmdEndDebugUtilsLabelEXT",
+
+        "vkQueueBeginDebugUtilsLabelEXT",
+        "vkQueueInsertDebugUtilsLabelEXT",
+        "vkQueueEndDebugUtilsLabelEXT",
     };
 
     for (const char* functionName : functionNames) {
@@ -505,6 +510,41 @@ VKAPI_ATTR void VKAPI_CALL vkSubmitDebugUtilsMessageEXT(
     return cachedPtr(instance, messageSeverity, messageTypes, pCallbackData);
 }
 // ========================================================================
+VKAPI_ATTR void VKAPI_CALL vkQueueBeginDebugUtilsLabelEXT(
+    VkQueue queue,
+    const VkDebugUtilsLabelEXT* pLabelInfo
+) {
+    static PFN_vkQueueBeginDebugUtilsLabelEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkQueueBeginDebugUtilsLabelEXT>(
+            vulkanFunctionsDispatchTable.at("vkQueueBeginDebugUtilsLabelEXT"));
+    }
+    return cachedPtr(queue, pLabelInfo);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkQueueInsertDebugUtilsLabelEXT(
+    VkQueue queue,
+    const VkDebugUtilsLabelEXT* pLabelInfo
+) {
+    static PFN_vkQueueInsertDebugUtilsLabelEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkQueueInsertDebugUtilsLabelEXT>(
+            vulkanFunctionsDispatchTable.at("vkQueueInsertDebugUtilsLabelEXT"));
+    }
+    return cachedPtr(queue, pLabelInfo);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkQueueEndDebugUtilsLabelEXT(
+    VkQueue queue
+) {
+    static PFN_vkQueueEndDebugUtilsLabelEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkQueueEndDebugUtilsLabelEXT>(
+            vulkanFunctionsDispatchTable.at("vkQueueEndDebugUtilsLabelEXT"));
+    }
+    return cachedPtr(queue);
+}
+// ========================================================================
 VKAPI_ATTR void VKAPI_CALL vkCmdBeginDebugUtilsLabelEXT(
     VkCommandBuffer commandBuffer,
     const VkDebugUtilsLabelEXT* pLabelInfo
@@ -513,6 +553,18 @@ VKAPI_ATTR void VKAPI_CALL vkCmdBeginDebugUtilsLabelEXT(
     if (!cachedPtr) [[unlikely]] {
         cachedPtr = reinterpret_cast<PFN_vkCmdBeginDebugUtilsLabelEXT>(
             vulkanFunctionsDispatchTable.at("vkCmdBeginDebugUtilsLabelEXT"));
+    }
+    return cachedPtr(commandBuffer, pLabelInfo);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdInsertDebugUtilsLabelEXT(
+    VkCommandBuffer commandBuffer,
+    const VkDebugUtilsLabelEXT* pLabelInfo
+) {
+    static PFN_vkCmdInsertDebugUtilsLabelEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkCmdInsertDebugUtilsLabelEXT>(
+            vulkanFunctionsDispatchTable.at("vkCmdInsertDebugUtilsLabelEXT"));
     }
     return cachedPtr(commandBuffer, pLabelInfo);
 }

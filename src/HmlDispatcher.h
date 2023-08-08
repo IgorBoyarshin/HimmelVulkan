@@ -11,6 +11,7 @@
 #include "HmlRenderPass.h"
 #include "renderer.h"
 #include "settings.h"
+#include "util.h"
 
 
 // Shared (CPU-GPU) data must be [maxFramesInFlight].

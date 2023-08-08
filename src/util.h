@@ -25,9 +25,8 @@ inline T getRandomUniformFloat(T low, T high) noexcept {
 }
 
 
+// TODO can make template specialization for command buffer and queue
 struct DebugLabel {
-    VkCommandBuffer commandBuffer;
-
     inline DebugLabel(VkCommandBuffer commandBuffer, const char* label) noexcept
             : commandBuffer(commandBuffer) {
         assert(commandBuffer && "::> Trying to create a DebugLabel with null commandBuffer.\n");
@@ -38,16 +37,48 @@ struct DebugLabel {
         vkCmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
     }
 
+    inline DebugLabel(VkQueue queue, const char* label) noexcept
+            : queue(queue) {
+        assert(queue && "::> Trying to create a DebugLabel with null queue.\n");
+
+        VkDebugUtilsLabelEXT debugLabel = {};
+        debugLabel.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+        debugLabel.pLabelName = label;
+        vkQueueBeginDebugUtilsLabelEXT(queue, &debugLabel);
+    }
+
     inline ~DebugLabel() noexcept {
         end();
     }
 
+    inline void insert(const char* label) noexcept {
+        if (commandBuffer) {
+            VkDebugUtilsLabelEXT debugLabel = {};
+            debugLabel.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+            debugLabel.pLabelName = label;
+            vkCmdInsertDebugUtilsLabelEXT(commandBuffer, &debugLabel);
+        } else if (queue) {
+            VkDebugUtilsLabelEXT debugLabel = {};
+            debugLabel.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+            debugLabel.pLabelName = label;
+            vkQueueInsertDebugUtilsLabelEXT(queue, &debugLabel);
+        } else assert(false);
+    }
+
+    // NOTE may be called multiple times (for explicit end() and then for destructor)
     inline void end() noexcept {
-        if (commandBuffer) [[likely]] {
+        if (commandBuffer) {
             vkCmdEndDebugUtilsLabelEXT(commandBuffer);
             commandBuffer = nullptr;
+        } else if (queue) {
+            vkQueueEndDebugUtilsLabelEXT(queue);
+            queue = nullptr;
         }
     }
+
+private:
+    VkCommandBuffer commandBuffer = nullptr;
+    VkQueue         queue         = nullptr;
 };
 
 

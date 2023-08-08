@@ -114,6 +114,9 @@ VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+#if USE_DEBUG_LABELS
+    hml::DebugLabel debugLabel{commandBuffer, "UI"};
+#endif
 #if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlUiRenderer: begin", "UIw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 #endif
@@ -145,6 +148,9 @@ VkCommandBuffer HmlUiRenderer::draw(const HmlFrameData& frameData) noexcept {
 
 #if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlUiRenderer: end", "UI", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+#endif
+#if USE_DEBUG_LABELS
+    debugLabel.end();
 #endif
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;

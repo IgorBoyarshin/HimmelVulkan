@@ -225,6 +225,9 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noe
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+#if USE_DEBUG_LABELS
+    hml::DebugLabel debugLabel(commandBuffer, "Snow");
+#endif
 #if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlSnowParticleRenderer: begin", "Sw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 #endif
@@ -262,6 +265,9 @@ VkCommandBuffer HmlSnowParticleRenderer::draw(const HmlFrameData& frameData) noe
 
 #if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlSnowParticleRenderer: end", "S", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+#endif
+#if USE_DEBUG_LABELS
+    debugLabel.end();
 #endif
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;

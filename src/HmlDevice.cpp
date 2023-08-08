@@ -8,6 +8,8 @@ std::unique_ptr<HmlDevice> HmlDevice::create(std::shared_ptr<HmlWindow> hmlWindo
         hmlDevice->instance = obj;
     } else return { nullptr };
 
+    if (!loadVulkanFunctions(hmlDevice->instance)) return { nullptr };
+
     if (enableValidationLayers) {
         if (const auto obj = createDebugMessanger(hmlDevice->instance); obj) {
             hmlDevice->debugMessenger = obj;
@@ -42,7 +44,7 @@ HmlDevice::~HmlDevice() noexcept {
     vkDestroyDevice(device, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     if (enableValidationLayers) {
-        destroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
     vkDestroyInstance(instance, nullptr);
 }
@@ -190,33 +192,11 @@ VkDebugUtilsMessengerEXT HmlDevice::createDebugMessanger(const VkInstance& insta
     // createInfo.pUserData = nullptr;
 
     VkDebugUtilsMessengerEXT debugMessenger;
-    if (createDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+    if (vkCreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
         std::cerr << "::> Failed to set up debug messenger.\n";
         return VK_NULL_HANDLE;
     }
     return debugMessenger;
-}
-
-
-VkResult HmlDevice::createDebugUtilsMessengerEXT(
-        VkInstance instance,
-        const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-        const VkAllocationCallbacks* pAllocator,
-        VkDebugUtilsMessengerEXT* pDebugMessenger) noexcept {
-    const auto func = (PFN_vkCreateDebugUtilsMessengerEXT)
-        vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-    if (func) return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-    else      return VK_ERROR_EXTENSION_NOT_PRESENT;
-}
-
-
-void HmlDevice::destroyDebugUtilsMessengerEXT(
-        VkInstance instance,
-        VkDebugUtilsMessengerEXT debugMessenger,
-        const VkAllocationCallbacks* pAllocator) noexcept {
-    const auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)
-        vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-    if (func) func(instance, debugMessenger, pAllocator);
 }
 
 
@@ -452,4 +432,98 @@ VkDevice HmlDevice::createLogicalDevice(VkPhysicalDevice physicalDevice,
     }
 
     return device;
+}
+// ========================================================================
+// ========================================================================
+// ========================================================================
+std::unordered_map<const char*, PFN_vkVoidFunction> vulkanFunctionsDispatchTable;
+
+
+// NOTE we could get rid of this function entirely and just load the pointer
+// on demand into static cached variables in each respective function.
+bool HmlDevice::loadVulkanFunctions(VkInstance instance) {
+    std::vector<const char*> functionNames = {
+        "vkCreateDebugUtilsMessengerEXT",
+        "vkDestroyDebugUtilsMessengerEXT",
+        "vkSubmitDebugUtilsMessageEXT",
+
+        "vkCmdBeginDebugUtilsLabelEXT",
+        "vkCmdEndDebugUtilsLabelEXT",
+    };
+
+    for (const char* functionName : functionNames) {
+        PFN_vkVoidFunction fp = vkGetInstanceProcAddr(instance, functionName);
+        if (!fp) { // check shouldn't be necessary (based on spec)
+            std::cerr << "::> Failed to load " << functionName << ".\n";
+            // TODO maybe have separate lists for "required" and "nice to have" extensions
+            return false;
+        }
+        vulkanFunctionsDispatchTable[functionName] = fp;
+    }
+
+    return true;
+}
+// ========================================================================
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateDebugUtilsMessengerEXT(
+    VkInstance instance,
+    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkDebugUtilsMessengerEXT* pMessenger
+) {
+    static PFN_vkCreateDebugUtilsMessengerEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+            vulkanFunctionsDispatchTable.at("vkCreateDebugUtilsMessengerEXT"));
+    }
+    return cachedPtr(instance, pCreateInfo, pAllocator, pMessenger);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkDestroyDebugUtilsMessengerEXT(
+    VkInstance instance,
+    VkDebugUtilsMessengerEXT messenger,
+    const VkAllocationCallbacks* pAllocator
+) {
+    static PFN_vkDestroyDebugUtilsMessengerEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+            vulkanFunctionsDispatchTable.at("vkDestroyDebugUtilsMessengerEXT"));
+    }
+    return cachedPtr(instance, messenger, pAllocator);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkSubmitDebugUtilsMessageEXT(
+    VkInstance instance,
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData
+) {
+    static PFN_vkSubmitDebugUtilsMessageEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkSubmitDebugUtilsMessageEXT>(
+            vulkanFunctionsDispatchTable.at("vkSubmitDebugUtilsMessageEXT"));
+    }
+    return cachedPtr(instance, messageSeverity, messageTypes, pCallbackData);
+}
+// ========================================================================
+VKAPI_ATTR void VKAPI_CALL vkCmdBeginDebugUtilsLabelEXT(
+    VkCommandBuffer commandBuffer,
+    const VkDebugUtilsLabelEXT* pLabelInfo
+) {
+    static PFN_vkCmdBeginDebugUtilsLabelEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkCmdBeginDebugUtilsLabelEXT>(
+            vulkanFunctionsDispatchTable.at("vkCmdBeginDebugUtilsLabelEXT"));
+    }
+    return cachedPtr(commandBuffer, pLabelInfo);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdEndDebugUtilsLabelEXT(
+    VkCommandBuffer commandBuffer
+) {
+    static PFN_vkCmdEndDebugUtilsLabelEXT cachedPtr = nullptr;
+    if (!cachedPtr) [[unlikely]] {
+        cachedPtr = reinterpret_cast<PFN_vkCmdEndDebugUtilsLabelEXT>(
+            vulkanFunctionsDispatchTable.at("vkCmdEndDebugUtilsLabelEXT"));
+    }
+    return cachedPtr(commandBuffer);
 }

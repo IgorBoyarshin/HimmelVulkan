@@ -96,6 +96,9 @@ void HmlLightRenderer::bake() noexcept {
             .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
         };
         hmlContext->hmlCommands->beginRecordingSecondary(commandBuffer, &inheritanceInfo);
+#if USE_DEBUG_LABELS
+        hml::DebugLabel debugLabel(commandBuffer, "Light");
+#endif
 #if USE_TIMESTAMP_QUERIES
         // NOTE XXX we cannot use HmlQueries for baked commands because the
         // registration happens only once (is not baked. obviously). Maybe we
@@ -121,6 +124,9 @@ void HmlLightRenderer::bake() noexcept {
 
 #if USE_TIMESTAMP_QUERIES
         // hmlContext->hmlQueries->registerEvent("HmlLightRenderer: end", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+#endif
+#if USE_DEBUG_LABELS
+        debugLabel.end();
 #endif
         hmlContext->hmlCommands->endRecording(commandBuffer);
     }

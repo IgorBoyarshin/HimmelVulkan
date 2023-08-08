@@ -3,6 +3,10 @@
 
 #include <random>
 
+#include <vulkan/vulkan.hpp>
+
+#include "settings.h"
+
 
 namespace hml {
 
@@ -19,6 +23,32 @@ inline T getRandomUniformFloat(T low, T high) noexcept {
 
     return dist(e2);
 }
+
+
+struct DebugLabel {
+    VkCommandBuffer commandBuffer;
+
+    inline DebugLabel(VkCommandBuffer commandBuffer, const char* label) noexcept
+            : commandBuffer(commandBuffer) {
+        assert(commandBuffer && "::> Trying to create a DebugLabel with null commandBuffer.\n");
+
+        VkDebugUtilsLabelEXT debugLabel = {};
+        debugLabel.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+        debugLabel.pLabelName = label;
+        vkCmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
+    }
+
+    inline ~DebugLabel() noexcept {
+        end();
+    }
+
+    inline void end() noexcept {
+        if (commandBuffer) [[likely]] {
+            vkCmdEndDebugUtilsLabelEXT(commandBuffer);
+            commandBuffer = nullptr;
+        }
+    }
+};
 
 
 }

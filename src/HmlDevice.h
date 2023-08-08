@@ -8,6 +8,7 @@
 #include <set>
 #include <algorithm>
 #include <span>
+#include <unordered_map>
 
 #include "settings.h"
 #include "HmlWindow.h"
@@ -67,15 +68,7 @@ struct HmlDevice {
     static std::vector<const char*> getRequiredExtensions(bool enableValidationLayers) noexcept;
     static VkSurfaceKHR createSurface(VkInstance instance, GLFWwindow* window) noexcept;
     static VkDebugUtilsMessengerEXT createDebugMessanger(const VkInstance& instance) noexcept;
-    static VkResult createDebugUtilsMessengerEXT(
-            VkInstance instance,
-            const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-            const VkAllocationCallbacks* pAllocator,
-            VkDebugUtilsMessengerEXT* pDebugMessenger) noexcept;
-    static void destroyDebugUtilsMessengerEXT(
-            VkInstance instance,
-            VkDebugUtilsMessengerEXT debugMessenger,
-            const VkAllocationCallbacks* pAllocator) noexcept;
+    static bool loadVulkanFunctions(VkInstance instance);
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
             VkDebugUtilsMessageTypeFlagsEXT messageType,

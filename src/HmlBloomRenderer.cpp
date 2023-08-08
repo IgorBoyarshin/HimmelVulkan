@@ -111,6 +111,9 @@ VkCommandBuffer HmlBloomRenderer::draw(const HmlFrameData& frameData) noexcept {
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+#if USE_DEBUG_LABELS
+    hml::DebugLabel debugLabel{commandBuffer, "Bloom"};
+#endif
 #if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlBloomRenderer: begin", "BLw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 #endif
@@ -133,6 +136,9 @@ VkCommandBuffer HmlBloomRenderer::draw(const HmlFrameData& frameData) noexcept {
 
 #if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlBloomRenderer: end", "BL", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+#endif
+#if USE_DEBUG_LABELS
+    debugLabel.end();
 #endif
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;

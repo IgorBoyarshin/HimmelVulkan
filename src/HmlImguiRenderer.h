@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "settings.h"
+#include "util.h"
 #include "HmlContext.h"
 #include "renderer.h"
 

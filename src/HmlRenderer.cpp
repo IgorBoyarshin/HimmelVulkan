@@ -349,6 +349,9 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
     assert(getCurrentPipelines().size() == 2 && "::> Expected two pipelines in HmlRenderer.\n");
 
     { // Regular Entities
+#if USE_DEBUG_LABELS
+        hml::DebugLabel debugLabel(commandBuffer, "Regular Entities");
+#endif
 #if USE_TIMESTAMP_QUERIES
         if (mode == Mode::Regular) {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: begin regular entities", "Ew", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
@@ -411,6 +414,9 @@ VkCommandBuffer HmlRenderer::draw(const HmlFrameData& frameData) noexcept {
     }
 
     if (!instancedCounts.empty()) { // Instanced (static Entities)
+#if USE_DEBUG_LABELS
+        hml::DebugLabel debugLabel(commandBuffer, "Instanced (static) Entities");
+#endif
 #if USE_TIMESTAMP_QUERIES
         if (mode == Mode::Regular) {
             hmlContext->hmlQueries->registerEvent("HmlRenderer: begin instanced entities", "EIw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);

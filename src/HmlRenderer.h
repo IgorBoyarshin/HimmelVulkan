@@ -10,6 +10,7 @@
 #include <span>
 
 #include "settings.h"
+#include "util.h"
 #include "HmlContext.h"
 #include "HmlPipeline.h"
 #include "HmlModel.h"

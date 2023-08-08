@@ -139,6 +139,9 @@ VkCommandBuffer HmlImguiRenderer::draw(const HmlFrameData& frameData) noexcept {
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+#if USE_DEBUG_LABELS
+    hml::DebugLabel debugLabel(commandBuffer, "Imgui");
+#endif
 #if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlImguiRenderer: begin", "ImG(w)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 #endif
@@ -198,6 +201,9 @@ VkCommandBuffer HmlImguiRenderer::draw(const HmlFrameData& frameData) noexcept {
 
 #if USE_TIMESTAMP_QUERIES
     hmlContext->hmlQueries->registerEvent("HmlImguiRenderer: end", "ImG", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+#endif
+#if USE_DEBUG_LABELS
+    debugLabel.end();
 #endif
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;

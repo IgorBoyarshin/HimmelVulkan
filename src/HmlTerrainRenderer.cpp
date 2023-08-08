@@ -290,6 +290,9 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
     hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+#if USE_DEBUG_LABELS
+    hml::DebugLabel debugLabel{commandBuffer, "Terrain"};
+#endif
 #if USE_TIMESTAMP_QUERIES
     if (mode == Mode::Regular) {
         hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: begin", "Tw(r)", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
@@ -341,6 +344,9 @@ VkCommandBuffer HmlTerrainRenderer::draw(const HmlFrameData& frameData) noexcept
     } else if (mode == Mode::Shadowmap) {
         hmlContext->hmlQueries->registerEvent("HmlTerrainRenderer: end", "T(s)", commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     }
+#endif
+#if USE_DEBUG_LABELS
+    debugLabel.end();
 #endif
     hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;

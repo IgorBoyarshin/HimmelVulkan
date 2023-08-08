@@ -18,6 +18,7 @@
 #include "HmlResourceManager.h"
 #include "HmlDescriptors.h"
 #include "renderer.h"
+#include "util.h"
 
 
 struct HmlTerrainRenderer : HmlDrawer {

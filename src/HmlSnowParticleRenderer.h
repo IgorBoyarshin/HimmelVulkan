@@ -71,7 +71,7 @@ struct HmlSnowParticleRenderer : HmlDrawer {
             const std::variant<SnowBoxBounds, SnowCameraBounds>& snowBounds,
             std::shared_ptr<HmlContext> hmlContext,
             VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept;
-    ~HmlSnowParticleRenderer() noexcept;
+    virtual ~HmlSnowParticleRenderer() noexcept;
     void createSnow(uint32_t count, const SnowBounds& bounds) noexcept;
     void updateForDt(float dt, float timeSinceStart) noexcept;
     void updateForImage(uint32_t imageIndex) noexcept;

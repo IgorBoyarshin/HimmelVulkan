@@ -36,7 +36,7 @@ struct HmlDeferredRenderer : HmlDrawer {
     static std::unique_ptr<HmlDeferredRenderer> create(
         std::shared_ptr<HmlContext> hmlContext,
         VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept;
-    ~HmlDeferredRenderer() noexcept;
+    virtual ~HmlDeferredRenderer() noexcept;
     void specify(const std::array<std::vector<std::shared_ptr<HmlImageResource>>, G_COUNT>& resources) noexcept;
     static std::pair<float, float> calculateSphereYawPitch(float aspect_w_h, float cameraFov) noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;

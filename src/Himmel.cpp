@@ -1249,7 +1249,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             // NOTE Width and height are calculated in such a way as to contain
             // without cut-offs the biggest object in the scene, which happens
             // to be the World.
-            static constexpr float sqrt2 = std::sqrt(2.0f);
+            static const float sqrt2 = std::sqrt(2.0f);
             const float width = world->finish.x;
             const float height = world->finish.y;
             // NOTE should theoretically produce better result for small pitch values,
@@ -1462,31 +1462,31 @@ bool Himmel::prepareResources() noexcept {
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferPositions,
-                .loadColor = HmlRenderPass::LoadColor::Clear({ VERY_FAR, VERY_FAR, VERY_FAR, 1.0f }),
+                .loadColor = HmlRenderPass::LoadColor::Clear({{ VERY_FAR, VERY_FAR, VERY_FAR, 1.0f }}),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferNormals,
-                .loadColor = HmlRenderPass::LoadColor::Clear({ 0.0f, 0.0f, 0.0f, 1.0f }),
+                .loadColor = HmlRenderPass::LoadColor::Clear({{ 0.0f, 0.0f, 0.0f, 1.0f }}),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferColors,
-                .loadColor = HmlRenderPass::LoadColor::Clear({ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }),
+                .loadColor = HmlRenderPass::LoadColor::Clear({{ weather.fogColor.x, weather.fogColor.y, weather.fogColor.z, 1.0f }}),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferLightSpacePositions,
-                .loadColor = HmlRenderPass::LoadColor::Clear({ 2.0f, 2.0f, 2.0f, 2.0f }), // TODO i dunno!
+                .loadColor = HmlRenderPass::LoadColor::Clear({{ 2.0f, 2.0f, 2.0f, 2.0f }}), // TODO i dunno!
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = gBufferIds,
-                .loadColor = HmlRenderPass::LoadColor::Clear({ 0 }),
+                .loadColor = HmlRenderPass::LoadColor::Clear({{ 0 }}),
                 .preLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             },
@@ -1597,7 +1597,7 @@ bool Himmel::prepareResources() noexcept {
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = brightness1Textures,
-                .loadColor = HmlRenderPass::LoadColor::Clear({ 0.0f, 0.0f, 0.0f, 1.0f }),
+                .loadColor = HmlRenderPass::LoadColor::Clear({{ 0.0f, 0.0f, 0.0f, 1.0f }}),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },

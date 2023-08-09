@@ -13,6 +13,9 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
     set(USE_MINGW "True")
     set(CMAKE_C_COMPILER ${MINGW_PATH}/bin/gcc.exe)
     set(CMAKE_CXX_COMPILER  ${MINGW_PATH}/bin/g++.exe)
+elseif (CMAKE_GENERATOR STREQUAL "Ninja")
+    set(CMAKE_C_COMPILER ${LLVM_PATH}/bin/clang.exe)
+    set(CMAKE_CXX_COMPILER ${LLVM_PATH}/bin/clang++.exe)
 endif()
 
 project(${NAME} VERSION 0.23.0)
@@ -42,6 +45,8 @@ if (DEFINED GLFW_PATH)
   elseif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
     message(STATUS "USING MINGW")
     set(GLFW_LIB "${GLFW_PATH}/lib-mingw-w64") # 2.1 make sure matches glfw mingw subdirectory
+  elseif (CMAKE_GENERATOR STREQUAL "Ninja")
+    set(GLFW_LIB "${GLFW_PATH}/lib-vc2022")
   endif()
 else()
   find_package(glfw3 3.3 REQUIRED)
@@ -66,7 +71,8 @@ file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+# target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 
@@ -97,7 +103,14 @@ if (WIN32)
 
   target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1)
 
-  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-volatile -Wno-ignored-attributes -mavx -mavx2 -O0)
+  if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-volatile -Wno-ignored-attributes -mavx -mavx2 -O0)
+  elseif (CMAKE_GENERATOR STREQUAL "Ninja")
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-ignored-attributes -mavx -mavx2 -O0)
+  endif()
+
+  # target_link_options(${PROJECT_NAME} PRIVATE -fuse-ld=lld)
+
 elseif (UNIX)
     message(STATUS "CREATING BUILD FOR UNIX")
     target_include_directories(${PROJECT_NAME} PUBLIC

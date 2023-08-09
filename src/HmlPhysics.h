@@ -318,7 +318,6 @@ class HmlPhysics {
     void removeObjectWithIdFromBucket(Object::Id id, const Bucket& bucket) noexcept;
     // ========================================================================
     ctpl::thread_pool threadPool;
-    bool firstUpdateAfterLastRegister = true;
     std::vector<Bucket::Bounding> allBoundingBucketsBefore; // for each non-stationary object; from previous frame
 
     struct ThreadedData {

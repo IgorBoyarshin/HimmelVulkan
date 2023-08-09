@@ -131,6 +131,7 @@ struct Himmel {
         // glm::vec2 size;
 
         Car(const glm::vec3& posCenter, float sizeScaler) : posCenter(posCenter), sizeScaler(sizeScaler) {}
+        inline virtual ~Car() {}
 
         bool cachedViewValid = false;
         glm::mat4 cachedModelMatrix;

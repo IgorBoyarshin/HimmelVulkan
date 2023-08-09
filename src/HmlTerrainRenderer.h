@@ -97,7 +97,7 @@ struct HmlTerrainRenderer : HmlDrawer {
             const Bounds& bounds,
             std::shared_ptr<HmlContext> hmlContext,
             VkDescriptorSetLayout viewProjDescriptorSetLayout) noexcept;
-    ~HmlTerrainRenderer() noexcept;
+    virtual ~HmlTerrainRenderer() noexcept;
     void constructTree(SubTerrain& subTerrain, const glm::vec3& cameraPos) const noexcept;
     void update(const glm::vec3& cameraPos) noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;

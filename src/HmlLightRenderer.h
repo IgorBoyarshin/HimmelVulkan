@@ -38,7 +38,7 @@ struct HmlLightRenderer : HmlDrawer {
             std::shared_ptr<HmlContext> hmlContext,
             VkDescriptorSetLayout viewProjDescriptorSetLayout,
             const std::vector<VkDescriptorSet>& generalDescriptorSet_0_perImage) noexcept;
-    ~HmlLightRenderer() noexcept;
+    virtual ~HmlLightRenderer() noexcept;
     void specify(uint32_t count) noexcept;
     void bake() noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;

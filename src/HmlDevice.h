@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <span>
 #include <unordered_map>
+#include <array>
 
 #include "settings.h"
 #include "HmlWindow.h"
@@ -44,12 +45,12 @@ struct HmlDevice {
 
 
     static constexpr bool enableValidationLayers = true;
-    static constexpr std::array requiredValidationLayers = {
+    static constexpr std::array<const char*, 1> requiredValidationLayers = {{
         "VK_LAYER_KHRONOS_validation"
-    };
-    static constexpr std::array requiredDeviceExtensions = {
+    }};
+    static constexpr std::array<const char*, 1> requiredDeviceExtensions = {{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
-    };
+    }};
 
 
     static std::unique_ptr<HmlDevice> create(std::shared_ptr<HmlWindow> hmlWindow) noexcept;

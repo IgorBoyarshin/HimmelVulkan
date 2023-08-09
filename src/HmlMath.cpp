@@ -312,8 +312,8 @@ template std::ostream& operator<<(std::ostream& ostream, const vec3& v);
 template std::ostream& operator<<(std::ostream& ostream, const vec3_128& v);
 template std::ostream& operator<<(std::ostream& ostream, const vec3_256& v);
 // ============================================================================
-template class vec3_t<TF>;
-template class vec3_t<TF128>;
-template class vec3_t<TF256>;
+template struct vec3_t<TF>;
+template struct vec3_t<TF128>;
+template struct vec3_t<TF256>;
 
 }

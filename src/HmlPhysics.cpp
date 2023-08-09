@@ -614,7 +614,7 @@ void HmlPhysics::checkForAndHandleCollisions() noexcept {
             const bool lastThread = threadIndex + 1 == poolSize;
             const auto startIt = std::next(objectsInBuckets.cbegin(), threadIndex * chunk);
             const auto endIt = lastThread ? objectsInBuckets.cend() : std::next(objectsInBuckets.cbegin(), (threadIndex + 1) * chunk);
-            results[threadIndex] = threadPool.push([this, startIt, endIt, &traverseBucket](int){
+            results[threadIndex] = threadPool.push([startIt, endIt, &traverseBucket](int){
                 Adjustments adjustments;
                 for (auto it = startIt; it != endIt; ++it) {
                     const auto& [_bucket, ids] = *it;

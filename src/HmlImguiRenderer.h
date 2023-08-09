@@ -39,7 +39,7 @@ struct HmlImguiRenderer : HmlDrawer {
         const std::vector<std::shared_ptr<std::unique_ptr<HmlBuffer>>>& vertexBuffers,
         const std::vector<std::shared_ptr<std::unique_ptr<HmlBuffer>>>& indexBuffers,
         std::shared_ptr<HmlContext> hmlContext) noexcept;
-    ~HmlImguiRenderer() noexcept;
+    virtual ~HmlImguiRenderer() noexcept;
     VkCommandBuffer draw(const HmlFrameData& frameData) noexcept override;
 };
 

@@ -212,9 +212,10 @@ std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFr
             if (lastStage) {
                 // Use this fence to know when we can start dispatching a new frame in flight
                 signalFence = finishedLastStageOf[frameData.frameInFlightIndex];
-            } else if (stageFinishSignalRequested) {
+            } else {
+                assert(stageFinishSignalRequested && "Should've had a fence to signal");
                 signalFence = fenceForStageFinish[stage.name];
-            } else assert(false && "Should've had a fence to signal");
+            }
             vkResetFences(hmlContext->hmlDevice->device, 1, &signalFence);
 
             VkSubmitInfo submitInfo{

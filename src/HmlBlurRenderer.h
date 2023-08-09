@@ -76,7 +76,7 @@ struct HmlBlurRenderer : HmlDrawer {
         std::shared_ptr<HmlDescriptors> hmlDescriptors,
         uint32_t imageCount,
         uint32_t framesInFlight) noexcept;
-    ~HmlBlurRenderer() noexcept;
+    virtual ~HmlBlurRenderer() noexcept;
     void specify(
         const std::vector<std::shared_ptr<HmlImageResource>>& firstTextures,
         const std::vector<std::shared_ptr<HmlImageResource>>& secondTextures) noexcept;

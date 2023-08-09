@@ -482,7 +482,7 @@ std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* verti
     auto model = std::make_shared<HmlModelResource>();
     model->hmlDevice = hmlDevice;
     model->indicesCount = indices.size();
-    model->textureResource = { nullptr };
+    model->textureResource = {};
     model->vertexBuffer = createVertexBufferWithData(vertices, verticesSizeBytes);
     model->indexBuffer = createIndexBufferWithData(indices.data(), indices.size() * sizeof(indices[0]));
 

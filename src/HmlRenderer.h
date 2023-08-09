@@ -106,7 +106,7 @@ struct HmlRenderer : HmlDrawer {
     std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;
     static std::unique_ptr<HmlRenderer> create(std::shared_ptr<HmlContext> hmlContext, VkDescriptorSetLayout generalDescriptorSetLayout) noexcept;
-    ~HmlRenderer() noexcept;
+    virtual ~HmlRenderer() noexcept;
     void specifyEntitiesToRender(std::span<const std::shared_ptr<Entity>> entities) noexcept;
     void specifyStaticEntitiesToRender(std::span<const Entity> staticEntities) noexcept;
     void updateDescriptorSetStaticTextures() noexcept;

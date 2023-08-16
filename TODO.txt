@@ -3,6 +3,7 @@
 ===============
 
 ==== MODERATE ====
+-- LOG_DESTROYS should print actual IDs (addresses) for ease of debugging with validation layers
 ==================
 
 ==== BIG ====

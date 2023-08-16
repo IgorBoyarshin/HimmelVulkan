@@ -2,6 +2,7 @@ shaders/out
 main
 *.o
 models/
+libs/
 *.bckp
 build/
 imgui.ini

@@ -162,6 +162,10 @@ std::optional<HmlDispatcher::DoStagesResult> HmlDispatcher::doStages(const HmlFr
 
         // ======== Record and execute secondary command buffers ========
         {
+#if USE_DEBUG_LABELS
+            // hml::DebugLabel debugLabel(hmlContext->hmlDevice->graphicsQueue, stage.name.c_str());
+            hml::DebugLabel debugLabel(primaryCommandBuffer, stage.name.c_str());
+#endif
             stage.renderPass->begin(primaryCommandBuffer, frameData.swapchainImageIndex);
             {
                 // NOTE These are parallelizable

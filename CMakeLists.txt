@@ -106,7 +106,8 @@ if (WIN32)
   if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
     target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-volatile -Wno-ignored-attributes -mavx -mavx2 -O0)
   elseif (CMAKE_GENERATOR STREQUAL "Ninja")
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-ignored-attributes -mavx -mavx2 -O0)
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-unused-parameter -Wpedantic -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-ignored-attributes -mavx -mavx2 -O0 -Wno-missing-field-initializers)
+    # nocheckin -Wmissing-field-initializers
   endif()
 
   # target_link_options(${PROJECT_NAME} PRIVATE -fuse-ld=lld)

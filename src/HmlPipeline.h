@@ -95,6 +95,9 @@ struct HmlGraphicsPipelineConfig {
 
 
 struct HmlPipeline {
+    using Id = uint32_t;
+    Id id;
+
     VkPipelineLayout layout;
     VkPipeline pipeline;
 
@@ -109,6 +112,12 @@ struct HmlPipeline {
 
     ~HmlPipeline() noexcept;
 
+    inline bool operator==(const HmlPipeline& other) const {
+        return (layout == other.layout)
+            && (pipeline == other.pipeline)
+            && (pushConstantsStages == other.pushConstantsStages);
+    }
+
     private:
 
     std::optional<std::pair<std::vector<VkShaderModule>, std::vector<VkPipelineShaderStageCreateInfo>>>
@@ -117,6 +126,18 @@ struct HmlPipeline {
         VkShaderModule shaderModule, const std::optional<VkSpecializationInfo>& specializationInfoOpt) noexcept;
     VkShaderModule createShaderModule(std::vector<char>&& code) noexcept;
     static std::vector<char> readFile(const char* fileName) noexcept;
+    static Id newId() noexcept;
 };
+
+
+// template<> struct std::hash<HmlPipeline> {
+//     inline size_t operator()(const HmlPipeline& hmlPipeline) const {
+//         std::size_t res = 17;
+//         res = res * 31 + hash<VkPipelineLayout>()(hmlPipeline.layout);
+//         res = res * 31 + hash<VkPipeline>()(hmlPipeline.pipeline);
+//         res = res * 31 + hash<VkShaderStageFlags>()(hmlPipeline.pushConstantsStages);
+//         return res;
+//     }
+// };
 
 #endif

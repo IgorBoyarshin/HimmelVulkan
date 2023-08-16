@@ -330,3 +330,9 @@ std::vector<char> HmlPipeline::readFile(const char* fileName) noexcept {
 
     return buffer;
 }
+
+
+HmlPipeline::Id HmlPipeline::newId() noexcept {
+    static Id id = 0;
+    return id++;
+}

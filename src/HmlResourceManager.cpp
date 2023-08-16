@@ -1,5 +1,13 @@
 #include "HmlResourceManager.h"
 
+// #define TINYGLTF_NO_INCLUDE_STB_IMAGE
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF_NOEXCEPTION
+#define TINYGLTF_USE_CPP14
+#include "../libs/tinygltf/tiny_gltf.h"
+
 
 HmlImageResource::~HmlImageResource() noexcept {
 #if LOG_DESTROYS
@@ -33,6 +41,19 @@ HmlModelResource::~HmlModelResource() noexcept {
 
 
 HmlModelResource::Id HmlModelResource::newId() noexcept {
+    static Id id = 0;
+    return id++;
+}
+
+
+HmlComplexModelResource::~HmlComplexModelResource() noexcept {
+#if LOG_DESTROYS
+    std::cout << ":> Destroying HmlComplexModelResource.\n";
+#endif
+}
+
+
+HmlComplexModelResource::Id HmlComplexModelResource::newId() noexcept {
     static Id id = 0;
     return id++;
 }
@@ -113,12 +134,20 @@ HmlBuffer::~HmlBuffer() noexcept {
         case Type::STORAGE: std::cout << ":> Destroying HmlBuffer (storage).\n"; break;
         case Type::VERTEX: std::cout << ":> Destroying HmlBuffer (vertex).\n"; break;
         case Type::INDEX: std::cout << ":> Destroying HmlBuffer (index).\n"; break;
+        case Type::VERTEX_INDEX: std::cout << ":> Destroying HmlBuffer (vertex-index).\n"; break;
     }
 #endif
 
     unmap();
     vkDestroyBuffer(hmlDevice->device, buffer, nullptr);
     vkFreeMemory(hmlDevice->device, memory, nullptr);
+}
+// ============================================================================
+// ============================================================================
+// ============================================================================
+// TODO maybe is inefficient
+bool HmlAttributes::operator==(const HmlAttributes& other) const noexcept {
+    return std::hash<HmlAttributes>{}(*this) == std::hash<HmlAttributes>{}(other);
 }
 // ============================================================================
 // ============================================================================
@@ -244,6 +273,18 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createIndexBuffer(VkDeviceSize si
 }
 
 
+std::unique_ptr<HmlBuffer> HmlResourceManager::createVertexIndexBuffer(VkDeviceSize sizeBytes) const noexcept {
+    auto buffer = std::make_unique<HmlBuffer>(true);
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::VERTEX_INDEX;
+    buffer->sizeBytes = sizeBytes;
+    const auto usage      = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+    return buffer;
+}
+
+
 std::unique_ptr<HmlBuffer> HmlResourceManager::createVertexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept {
     auto stagingBuffer = createStagingBufferFromHost(sizeBytes);
     stagingBuffer->map();
@@ -277,6 +318,27 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createIndexBufferWithData(const v
     buffer->sizeBytes = sizeBytes;
 
     const auto usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    const auto memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
+
+    copyBuffer(stagingBuffer->buffer, buffer->buffer, sizeBytes);
+
+    return buffer;
+}
+
+
+std::unique_ptr<HmlBuffer> HmlResourceManager::createVertexIndexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept {
+    auto stagingBuffer = createStagingBufferFromHost(sizeBytes);
+    stagingBuffer->map();
+    stagingBuffer->update(data);
+    stagingBuffer->unmap();
+
+    auto buffer = std::make_unique<HmlBuffer>(false);
+    buffer->hmlDevice = hmlDevice;
+    buffer->type = HmlBuffer::Type::VERTEX_INDEX;
+    buffer->sizeBytes = sizeBytes;
+
+    const auto usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     const auto memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     createBuffer(sizeBytes, usage, memoryType, buffer->buffer, buffer->memory);
 
@@ -474,34 +536,6 @@ std::vector<std::shared_ptr<HmlImageResource>> HmlResourceManager::wrapSwapchain
     }
 
     return imageResources;
-}
-
-
-// Model with color
-std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) noexcept {
-    auto model = std::make_shared<HmlModelResource>();
-    model->hmlDevice = hmlDevice;
-    model->indicesCount = indices.size();
-    model->textureResource = {};
-    model->vertexBuffer = createVertexBufferWithData(vertices, verticesSizeBytes);
-    model->indexBuffer = createIndexBufferWithData(indices.data(), indices.size() * sizeof(indices[0]));
-
-    models.push_back(model);
-    return model;
-}
-
-
-// Model with texture
-std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices, const char* textureFileName, VkFilter filter) noexcept {
-    auto model = std::make_shared<HmlModelResource>();
-    model->hmlDevice = hmlDevice;
-    model->indicesCount = indices.size();
-    model->textureResource = newTextureResource(textureFileName, 4, VK_FORMAT_R8G8B8A8_SRGB, filter);
-    model->vertexBuffer = createVertexBufferWithData(vertices, verticesSizeBytes);
-    model->indexBuffer = createIndexBufferWithData(indices.data(), indices.size() * sizeof(indices[0]));
-
-    models.push_back(model);
-    return model;
 }
 // ========================================================================
 // ========================================================================
@@ -1093,4 +1127,351 @@ void HmlResourceManager::copyImageToBuffer(VkImage image, VkBuffer buffer, VkExt
     };
 
     vkCmdCopyImageToBuffer(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &region);
+}
+// ========================================================================
+// ========================================================================
+// ========================================================================
+// TODO can make a look-up table
+static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
+    switch (componentType) {
+        case TINYGLTF_COMPONENT_TYPE_BYTE:
+            switch (count) {
+                case 1: return VK_FORMAT_R8_SINT;
+                case 2: return VK_FORMAT_R8G8_SINT;
+                case 3: return VK_FORMAT_R8G8B8_SINT;
+                case 4: return VK_FORMAT_R8G8B8A8_SINT;
+                default:
+                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+            switch (count) {
+                case 1: return VK_FORMAT_R8_UINT;
+                case 2: return VK_FORMAT_R8G8_UINT;
+                case 3: return VK_FORMAT_R8G8B8_UINT;
+                case 4: return VK_FORMAT_R8G8B8A8_UINT;
+                default:
+                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        case TINYGLTF_COMPONENT_TYPE_SHORT:
+            switch (count) {
+                case 1: return VK_FORMAT_R16_SINT;
+                case 2: return VK_FORMAT_R16G16_SINT;
+                case 3: return VK_FORMAT_R16G16B16_SINT;
+                case 4: return VK_FORMAT_R16G16B16A16_SINT;
+                default:
+                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+            switch (count) {
+                case 1: return VK_FORMAT_R16_UINT;
+                case 2: return VK_FORMAT_R16G16_UINT;
+                case 3: return VK_FORMAT_R16G16B16_UINT;
+                case 4: return VK_FORMAT_R16G16B16A16_UINT;
+                default:
+                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        case TINYGLTF_COMPONENT_TYPE_INT:
+            switch (count) {
+                case 1: return VK_FORMAT_R32_SINT;
+                case 2: return VK_FORMAT_R32G32_SINT;
+                case 3: return VK_FORMAT_R32G32B32_SINT;
+                case 4: return VK_FORMAT_R32G32B32A32_SINT;
+                default:
+                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+            switch (count) {
+                case 1: return VK_FORMAT_R32_UINT;
+                case 2: return VK_FORMAT_R32G32_UINT;
+                case 3: return VK_FORMAT_R32G32B32_UINT;
+                case 4: return VK_FORMAT_R32G32B32A32_UINT;
+                default:
+                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        case TINYGLTF_COMPONENT_TYPE_FLOAT:
+            switch (count) {
+                case 1: return VK_FORMAT_R32_SFLOAT;
+                case 2: return VK_FORMAT_R32G32_SFLOAT;
+                case 3: return VK_FORMAT_R32G32B32_SFLOAT;
+                case 4: return VK_FORMAT_R32G32B32A32_SFLOAT;
+                default:
+                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        case TINYGLTF_COMPONENT_TYPE_DOUBLE:
+            switch (count) {
+                case 1: return VK_FORMAT_R64_SFLOAT;
+                case 2: return VK_FORMAT_R64G64_SFLOAT;
+                case 3: return VK_FORMAT_R64G64B64_SFLOAT;
+                case 4: return VK_FORMAT_R64G64B64A64_SFLOAT;
+                default:
+                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        default:
+            assert(false && "::> gltfToFormat(): Unimplemented componentType");
+            return VK_FORMAT_UNDEFINED; // stub
+    }
+}
+
+
+static void bindMesh(
+        const tinygltf::Model& model,
+        const tinygltf::Mesh& mesh,
+        const std::vector<HmlBufferView>& hmlBufferViews,
+        std::vector<std::unique_ptr<HmlComplexModelResource>>& hmlComplexModels) noexcept {
+    std::cout << "Binding its mesh '" << mesh.name << "' which has " << mesh.primitives.size() << " primitives.\n";
+    for (size_t i = 0; i < mesh.primitives.size(); i++) {
+        std::cout << "Primitive #" << i << "\n";
+        const tinygltf::Primitive& primitive = mesh.primitives[i];
+        const tinygltf::Accessor& indexBufferAccessor = model.accessors[primitive.indices];
+        std::cout << "Has IndexBuffer (buffer view [" << indexBufferAccessor.bufferView << "]) with "
+            << indexBufferAccessor.count << " " << tinygltf::GetComponentSizeInBytes(indexBufferAccessor.componentType)
+            << "-byte elements " << std::endl;
+
+        assert(model.bufferViews[indexBufferAccessor.bufferView].target == TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER
+            && "::> The primitive uses an index buffer view that was not specified (and thus was not created) as an index buffer");
+
+        std::cout << "Uses material #" << primitive.material << "\n";
+
+        assert(primitive.mode == 4); // triangles
+
+        // TODO Implement the ability to have interleaved attributes by re-constructuring them here.
+        // TODO Measure performance difference from having attributes interleaved vs in multiple buffers.
+        std::vector<HmlBufferView> vertexBufferViews(HmlAttributes::AttributeCount);
+        HmlAttributes hmlAttributes;
+        for (const auto &attrib : primitive.attributes) {
+            const tinygltf::Accessor& accessor = model.accessors[attrib.second];
+            const int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+            assert(byteStride != -1);
+
+            const auto attributeType = HmlAttributes::typeFromName(attrib.first);
+            const auto attributePlace = HmlAttributes::placeFromType(attributeType);
+            vertexBufferViews[attributePlace] = hmlBufferViews[accessor.bufferView];
+            // vertexBufferViews.push_back(hmlBufferViews[accessor.bufferView]);
+
+            int size = 1;
+            if (accessor.type != TINYGLTF_TYPE_SCALAR) {
+                size = accessor.type;
+            }
+
+            std::cout << "\tHas attribute " << attrib.first << " (buffer view [" << accessor.bufferView << "]) which has " << size << " components (" << tinygltf::GetComponentSizeInBytes(accessor.componentType) << " bytes per component) and " << byteStride << " byteStride\n";
+
+            assert(byteStride == tinygltf::GetComponentSizeInBytes(accessor.componentType) * size);
+
+            hmlAttributes.add(
+                attributeType,
+                gltfToFormat(accessor.componentType, size),
+                byteStride,
+                accessor.byteOffset);
+
+            if (accessor.byteOffset) {
+                std::cout << "::> WARNING: byteOffset is non-zero: " << accessor.byteOffset << "\n";
+            }
+        }
+
+        // Clean up unused attribute cells
+        for (auto it = vertexBufferViews.begin(); it != vertexBufferViews.end(); ++it) {
+            if (!(it->hmlBuffer)) it = vertexBufferViews.erase(it);
+        }
+
+        // ======== Textures
+
+        // for (size_t i = 0; i < model.textures.size(); i++) {
+        //     // fixme: Use material's baseColor
+        //     const tinygltf::Texture& tex = model.textures[i];
+        //     assert(tex.source > -1);
+        //     // GLuint texid;
+        //     // glGenTextures(1, &texid);
+        //     const tinygltf::Image& image = model.images[tex.source];
+        //
+        //     std::cout << "\tHas texture '" << (image.name.empty() ? image.uri : image.name) << "' (" << image.width << "x" << image.height << ") with a " << image.component << "-component Format and " << image.bits << " bits per channel\n";
+        //
+        //     // glBindTexture(GL_TEXTURE_2D, texid);
+        //     // glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        //     // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        //     // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        //     // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        //     // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        //
+        //     // std::cout << "\t\tFormat has " << image.component << " components\n";
+        //     // GLenum format = GL_RGBA;
+        //     // if (image.component == 1) {
+        //     //     format = GL_RED;
+        //     // } else if (image.component == 2) {
+        //     //     format = GL_RG;
+        //     // } else if (image.component == 3) {
+        //     //     format = GL_RGB;
+        //     // } else {
+        //     //     // ???
+        //     // }
+        //
+        //     // std::cout << "\t\tWith " << image.bits << " bits per channel\n";
+        //     // GLenum type = GL_UNSIGNED_BYTE;
+        //     // if (image.bits == 8) {
+        //     //     // ok
+        //     // } else if (image.bits == 16) {
+        //     //     type = GL_UNSIGNED_SHORT;
+        //     // } else {
+        //     //     // ???
+        //     // }
+        //
+        //     // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, format, type, &image.image.at(0));
+        // }
+
+
+
+
+        // ======== Assemble HmlComplexModelResource
+        auto model = std::make_unique<HmlComplexModelResource>();
+        switch (indexBufferAccessor.componentType) {
+            case TINYGLTF_COMPONENT_TYPE_SHORT:
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                model->indicesCount = IndicesCount::with16(indexBufferAccessor.count);
+                break;
+            case TINYGLTF_COMPONENT_TYPE_INT:
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                model->indicesCount = IndicesCount::with32(indexBufferAccessor.count);
+                break;
+            default:
+                assert(false && "::> Unexpected type found for IndexBuffer component.");
+        }
+        model->indexBufferView = hmlBufferViews[indexBufferAccessor.bufferView];
+        model->vertexBufferViews = std::move(vertexBufferViews);
+        model->hmlAttributes = std::move(hmlAttributes);
+
+        hmlComplexModels.push_back(std::move(model));
+    }
+}
+
+
+static void bindModelNodes(tinygltf::Model &model, tinygltf::Node &node, const std::vector<HmlBufferView>& hmlBufferViews, std::vector<std::unique_ptr<HmlComplexModelResource>>& hmlComplexModels) {
+    std::cout << " with name '" << node.name << "'.\n";
+
+    assert(0 <= node.mesh && (size_t)node.mesh < model.meshes.size());
+    bindMesh(model, model.meshes[node.mesh], hmlBufferViews, hmlComplexModels);
+
+    for (size_t i = 0; i < node.children.size(); i++) {
+        const auto childNode = node.children[i];
+        assert(0 <= childNode && (size_t)childNode < model.nodes.size());
+        std::cout << "Binding child #" << childNode;
+        bindModelNodes(model, model.nodes[childNode], hmlBufferViews, hmlComplexModels);
+    }
+}
+
+
+std::shared_ptr<HmlScene> HmlResourceManager::loadAsset(const char* path) noexcept {
+    tinygltf::Model model;
+    tinygltf::TinyGLTF loader;
+    std::string err;
+    std::string warn;
+
+    bool parsed = loader.LoadASCIIFromFile(&model, &err, &warn, path);
+    //bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, path); // for binary glTF(.glb)
+
+    if (!warn.empty()) std::cerr << "::> GLTF Loader warning:" << warn.c_str() << ".\n";
+    if (!err.empty())  std::cerr << "::> GLTF Loader error:" << err.c_str() << ".\n";
+    if (!parsed) {
+        std::cerr << "::> GLTF Loader: failed to parse.\n";
+        return {};
+    }
+
+    // ======== Create buffers
+
+    std::vector<HmlBufferView> hmlBufferViews;
+    std::cout << "Have " << model.buffers.size() << " buffers:\n";
+    for (size_t i = 0; i < model.buffers.size(); i++) {
+        const auto bufferData = model.buffers[i].data.data();
+        const auto bufferSizeBytes = model.buffers[i].data.size();
+
+        bool hasVertex = false;
+        bool hasIndex = false;
+        for (size_t j = 0; j < model.bufferViews.size(); j++) {
+            if      (model.bufferViews[j].target == TINYGLTF_TARGET_ARRAY_BUFFER)         hasVertex = true;
+            else if (model.bufferViews[j].target == TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER) hasIndex  = true;
+            else assert(false);
+        }
+
+        // Turn unique_ptr to shared_ptr
+        std::shared_ptr<HmlBuffer> hmlBuffer = [&](){
+            if (hasVertex && hasIndex) return createVertexIndexBufferWithData(bufferData, bufferSizeBytes);
+            else if (hasVertex)        return createVertexBufferWithData(bufferData, bufferSizeBytes);
+            else if (hasIndex)         return createIndexBufferWithData(bufferData, bufferSizeBytes);
+            else assert(false && "::> Buffer has no buffer views associated with it.");
+            return std::make_unique<HmlBuffer>(false); // stub
+        }();
+
+        std::cout << "#" << i << " with size " << bufferSizeBytes << " bytes\n";
+        std::cout << "With such buffer views tied to it:\n";
+        for (size_t j = 0; j < model.bufferViews.size(); j++) {
+            if ((size_t)model.bufferViews[j].buffer != i) continue;
+
+            std::cout << "[" << j << "] ";
+
+            if      (model.bufferViews[j].target == TINYGLTF_TARGET_ARRAY_BUFFER )        std::cout << "\t{VERTEX_BUFFER}";
+            else if (model.bufferViews[j].target == TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER) std::cout << "\t{INDEX_BUFFER} ";
+            else assert(false);
+
+            const auto start = model.bufferViews[j].byteOffset;
+            const auto size = model.bufferViews[j].byteLength;
+            const auto end = start + size;
+            std::cout << "[" << start << ";" << end << ") = " << size << " bytes.\n";
+
+            hmlBufferViews.push_back(HmlBufferView{ hmlBuffer, start });
+        }
+    }
+
+    // ======== Create models
+
+    // TODO This vector will be replaced by a tree data structure to emulate nodes
+    std::vector<std::unique_ptr<HmlComplexModelResource>> hmlComplexModels;
+
+    const tinygltf::Scene &scene = model.scenes[model.defaultScene];
+    std::cout << "Using scene '" << scene.name << "' (#" << model.defaultScene << ") out of " << model.scenes.size() << ".\n";
+    std::cout << "This scene has " << scene.nodes.size() << " nodes.\n";
+    for (size_t i = 0; i < scene.nodes.size(); i++) {
+        assert((scene.nodes[i] >= 0) && ((size_t)scene.nodes[i] < model.nodes.size()));
+        std::cout << "Binding node #" << i;
+        bindModelNodes(model, model.nodes[scene.nodes[i]], hmlBufferViews, hmlComplexModels);
+    }
+
+    // ======== Return
+
+    auto hmlScene = std::make_shared<HmlScene>();
+    hmlScene->hmlComplexModelResources = std::move(hmlComplexModels);
+    return hmlScene;
+}
+
+
+// Model with color
+std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) noexcept {
+    auto model = std::make_shared<HmlModelResource>();
+    // model->hmlDevice = hmlDevice;
+    model->indicesCount = indices.size();
+    model->textureResource = {};
+    model->vertexBuffer = createVertexBufferWithData(vertices, verticesSizeBytes);
+    model->indexBuffer = createIndexBufferWithData(indices.data(), indices.size() * sizeof(indices[0]));
+
+    models.push_back(model);
+    return model;
+}
+
+
+// Model with texture
+std::shared_ptr<HmlModelResource> HmlResourceManager::newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices, const char* textureFileName, VkFilter filter) noexcept {
+    auto model = std::make_shared<HmlModelResource>();
+    // model->hmlDevice = hmlDevice;
+    model->indicesCount = indices.size();
+    model->textureResource = newTextureResource(textureFileName, 4, VK_FORMAT_R8G8B8A8_SRGB, filter);
+    model->vertexBuffer = createVertexBufferWithData(vertices, verticesSizeBytes);
+    model->indexBuffer = createIndexBufferWithData(indices.data(), indices.size() * sizeof(indices[0]));
+
+    models.push_back(model);
+    return model;
 }

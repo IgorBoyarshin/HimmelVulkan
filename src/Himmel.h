@@ -17,6 +17,7 @@
 #include "HmlSwapchain.h"
 #include "HmlResourceManager.h"
 #include "HmlRenderer.h"
+#include "HmlComplexRenderer.h"
 #include "HmlSnowParticleRenderer.h"
 #include "HmlTerrainRenderer.h"
 #include "HmlUiRenderer.h"
@@ -230,7 +231,7 @@ struct Himmel {
         inline void updateForDt(float dt) noexcept {
             static constexpr float SPEED = 0.2f;
             t += SPEED * dt;
-            // t = 3.2f;
+            t = 1.5f;
 
             while (t > FULL_CYCLE) t -= FULL_CYCLE;
         }
@@ -270,6 +271,7 @@ struct Himmel {
     std::shared_ptr<HmlRenderPass> hmlRenderPassForward;
     std::shared_ptr<HmlRenderPass> hmlRenderPassUi;
     std::shared_ptr<HmlRenderer> hmlRenderer;
+    std::shared_ptr<HmlComplexRenderer> hmlComplexRenderer;
     std::shared_ptr<HmlUiRenderer> hmlUiRenderer;
     std::shared_ptr<HmlBloomRenderer> hmlBloomRenderer;
     std::shared_ptr<HmlDeferredRenderer> hmlDeferredRenderer;
@@ -328,9 +330,12 @@ struct Himmel {
         std::shared_ptr<HmlModelResource> tree2;
         std::shared_ptr<HmlModelResource> sphere;
         std::shared_ptr<HmlModelResource> cube;
+
+        std::shared_ptr<HmlComplexModelResource> complexCube;
     } modelStorage;
 
     std::vector<std::shared_ptr<HmlRenderer::Entity>> entities;
+    std::vector<std::shared_ptr<HmlComplexRenderer::Entity>> complexEntities;
     // NOTE Since it's really a bad performance thing to have an array of pointers,
     // here we try to see if a basic approach works architecturally-wise.
     std::vector<HmlRenderer::Entity> staticEntities;

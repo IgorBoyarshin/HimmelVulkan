@@ -5,6 +5,7 @@
 #include <vector>
 #include <iostream>
 #include <unordered_set>
+#include <limits>
 
 
 #include "settings.h"
@@ -43,7 +44,7 @@ struct HmlImageResource {
 
 struct HmlBuffer {
     enum class Type {
-        STAGING_FROM_HOST, STAGING_TO_HOST, UNIFORM, STORAGE, VERTEX, INDEX
+        STAGING_FROM_HOST, STAGING_TO_HOST, UNIFORM, STORAGE, VERTEX, INDEX, VERTEX_INDEX
     } type;
 
     struct Pack {
@@ -64,6 +65,7 @@ struct HmlBuffer {
     bool update(const void* newData) noexcept;
     bool update(const void* newData, VkDeviceSize customUpdateSizeBytes) noexcept;
     bool download(void* dst) const noexcept ;
+    // HmlBuffer() noexcept;
     HmlBuffer(bool mappable) noexcept;
     ~HmlBuffer() noexcept;
 
@@ -72,11 +74,128 @@ struct HmlBuffer {
 };
 
 
+struct HmlBufferView {
+    std::shared_ptr<HmlBuffer> hmlBuffer;
+    VkDeviceSize offset;
+    // NOTE We don't seem to need (use) the length
+
+    inline HmlBufferView() noexcept {};
+    inline HmlBufferView(const std::shared_ptr<HmlBuffer>& hmlBuffer, VkDeviceSize offset) noexcept
+        : hmlBuffer(hmlBuffer), offset(offset) {}
+};
+
+
+struct IndicesCount {
+    VkIndexType type;
+    uint32_t count;
+
+    inline static IndicesCount with16(uint16_t count) noexcept {
+        return IndicesCount{ VK_INDEX_TYPE_UINT16, count };
+    }
+    inline static IndicesCount with16(auto count) noexcept {
+        static constexpr auto max = std::numeric_limits<uint16_t>::max();
+        assert(count <= max);
+        return IndicesCount{ VK_INDEX_TYPE_UINT16, static_cast<uint32_t>(count) };
+    }
+    inline static IndicesCount with32(uint32_t count) noexcept {
+        return IndicesCount{ VK_INDEX_TYPE_UINT32, count };
+    }
+
+    inline IndicesCount() noexcept : type(VK_INDEX_TYPE_UINT16), count(0) {}
+private:
+    inline IndicesCount(VkIndexType type, uint32_t count) noexcept : type(type), count(count) {}
+};
+
+
+struct HmlAttributes {
+    enum AttributePlace : uint8_t {
+        AttributePlacePosition   = 0,
+        AttributePlaceNormal     = 1,
+        AttributePlaceTangent    = 2,
+        AttributePlaceTexCoord_0 = 3,
+        AttributeCount           = 4
+    };
+    enum AttributeType : uint8_t {
+        AttributeTypePosition   = 1 << AttributePlacePosition,
+        AttributeTypeNormal     = 1 << AttributePlaceNormal,
+        AttributeTypeTangent    = 1 << AttributePlaceTangent,
+        AttributeTypeTexCoord_0 = 1 << AttributePlaceTexCoord_0,
+    };
+
+    static inline AttributePlace placeFromType(AttributeType type) noexcept {
+        switch (type) {
+            case AttributeTypePosition:   return AttributePlacePosition;
+            case AttributeTypeNormal:     return AttributePlaceNormal;
+            case AttributeTypeTangent:    return AttributePlaceTangent;
+            case AttributeTypeTexCoord_0: return AttributePlaceTexCoord_0;
+        }
+        assert(false);
+        return AttributePlacePosition; // stub
+    }
+
+    inline static AttributeType typeFromName(const std::string& name) noexcept {
+        if (name.compare("POSITION") == 0)   return AttributeTypePosition;
+        if (name.compare("NORMAL") == 0)     return AttributeTypeNormal;
+        if (name.compare("TANGENT") == 0)    return AttributeTypeTangent;
+        if (name.compare("TEXCOORD_0") == 0) return AttributeTypeTexCoord_0;
+
+        std::cerr << "::> Unexpected type name: " << name << std::endl;
+        assert(false);
+        return AttributeTypePosition; // stub
+    }
+
+    std::vector<VkVertexInputBindingDescription> bindingDescriptions;
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+    uint8_t usedAttributeTypes = 0;
+
+    // NOTE for now each location has a separate corresponding buffer binding
+    // NOTE we could compute sizeBytes from format ourselves, but for now let's just pass it
+    inline void add(AttributeType type, VkFormat format, uint32_t sizeBytes, uint32_t byteOffset) noexcept {
+        const auto place = placeFromType(type);
+        attributeDescriptions.push_back(VkVertexInputAttributeDescription{
+            .location = place, // as in shader
+            .binding = place, // vertex buffer
+            .format = format,
+            .offset = byteOffset // offsetof(Vertex, pos)
+        });
+
+        bindingDescriptions.push_back(VkVertexInputBindingDescription{
+            .binding = place,
+            .stride = sizeBytes,
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+        });
+
+        assert(((usedAttributeTypes & type) == 0) && "::> Multiple occurances of AttributeType");
+        usedAttributeTypes |= type;
+    }
+
+    bool operator==(const HmlAttributes& other) const noexcept;
+};
+
+
+template<> struct std::hash<HmlAttributes> {
+    inline size_t operator()(const HmlAttributes& hmlAttributes) const noexcept {
+        std::size_t res = 17;
+        for (const auto& bindingDescription : hmlAttributes.bindingDescriptions) {
+            res = res * 31 + hash<uint32_t>{}(bindingDescription.binding);
+            res = res * 31 + hash<uint32_t>{}(bindingDescription.stride);
+            res = res * 31 + hash<VkVertexInputRate>()(bindingDescription.inputRate);
+        }
+        for (const auto& attributeDescription : hmlAttributes.attributeDescriptions) {
+            res = res * 31 + hash<uint32_t>{}(attributeDescription.location);
+            res = res * 31 + hash<uint32_t>{}(attributeDescription.binding);
+            res = res * 31 + hash<uint32_t>{}(attributeDescription.offset);
+            res = res * 31 + hash<VkFormat>{}(attributeDescription.format);
+        }
+        res = res * 31 + hash<uint32_t>{}(hmlAttributes.usedAttributeTypes);
+        return res;
+    }
+};
+
+
 struct HmlModelResource {
     using Id = uint32_t;
     Id id;
-
-    std::shared_ptr<HmlDevice> hmlDevice;
 
     uint32_t indicesCount;
 
@@ -95,6 +214,34 @@ struct HmlModelResource {
 };
 
 
+struct HmlComplexModelResource {
+    using Id = uint32_t;
+    Id id;
+
+    std::vector<HmlBufferView> vertexBufferViews;
+    HmlBufferView indexBufferView;
+    IndicesCount indicesCount;
+
+    // TODO Most HmlAttributes will be the same between HmlModels, so it is not great to store them per model.
+    HmlAttributes hmlAttributes;
+
+    // std::unique_ptr<HmlImageResource> textureResource;
+
+    inline HmlComplexModelResource() noexcept : id(newId()) {}
+    ~HmlComplexModelResource() noexcept;
+
+    private:
+    static Id newId() noexcept;
+};
+
+
+struct HmlScene {
+    // NOTE shared because we can't otherwise createe shared_ptr from them when accessing
+    // std::vector<std::shared_ptr<HmlComplexModelResource>> hmlComplexModelResources;
+    std::vector<std::unique_ptr<HmlComplexModelResource>> hmlComplexModelResources;
+};
+
+
 struct HmlResourceManager {
     std::shared_ptr<HmlDevice> hmlDevice;
     std::shared_ptr<HmlCommands> hmlCommands;
@@ -108,6 +255,7 @@ struct HmlResourceManager {
     // the models is to eventually implement a system to access Models from here
     // in the first place (not just store them here as well).
     std::vector<std::shared_ptr<HmlModelResource>> models;
+    std::vector<std::shared_ptr<HmlComplexModelResource>> complexModels;
     // ========================================================================
     struct ReleaseData {
         std::unique_ptr<HmlBuffer> hmlBuffer;
@@ -136,14 +284,17 @@ struct HmlResourceManager {
         std::shared_ptr<HmlCommands> hmlCommands) noexcept;
     ~HmlResourceManager() noexcept;
     // TODO consistency between new and create
+    // TODO make explicit whether transfer is done via coherent memory or staging buffer
     std::unique_ptr<HmlBuffer> createStagingBufferFromHost(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createStagingBufferToHost(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createUniformBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createStorageBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createVertexBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createIndexBuffer(VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createVertexIndexBuffer(VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createVertexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlBuffer> createIndexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept;
+    std::unique_ptr<HmlBuffer> createVertexIndexBufferWithData(const void* data, VkDeviceSize sizeBytes) const noexcept;
     std::unique_ptr<HmlImageResource> newShadowResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newRenderTargetImageResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newReadableRenderable(VkExtent2D extent, VkFormat format) noexcept;
@@ -159,6 +310,9 @@ struct HmlResourceManager {
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices) noexcept;
     // Model with texture
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices, const char* textureFileName, VkFilter filter) noexcept;
+    // Complex model
+    std::shared_ptr<HmlScene> loadAsset(const char* path) noexcept;
+
     // ========================================================================
     // NOTE: unused
     // TODO remove
@@ -233,5 +387,6 @@ struct HmlResourceManager {
     void copyBufferToImage(VkBuffer buffer, VkImage image, VkExtent2D extent) const noexcept;
     void copyImageToBuffer(VkImage image, VkBuffer buffer, VkExtent2D extent, VkCommandBuffer commandBuffer) const noexcept;
 };
+
 
 #endif

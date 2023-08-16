@@ -200,6 +200,8 @@ VkDebugUtilsMessengerEXT HmlDevice::createDebugMessanger(const VkInstance& insta
 }
 
 
+// TODO save all of them into a log and print (or don't print) at controlled
+// point in time rather than directly into std::err(cout) at random time.
 VKAPI_ATTR VkBool32 VKAPI_CALL HmlDevice::debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT messageType,

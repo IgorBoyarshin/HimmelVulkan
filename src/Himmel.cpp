@@ -1,7 +1,7 @@
 #include "Himmel.h"
 
 
-#define SNOW_IS_ON    0
+#define SNOW_IS_ON    1
 #define DEBUG_TERRAIN 0
 
 
@@ -110,6 +110,7 @@ bool Himmel::init() noexcept {
 #endif
     if (!initEntities()) return false; // NOTE must be after Physics because is expected to set the last entity
 
+    // NOTE must be after initEntities() so that HmlComplexRenderer knows what pipelines to create
     if (!prepareResources()) return false;
 
     successfulInit = true;
@@ -158,6 +159,9 @@ bool Himmel::initContext() noexcept {
 bool Himmel::initRenderers(const char* heightmapFile) noexcept {
     hmlRenderer = HmlRenderer::create(hmlContext, generalDescriptorSetLayout);
     if (!hmlRenderer) return false;
+
+    hmlComplexRenderer = HmlComplexRenderer::create(hmlContext, generalDescriptorSetLayout);
+    if (!hmlComplexRenderer) return false;
 
     hmlDeferredRenderer = HmlDeferredRenderer::create(hmlContext, generalDescriptorSetLayout);
     if (!hmlDeferredRenderer) return false;
@@ -309,6 +313,17 @@ bool Himmel::initEntities() noexcept {
 
 
         hmlRenderer->specifyEntitiesToRender(entities);
+
+        {
+            auto modelMatrix = glm::mat4(1.0f);
+            modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 60.0f});
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(5.0f));
+
+            complexEntities.push_back(std::make_shared<HmlComplexRenderer::Entity>(modelStorage.complexCube));
+            complexEntities.back()->modelMatrix = modelMatrix;
+        }
+
+        hmlComplexRenderer->specifyEntitiesToRender(complexEntities);
     }
 
     { // Static Entities
@@ -512,6 +527,13 @@ bool Himmel::initModels() noexcept {
 
         const auto verticesSizeBytes = sizeof(vertices[0]) * vertices.size();
         modelStorage.cube = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
+    }
+
+    { // Sponza
+        // auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/sponza/NewSponza_Main_glTF_002.gltf");
+        auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/Cube/Cube.gltf");
+        modelStorage.complexCube = std::move(hmlScene->hmlComplexModelResources.at(0));
+        // return false;
     }
 
     return true;
@@ -1457,7 +1479,7 @@ bool Himmel::prepareResources() noexcept {
                 // TODO dispatcher.registerStats("Waiting for stage from previous frame", begin, end);
             }
         },
-        .drawers = { hmlTerrainRenderer, hmlRenderer },
+        .drawers = { hmlTerrainRenderer, hmlRenderer, hmlComplexRenderer },
         .differentExtent = std::nullopt,
         .colorAttachments = {
             HmlRenderPass::ColorAttachment{

@@ -14,10 +14,8 @@ std::vector<std::unique_ptr<HmlPipeline>> HmlComplexRenderer::createPipelines(
         HmlGraphicsPipelineConfig config{
             .bindingDescriptions   = hmlAttributes.bindingDescriptions,
             .attributeDescriptions = hmlAttributes.attributeDescriptions,
-            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, // TODO take from ComplexModel
-            .hmlShaders = HmlShaders() // TODO generate based on hmlAttributes
-                .addVertex("../shaders/out/complex_deferred.vert.spv")
-                .addFragment("../shaders/out/complex_deferred.frag.spv"),
+            .topology = hmlAttributes.topology,
+            .hmlShaders = ShaderManager::generateComplexFor(hmlAttributes),
             .renderPass = hmlRenderPass->renderPass,
             .extent = hmlRenderPass->extent,
             .polygoneMode = VK_POLYGON_MODE_FILL,

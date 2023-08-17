@@ -107,6 +107,7 @@ private:
 };
 
 
+// Embodies what we generalize HmlModels over in terms of pipeline requirements
 struct HmlAttributes {
     enum AttributePlace : uint8_t {
         AttributePlacePosition   = 0,
@@ -144,6 +145,7 @@ struct HmlAttributes {
         return AttributeTypePosition; // stub
     }
 
+    VkPrimitiveTopology topology;
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
     uint8_t usedAttributeTypes = 0;

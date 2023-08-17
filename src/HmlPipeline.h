@@ -9,6 +9,7 @@
 
 #include "settings.h"
 #include "HmlDevice.h"
+#include "HmlResourceManager.h"
 
 
 struct HmlShaders {
@@ -56,6 +57,26 @@ struct HmlShaders {
         fragment = fileNameSpv;
         fragmentSpecializationInfo = specializationInfo;
         return *this;
+    }
+};
+
+
+struct ShaderManager {
+    static inline HmlShaders generateComplexFor(const HmlAttributes& hmlAttributes) noexcept {
+        // NOTE For now ignore bindings and just focus on manually-written shaders
+        const auto usedTypes = hmlAttributes.usedAttributeTypes;
+        switch (usedTypes) {
+            case HmlAttributes::AttributeTypePosition |
+                 HmlAttributes::AttributeTypeNormal |
+                 HmlAttributes::AttributeTypeTangent |
+                 HmlAttributes::AttributeTypeTexCoord_0:
+                return HmlShaders()
+                    .addVertex("../shaders/out/complex_deferred.vert.spv")
+                    .addFragment("../shaders/out/complex_deferred.frag.spv");
+            default:
+                assert(false && "::> Unimplemented shader requirement");
+                return HmlShaders{}; // stub
+        }
     }
 };
 

@@ -1240,12 +1240,19 @@ static void bindMesh(
 
         std::cout << "Uses material #" << primitive.material << "\n";
 
-        assert(primitive.mode == 4); // triangles
+        VkPrimitiveTopology topology;
+        switch (primitive.mode) {
+            case 4: topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; break;
+            default:
+                assert(false && "::> Unsupported topology.");
+                topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // stub
+        }
 
         // TODO Implement the ability to have interleaved attributes by re-constructuring them here.
         // TODO Measure performance difference from having attributes interleaved vs in multiple buffers.
         std::vector<HmlBufferView> vertexBufferViews(HmlAttributes::AttributeCount);
         HmlAttributes hmlAttributes;
+        hmlAttributes.topology = topology;
         for (const auto &attrib : primitive.attributes) {
             const tinygltf::Accessor& accessor = model.accessors[attrib.second];
             const int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);

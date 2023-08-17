@@ -123,6 +123,7 @@ struct HmlAttributes {
         AttributeTypeTexCoord_0 = 1 << AttributePlaceTexCoord_0,
     };
 
+
     static inline AttributePlace placeFromType(AttributeType type) noexcept {
         switch (type) {
             case AttributeTypePosition:   return AttributePlacePosition;
@@ -145,31 +146,76 @@ struct HmlAttributes {
         return AttributeTypePosition; // stub
     }
 
+
+    // Promises that resulting bindings are:
+    // - a subset of unique AttributeTypes;
+    // - ordered according to AttributePlace;
+    // - indexed consequently starting from 0 with 1 increment.
+    struct Builder {
+        struct Config {
+            AttributeType type;
+            VkFormat format;
+            uint32_t sizeBytes;
+            uint32_t byteOffset;
+
+            inline Config() noexcept {}
+            inline Config(AttributeType type, VkFormat format, uint32_t sizeBytes, uint32_t byteOffset) noexcept
+                : type(type), format(format), sizeBytes(sizeBytes), byteOffset(byteOffset) {}
+        };
+
+        std::array<Config, AttributeCount> configs;
+        uint8_t usedAttributeTypes = 0;
+        VkPrimitiveTopology topology;
+
+        // NOTE we could compute sizeBytes from format ourselves, but for now let's just pass it
+        inline Builder& add(AttributeType type, VkFormat format, uint32_t sizeBytes, uint32_t byteOffset) noexcept {
+            assert(((usedAttributeTypes & type) == 0) && "::> Multiple occurances of AttributeType");
+            usedAttributeTypes |= type;
+
+            const auto place = placeFromType(type);
+            configs[place] = Config{type, format, sizeBytes, byteOffset};
+
+            return *this;
+        }
+
+        inline HmlAttributes seal() noexcept {
+            HmlAttributes hmlAttributes;
+            hmlAttributes.usedAttributeTypes = usedAttributeTypes;
+            hmlAttributes.topology = topology;
+
+            uint32_t index = 0;
+            for (const auto& [type, format, sizeBytes, byteOffset] : configs) {
+                if ((usedAttributeTypes & type) == 0) continue; // type not present
+
+                hmlAttributes.attributeDescriptions.push_back(VkVertexInputAttributeDescription{
+                    .location = index, // as in shader
+                    .binding = index, // vertex buffer
+                    .format = format,
+                    .offset = byteOffset // offsetof(Vertex, pos)
+                });
+                hmlAttributes.bindingDescriptions.push_back(VkVertexInputBindingDescription{
+                    .binding = index,
+                    .stride = sizeBytes,
+                    .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+                });
+
+                index++;
+            }
+
+            return hmlAttributes;
+        }
+
+        inline Builder(VkPrimitiveTopology topology) : topology(topology) {}
+    };
+
+    static inline Builder build(VkPrimitiveTopology topology) noexcept {
+        return Builder{ topology };
+    }
+
     VkPrimitiveTopology topology;
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
     uint8_t usedAttributeTypes = 0;
-
-    // NOTE for now each location has a separate corresponding buffer binding
-    // NOTE we could compute sizeBytes from format ourselves, but for now let's just pass it
-    inline void add(AttributeType type, VkFormat format, uint32_t sizeBytes, uint32_t byteOffset) noexcept {
-        const auto place = placeFromType(type);
-        attributeDescriptions.push_back(VkVertexInputAttributeDescription{
-            .location = place, // as in shader
-            .binding = place, // vertex buffer
-            .format = format,
-            .offset = byteOffset // offsetof(Vertex, pos)
-        });
-
-        bindingDescriptions.push_back(VkVertexInputBindingDescription{
-            .binding = place,
-            .stride = sizeBytes,
-            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
-        });
-
-        assert(((usedAttributeTypes & type) == 0) && "::> Multiple occurances of AttributeType");
-        usedAttributeTypes |= type;
-    }
 
     bool operator==(const HmlAttributes& other) const noexcept;
 };

@@ -1251,8 +1251,7 @@ static void bindMesh(
         // TODO Implement the ability to have interleaved attributes by re-constructuring them here.
         // TODO Measure performance difference from having attributes interleaved vs in multiple buffers.
         std::vector<HmlBufferView> vertexBufferViews(HmlAttributes::AttributeCount);
-        HmlAttributes hmlAttributes;
-        hmlAttributes.topology = topology;
+        auto hmlAttributesBuilder = HmlAttributes::build(topology);
         for (const auto &attrib : primitive.attributes) {
             const tinygltf::Accessor& accessor = model.accessors[attrib.second];
             const int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
@@ -1272,7 +1271,7 @@ static void bindMesh(
 
             assert(byteStride == tinygltf::GetComponentSizeInBytes(accessor.componentType) * size);
 
-            hmlAttributes.add(
+            hmlAttributesBuilder.add(
                 attributeType,
                 gltfToFormat(accessor.componentType, size),
                 byteStride,
@@ -1351,7 +1350,7 @@ static void bindMesh(
         }
         model->indexBufferView = hmlBufferViews[indexBufferAccessor.bufferView];
         model->vertexBufferViews = std::move(vertexBufferViews);
-        model->hmlAttributes = std::move(hmlAttributes);
+        model->hmlAttributes = hmlAttributesBuilder.seal();
 
         hmlComplexModels.push_back(std::move(model));
     }

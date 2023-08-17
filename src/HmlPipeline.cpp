@@ -269,6 +269,7 @@ std::unique_ptr<HmlPipeline> HmlPipeline::createGraphics(std::shared_ptr<HmlDevi
     return hmlPipeline;
 }
 
+
 HmlPipeline::~HmlPipeline() noexcept {
 #if LOG_DESTROYS
     std::cout << ":> Destroying HmlPipeline...\n";

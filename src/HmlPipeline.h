@@ -73,6 +73,12 @@ struct ShaderManager {
                 return HmlShaders()
                     .addVertex("../shaders/out/complex_deferred.vert.spv")
                     .addFragment("../shaders/out/complex_deferred.frag.spv");
+            case HmlAttributes::AttributeTypePosition |
+                 HmlAttributes::AttributeTypeNormal |
+                 HmlAttributes::AttributeTypeTexCoord_0:
+                return HmlShaders()
+                    .addVertex("../shaders/out/complex_deferred_notangent.vert.spv")
+                    .addFragment("../shaders/out/complex_deferred_notangent.frag.spv");
             default:
                 assert(false && "::> Unimplemented shader requirement");
                 return HmlShaders{}; // stub
@@ -131,6 +137,7 @@ struct HmlPipeline {
             std::shared_ptr<HmlDevice> hmlDevice,
             HmlGraphicsPipelineConfig&& hmlPipelineConfig) noexcept;
 
+    inline HmlPipeline() noexcept : id(newId()) {}
     ~HmlPipeline() noexcept;
 
     inline bool operator==(const HmlPipeline& other) const {

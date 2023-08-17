@@ -332,6 +332,8 @@ struct Himmel {
         std::shared_ptr<HmlModelResource> cube;
 
         std::shared_ptr<HmlComplexModelResource> complexCube;
+        std::shared_ptr<HmlComplexModelResource> damagedHelmet;
+        // std::shared_ptr<HmlComplexModelResource> sponza;
     } modelStorage;
 
     std::vector<std::shared_ptr<HmlRenderer::Entity>> entities;

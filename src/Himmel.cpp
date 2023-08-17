@@ -317,9 +317,25 @@ bool Himmel::initEntities() noexcept {
         {
             auto modelMatrix = glm::mat4(1.0f);
             modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 60.0f});
-            modelMatrix = glm::scale(modelMatrix, glm::vec3(5.0f));
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(3.0f));
 
             complexEntities.push_back(std::make_shared<HmlComplexRenderer::Entity>(modelStorage.complexCube));
+            complexEntities.back()->modelMatrix = modelMatrix;
+        }
+        {
+            auto modelMatrix = glm::mat4(1.0f);
+            modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 40.0f});
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(5.0f));
+
+            complexEntities.push_back(std::make_shared<HmlComplexRenderer::Entity>(modelStorage.damagedHelmet));
+            complexEntities.back()->modelMatrix = modelMatrix;
+        }
+        {
+            auto modelMatrix = glm::mat4(1.0f);
+            modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 20.0f});
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(7.0f));
+
+            complexEntities.push_back(std::make_shared<HmlComplexRenderer::Entity>(modelStorage.damagedHelmet));
             complexEntities.back()->modelMatrix = modelMatrix;
         }
 
@@ -529,13 +545,24 @@ bool Himmel::initModels() noexcept {
         modelStorage.cube = hmlContext->hmlResourceManager->newModel(vertices.data(), verticesSizeBytes, indices);
     }
 
-    { // Sponza
-        // auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/sponza/NewSponza_Main_glTF_002.gltf");
+    // ==== Complex Models (glTF)
+
+    // { // Sponza
+    //     auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/sponza/NewSponza_Main_glTF_002.gltf");
+    //     modelStorage.sponza = std::move(hmlScene->hmlComplexModelResources.at(0));
+    // }
+
+    { // Cube
         auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/Cube/Cube.gltf");
         modelStorage.complexCube = std::move(hmlScene->hmlComplexModelResources.at(0));
-        // return false;
     }
 
+    { // Damanged helmet
+        auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/DamagedHelmet.gltf");
+        modelStorage.damagedHelmet = std::move(hmlScene->hmlComplexModelResources.at(0));
+    }
+
+    // return false;
     return true;
 }
 

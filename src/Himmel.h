@@ -343,6 +343,7 @@ struct Himmel {
     std::vector<HmlRenderer::Entity> staticEntities;
 
     bool successfulInit = false;
+    bool exitRequested = false;
 
     bool init() noexcept;
     bool initContext() noexcept;

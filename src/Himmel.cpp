@@ -827,7 +827,7 @@ void Himmel::testbenchFriction() noexcept {
 
 bool Himmel::run() noexcept {
     static auto startTime = std::chrono::high_resolution_clock::now();
-    while (!hmlContext->hmlWindow->shouldClose()) {
+    while (!hmlContext->hmlWindow->shouldClose() && !exitRequested) {
 #if USE_TIMESTAMP_QUERIES
         hmlContext->hmlQueries->beginFrame();
 #endif
@@ -1015,6 +1015,10 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         model = glm::rotate(model, (i+1) * 0.7f * sinceStart + i * 1.0f, glm::vec3(0.0, 1.0, 0.0));
         model = glm::translate(model, glm::vec3(50.0f, 0.0f, 0.0f)); // inner radius
         pointLightsDynamic[i].position = model[3];
+    }
+
+    if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        exitRequested = true;
     }
 
 

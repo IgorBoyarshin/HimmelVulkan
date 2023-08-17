@@ -47,9 +47,10 @@ std::unique_ptr<HmlComplexRenderer> HmlComplexRenderer::create(
     hmlRenderer->hmlContext = hmlContext;
 
     const auto imageCount = hmlContext->imageCount();
+    const auto texturesInMaterial = HmlMaterial::PlaceCount;
 
     hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
-        .withTextures(MAX_TEXTURES_COUNT + imageCount * MAX_TEXTURES_COUNT)
+        .withTextures(MAX_MODELS * texturesInMaterial)
         .withStorageBuffers(imageCount)
         .maxDescriptorSets(1 + imageCount)
         .build(hmlContext->hmlDevice);
@@ -60,33 +61,41 @@ std::unique_ptr<HmlComplexRenderer> HmlComplexRenderer::create(
     }
 
     {
-        hmlRenderer->descriptorSetLayoutTextures = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
-            .withTextureArrayAt(0, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES_COUNT)
+        hmlRenderer->descriptorSetLayoutMaterial = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
+            .withTextureArrayAt(0, VK_SHADER_STAGE_FRAGMENT_BIT, texturesInMaterial)
             .build(hmlContext->hmlDevice);
-        if (!hmlRenderer->descriptorSetLayoutTextures) return { nullptr };
-        hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutTextures);
+        if (!hmlRenderer->descriptorSetLayoutMaterial) return { nullptr };
+        hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutMaterial);
+    }
 
-        hmlRenderer->descriptorSet_textures_1 = hmlContext->hmlDescriptors->createDescriptorSets(1,
-            hmlRenderer->descriptorSetLayoutTextures, hmlRenderer->descriptorPool)[0];
-        if (!hmlRenderer->descriptorSet_textures_1) return { nullptr };
+    {
+        // hmlRenderer->descriptorSetLayoutTextures = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
+        //     .withTextureArrayAt(0, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES_COUNT)
+        //     .build(hmlContext->hmlDevice);
+        // if (!hmlRenderer->descriptorSetLayoutTextures) return { nullptr };
+        // hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutTextures);
+
+        // hmlRenderer->descriptorSet_textures_1 = hmlContext->hmlDescriptors->createDescriptorSets(1,
+        //     hmlRenderer->descriptorSetLayoutTextures, hmlRenderer->descriptorPool)[0];
+        // if (!hmlRenderer->descriptorSet_textures_1) return { nullptr };
     }
 
     {
 
-        hmlRenderer->descriptorSetLayoutInstances = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
-            .withStorageBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT)
-            .withTextureArrayAt(1, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES_COUNT)
-            .build(hmlContext->hmlDevice);
-        if (!hmlRenderer->descriptorSetLayoutInstances) return { nullptr };
-        hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutInstances);
-
-        auto descriptorSets = hmlContext->hmlDescriptors->createDescriptorSets(imageCount,
-            hmlRenderer->descriptorSetLayoutInstances, hmlRenderer->descriptorPool);
-        // TODO WTF??
-        // hmlRenderer->descriptorSet_instances_2_queue = std::queue<VkDescriptorSet>(std::move(descriptorSets));
-        // hmlRenderer->descriptorSet_instances_2_queue = std::queue<VkDescriptorSet>(descriptorSets.begin(), descriptorSets.end());
-        for (VkDescriptorSet set : descriptorSets) hmlRenderer->descriptorSet_instances_2_queue.push(set);
-        if (hmlRenderer->descriptorSet_instances_2_queue.empty()) return { nullptr };
+        // hmlRenderer->descriptorSetLayoutInstances = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
+        //     .withStorageBufferAt(0, VK_SHADER_STAGE_VERTEX_BIT)
+        //     .withTextureArrayAt(1, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES_COUNT)
+        //     .build(hmlContext->hmlDevice);
+        // if (!hmlRenderer->descriptorSetLayoutInstances) return { nullptr };
+        // hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutInstances);
+        //
+        // auto descriptorSets = hmlContext->hmlDescriptors->createDescriptorSets(imageCount,
+        //     hmlRenderer->descriptorSetLayoutInstances, hmlRenderer->descriptorPool);
+        // // TODO WTF??
+        // // hmlRenderer->descriptorSet_instances_2_queue = std::queue<VkDescriptorSet>(std::move(descriptorSets));
+        // // hmlRenderer->descriptorSet_instances_2_queue = std::queue<VkDescriptorSet>(descriptorSets.begin(), descriptorSets.end());
+        // for (VkDescriptorSet set : descriptorSets) hmlRenderer->descriptorSet_instances_2_queue.push(set);
+        // if (hmlRenderer->descriptorSet_instances_2_queue.empty()) return { nullptr };
     }
 
     return hmlRenderer;
@@ -102,8 +111,9 @@ HmlComplexRenderer::~HmlComplexRenderer() noexcept {
     // NOTE number of images, which most likely will not change, we ignore it.
     // DescriptorSets are freed automatically upon the deletion of the pool
     vkDestroyDescriptorPool(hmlContext->hmlDevice->device, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, descriptorSetLayoutTextures, nullptr);
-    vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, descriptorSetLayoutInstances, nullptr);
+    vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, descriptorSetLayoutMaterial, nullptr);
+    // vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, descriptorSetLayoutTextures, nullptr);
+    // vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, descriptorSetLayoutInstances, nullptr);
 }
 
 
@@ -111,37 +121,55 @@ void HmlComplexRenderer::specifyEntitiesToRender(std::span<const std::shared_ptr
     entitiesToRenderForModelForHmlAttributes.clear();
     entitiesToRenderForModelForPipelineId.clear(); // NOTE can't clear this in createPipelines() because that func is called per render pass
 
+    // ======== Sort entities into buckets by model by pipeline
+
+    hmlMaterialForModel.clear();
+    textureDescriptorSetForModel.clear();
     for (const auto& entity : entities) {
         const auto& model = entity->complexModelResource;
         const auto id = model->id;
         const auto& hmlAttributes = model->hmlAttributes;
 
         entitiesToRenderForModelForHmlAttributes[hmlAttributes][id].push_back(entity);
+
+        textureDescriptorSetForModel[id] = VkDescriptorSet{}; // just to make an entry in the map
+        hmlMaterialForModel[id] = model->hmlMaterial;
+    }
+
+    // ======== Allocate new descriptor sets
+
+    const auto modelsCount = textureDescriptorSetForModel.size();
+    assert(modelsCount <= MAX_MODELS &&
+       "::> There are more models than we've allocated textures in descriptor pool for.");
+    if (allocatedTextureDescriptorSets.size() < modelsCount) {
+        const auto count = modelsCount - allocatedTextureDescriptorSets.size();
+        auto newDescriptorSets = hmlContext->hmlDescriptors->createDescriptorSets(count, descriptorSetLayoutMaterial, descriptorPool);
+        allocatedTextureDescriptorSets.insert(allocatedTextureDescriptorSets.cend(), newDescriptorSets.begin(), newDescriptorSets.end());
+    }
+    size_t i = 0;
+    for (auto& [_model, descriptorSet] : textureDescriptorSetForModel) {
+        descriptorSet = allocatedTextureDescriptorSets[i++];
+    }
+
+    // ======== Update descriptor sets
+
+    // TODO @SPEED Could probably batch up all writes to vkUpdateDescriptorSets(right now is done per model)
+    std::array<VkSampler,   HmlMaterial::PlaceCount> samplers;
+    std::array<VkImageView, HmlMaterial::PlaceCount> imageViews;
+    const auto dummySampler = hmlContext->hmlResourceManager->dummyTextureResource->sampler;
+    const auto dummyView    = hmlContext->hmlResourceManager->dummyTextureResource->view;
+    for (const auto& [modelId, hmlMaterial] : hmlMaterialForModel) {
+        assert(HmlMaterial::PlaceCount == hmlMaterial.textures.size());
+        for (size_t i = 0; i < hmlMaterial.textures.size(); i++) {
+            const auto& hmlImageResource = hmlMaterial.textures[i];
+            samplers  [i] = hmlImageResource ? hmlImageResource->sampler : dummySampler;
+            imageViews[i] = hmlImageResource ? hmlImageResource->view    : dummyView;
+        }
+        HmlDescriptorSetUpdater(textureDescriptorSetForModel[modelId])
+            .textureArrayAt(0, samplers, imageViews)
+            .update(hmlContext->hmlDevice);
     }
 }
-
-
-// HmlComplexRenderer::TextureUpdateData HmlComplexRenderer::prepareTextureUpdateData(std::span<const EntitiesData> entitiesData) noexcept {
-//     // NOTE Setting the rest of indices to a dummy texture is done only because
-//     // the validation layer complains that corresponding textures are not set,
-//     // although supposedly being used in shader.
-//     // In reality, however, the logic is solid and they are not used.
-//
-//     std::array<VkSampler,   MAX_TEXTURES_COUNT> samplers;
-//     std::array<VkImageView, MAX_TEXTURES_COUNT> imageViews;
-//     const auto dummySampler = hmlContext->hmlResourceManager->dummyTextureResource->sampler;
-//     const auto dummyView    = hmlContext->hmlResourceManager->dummyTextureResource->view;
-//     std::fill(samplers.begin(), samplers.end(), dummySampler);
-//     std::fill(imageViews.begin(), imageViews.end(), dummyView);
-//
-//     for (const auto& [textureIndex, complexModelResource] : entitiesData) {
-//         if (!complexModelResource->textureResource) continue;
-//         samplers  [textureIndex] = complexModelResource->textureResource->sampler;
-//         imageViews[textureIndex] = complexModelResource->textureResource->view;
-//     }
-//
-//     return std::make_pair(std::move(samplers), std::move(imageViews));
-// }
 
 
 VkCommandBuffer HmlComplexRenderer::draw(const HmlFrameData& frameData) noexcept {
@@ -169,19 +197,19 @@ VkCommandBuffer HmlComplexRenderer::draw(const HmlFrameData& frameData) noexcept
     // }
 #endif
 
-    std::array<VkDescriptorSet, 3> descriptorSets = {
-        frameData.generalDescriptorSet_0, descriptorSet_textures_1, descriptorSet_instances_2_queue.front()
-    };
     for (const auto& hmlPipeline : getCurrentPipelines()) {
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hmlPipeline->pipeline);
-
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
         const auto& entitiesToRenderForModel = entitiesToRenderForModelForPipelineId[hmlPipeline->id];
         for (const auto& [modelId, entities] : entitiesToRenderForModel) {
             // NOTE We know there is at least 1 such entity (ensured by logic of specifyEntitiesToRender)
             const auto& model = entities[0]->complexModelResource;
+
+            std::array<VkDescriptorSet, 2> descriptorSets = {
+                frameData.generalDescriptorSet_0, textureDescriptorSetForModel[modelId]
+            };
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
             const auto bindingCount = model->vertexBufferViews.size();
             std::vector<VkBuffer> vertexBuffers;
@@ -205,14 +233,20 @@ VkCommandBuffer HmlComplexRenderer::draw(const HmlFrameData& frameData) noexcept
             const auto indexBufferOffset = model->indexBufferView.offset;
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, indexBufferOffset, model->indicesCount.type); // 0 is offset
 
+            const auto& hmlMaterial = hmlMaterialForModel[modelId];
+            static const auto indexForPlace = [](HmlMaterial::TexturePlace place, const HmlMaterial& hmlMaterial){
+                return hmlMaterial.textures[place] ? place : NO_TEXTURE_MARK;
+            };
             for (const auto& entity : entities) {
                 // NOTE Yes, in theory having a textureIndex per Entity is redundant
                 PushConstantRegular pushConstant{
                     .model = entity->modelMatrix,
-                    // .color = glm::vec4(entity->color, 1.0f),
-                    // .textureIndex = model->textureResource ? textureIndexFor[modelId] : NO_TEXTURE_MARK,
                     .color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
-                    .textureIndex = NO_TEXTURE_MARK,
+                    .baseColorTextureIndex = indexForPlace(HmlMaterial::PlaceBaseColor, hmlMaterial),
+                    .metallicRoughnessTextureIndex = indexForPlace(HmlMaterial::PlaceMetallicRoughness, hmlMaterial),
+                    .normalTextureIndex = indexForPlace(HmlMaterial::PlaceNormal, hmlMaterial),
+                    .occlusionTextureIndex = indexForPlace(HmlMaterial::PlaceOcclusion, hmlMaterial),
+                    .emissiveTextureIndex = indexForPlace(HmlMaterial::PlaceEmissive, hmlMaterial),
                     .id = entity->id,
                 };
                 vkCmdPushConstants(commandBuffer, hmlPipeline->layout,

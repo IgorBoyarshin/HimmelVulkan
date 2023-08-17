@@ -25,7 +25,7 @@
 // NOTE
 struct HmlComplexRenderer : HmlDrawer {
     struct Entity {
-        using Id = uint16_t;
+        using Id = uint32_t;
         static const Id INVALID_ID = 0;
         Id id = INVALID_ID;
         static Id nextFreeId; // is initted in cpp
@@ -50,7 +50,11 @@ struct HmlComplexRenderer : HmlDrawer {
     struct PushConstantRegular {
         alignas(16) glm::mat4 model;
         glm::vec4 color;
-        int32_t textureIndex;
+        int32_t baseColorTextureIndex;
+        int32_t metallicRoughnessTextureIndex;
+        int32_t normalTextureIndex;
+        int32_t occlusionTextureIndex;
+        int32_t emissiveTextureIndex;
         Entity::Id id;
     };
 
@@ -68,34 +72,42 @@ struct HmlComplexRenderer : HmlDrawer {
 
 
     VkDescriptorPool descriptorPool;
-    VkDescriptorSet  descriptorSet_textures_1;
-    std::queue<VkDescriptorSet> descriptorSet_instances_2_queue; // FIFO
-    VkDescriptorSetLayout descriptorSetLayoutTextures;
-    VkDescriptorSetLayout descriptorSetLayoutInstances;
+    // VkDescriptorSet  descriptorSet_textures_1;
+    // std::queue<VkDescriptorSet> descriptorSet_instances_2_queue; // FIFO
+    // VkDescriptorSetLayout descriptorSetLayoutTextures;
+    // VkDescriptorSetLayout descriptorSetLayoutInstances;
+
+    std::vector<VkDescriptorSet> allocatedTextureDescriptorSets;
+    VkDescriptorSetLayout descriptorSetLayoutMaterial;
+    std::unordered_map<HmlComplexModelResource::Id, VkDescriptorSet> textureDescriptorSetForModel;
 
     // NOTE we don't really need to permanently store the array of them in RAM.
-    struct EntityInstanceData {
-        glm::mat4 model;
-        inline EntityInstanceData(glm::mat4&& model) : model(model) {}
-    };
-    std::vector<uint32_t> instancedCounts;
+    // struct EntityInstanceData {
+    //     glm::mat4 model;
+    //     inline EntityInstanceData(glm::mat4&& model) : model(model) {}
+    // };
+    // std::vector<uint32_t> instancedCounts;
 
-    struct EntitiesData {
-        int32_t textureIndex;
-        std::shared_ptr<HmlComplexModelResource> complexModelResource;
-        // uint32_t count;
+    // struct EntitiesData {
+    //     int32_t textureIndex;
+    //     std::shared_ptr<HmlComplexModelResource> complexModelResource;
+    //     // uint32_t count;
+    //
+    //     inline EntitiesData() {}
+    //     inline EntitiesData(int32_t textureIndex, std::shared_ptr<HmlComplexModelResource> complexModelResource)
+    //         : textureIndex(textureIndex), complexModelResource(complexModelResource) {}
+    // };
 
-        inline EntitiesData() {}
-        inline EntitiesData(int32_t textureIndex, std::shared_ptr<HmlComplexModelResource> complexModelResource)
-            : textureIndex(textureIndex), complexModelResource(complexModelResource) {}
-    };
-
-    std::unique_ptr<HmlBuffer> instancedEntitiesStorageBuffer;
-    std::unordered_map<HmlComplexModelResource::Id, EntitiesData> staticEntitiesDataForModel;
+    // std::unique_ptr<HmlBuffer> instancedEntitiesStorageBuffer;
+    // std::unordered_map<HmlComplexModelResource::Id, EntitiesData> staticEntitiesDataForModel;
 
 
-    static constexpr uint32_t MAX_TEXTURES_COUNT = 32; // XXX must match the shader. NOTE can be increased (80+)
+    static constexpr auto MAX_MODELS = 64;
+    // static constexpr uint32_t MAX_TEXTURES_COUNT = 32; // XXX must match the shader. NOTE can be increased (80+)
     static constexpr int32_t NO_TEXTURE_MARK = -1;
+
+    // NOTE @SPEED we could alternatively store pre-computed indices instead of whole shared_ptrs
+    std::unordered_map<HmlComplexModelResource::Id, HmlMaterial> hmlMaterialForModel;
 
     // std::unordered_map<HmlComplexModelResource::Id, int32_t> textureIndexFor;
     // NOTE temporary; used only to pass data to createPipelines() from specifyEntities()
@@ -103,9 +115,9 @@ struct HmlComplexRenderer : HmlDrawer {
     // NOTE actually used at each draw
     std::unordered_map<HmlPipeline::Id, std::unordered_map<HmlComplexModelResource::Id, std::vector<std::shared_ptr<Entity>>>> entitiesToRenderForModelForPipelineId;
 
-    using TextureUpdateData = std::pair<std::array<VkSampler, MAX_TEXTURES_COUNT>, std::array<VkImageView, MAX_TEXTURES_COUNT>>;
+    // using TextureUpdateData = std::pair<std::array<VkSampler, MAX_TEXTURES_COUNT>, std::array<VkImageView, MAX_TEXTURES_COUNT>>;
 
-    TextureUpdateData prepareTextureUpdateData(std::span<const EntitiesData> entitiesData) noexcept;
+    // TextureUpdateData prepareTextureUpdateData(std::span<const EntitiesData> entitiesData) noexcept;
 
     std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;

@@ -46,6 +46,19 @@ HmlModelResource::Id HmlModelResource::newId() noexcept {
 }
 
 
+HmlMaterial::~HmlMaterial() noexcept {
+#if LOG_DESTROYS
+    std::cout << ":> Destroying HmlMaterial.\n";
+#endif
+}
+
+
+HmlMaterial::Id HmlMaterial::newId() noexcept {
+    static Id id = 0;
+    return id++;
+}
+
+
 HmlComplexModelResource::~HmlComplexModelResource() noexcept {
 #if LOG_DESTROYS
     std::cout << ":> Destroying HmlComplexModelResource.\n";
@@ -348,7 +361,7 @@ std::unique_ptr<HmlBuffer> HmlResourceManager::createVertexIndexBufferWithData(c
 }
 
 
-std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResourceFromData(uint32_t width, uint32_t height, uint32_t componentsCount, unsigned char* data, VkFormat format, std::optional<VkFilter> filter) noexcept {
+std::unique_ptr<HmlImageResource> HmlResourceManager::newTextureResourceFromData(uint32_t width, uint32_t height, uint32_t componentsCount, const unsigned char* data, VkFormat format, std::optional<VkFilter> filter) noexcept {
     // ======== Load data to a staging buffer
     const auto sizeBytes = width * height * componentsCount * sizeof(char);
     auto stagingBuffer = createStagingBufferFromHost(sizeBytes);
@@ -1132,7 +1145,7 @@ void HmlResourceManager::copyImageToBuffer(VkImage image, VkBuffer buffer, VkExt
 // ========================================================================
 // ========================================================================
 // TODO can make a look-up table
-static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
+static VkFormat gltfAttributeToFormat(uint32_t componentType, int count) noexcept {
     switch (componentType) {
         case TINYGLTF_COMPONENT_TYPE_BYTE:
             switch (count) {
@@ -1141,7 +1154,7 @@ static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
                 case 3: return VK_FORMAT_R8G8B8_SINT;
                 case 4: return VK_FORMAT_R8G8B8A8_SINT;
                 default:
-                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    std::cerr << "::> gltfAttributeToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
                     assert(false); return VK_FORMAT_UNDEFINED; // stub
             }
         case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
@@ -1151,7 +1164,7 @@ static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
                 case 3: return VK_FORMAT_R8G8B8_UINT;
                 case 4: return VK_FORMAT_R8G8B8A8_UINT;
                 default:
-                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    std::cerr << "::> gltfAttributeToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
                     assert(false); return VK_FORMAT_UNDEFINED; // stub
             }
         case TINYGLTF_COMPONENT_TYPE_SHORT:
@@ -1161,7 +1174,7 @@ static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
                 case 3: return VK_FORMAT_R16G16B16_SINT;
                 case 4: return VK_FORMAT_R16G16B16A16_SINT;
                 default:
-                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    std::cerr << "::> gltfAttributeToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
                     assert(false); return VK_FORMAT_UNDEFINED; // stub
             }
         case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
@@ -1171,7 +1184,7 @@ static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
                 case 3: return VK_FORMAT_R16G16B16_UINT;
                 case 4: return VK_FORMAT_R16G16B16A16_UINT;
                 default:
-                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    std::cerr << "::> gltfAttributeToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
                     assert(false); return VK_FORMAT_UNDEFINED; // stub
             }
         case TINYGLTF_COMPONENT_TYPE_INT:
@@ -1181,7 +1194,7 @@ static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
                 case 3: return VK_FORMAT_R32G32B32_SINT;
                 case 4: return VK_FORMAT_R32G32B32A32_SINT;
                 default:
-                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    std::cerr << "::> gltfAttributeToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
                     assert(false); return VK_FORMAT_UNDEFINED; // stub
             }
         case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
@@ -1191,7 +1204,7 @@ static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
                 case 3: return VK_FORMAT_R32G32B32_UINT;
                 case 4: return VK_FORMAT_R32G32B32A32_UINT;
                 default:
-                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    std::cerr << "::> gltfAttributeToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
                     assert(false); return VK_FORMAT_UNDEFINED; // stub
             }
         case TINYGLTF_COMPONENT_TYPE_FLOAT:
@@ -1201,7 +1214,7 @@ static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
                 case 3: return VK_FORMAT_R32G32B32_SFLOAT;
                 case 4: return VK_FORMAT_R32G32B32A32_SFLOAT;
                 default:
-                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    std::cerr << "::> gltfAttributeToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
                     assert(false); return VK_FORMAT_UNDEFINED; // stub
             }
         case TINYGLTF_COMPONENT_TYPE_DOUBLE:
@@ -1211,11 +1224,42 @@ static VkFormat gltfToFormat(uint32_t componentType, int count) noexcept {
                 case 3: return VK_FORMAT_R64G64B64_SFLOAT;
                 case 4: return VK_FORMAT_R64G64B64A64_SFLOAT;
                 default:
-                    std::cerr << "::> gltfToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
+                    std::cerr << "::> gltfAttributeToFormat(): Unimplemented count=" << count << " for componentType=FLOAT" << std::endl;
                     assert(false); return VK_FORMAT_UNDEFINED; // stub
             }
         default:
-            assert(false && "::> gltfToFormat(): Unimplemented componentType");
+            assert(false && "::> gltfAttributeToFormat(): Unimplemented componentType");
+            return VK_FORMAT_UNDEFINED; // stub
+    }
+}
+
+
+// TODO can make a look-up table
+static VkFormat gltfImageToFormat(int componentCount, int bitsPerComponent) noexcept {
+    switch (bitsPerComponent) {
+        case 8:
+            switch (componentCount) {
+                case 1: return VK_FORMAT_R8_UNORM;
+                case 2: return VK_FORMAT_R8G8_UNORM;
+                case 3: return VK_FORMAT_R8G8B8_UNORM;
+                case 4: return VK_FORMAT_R8G8B8A8_UNORM;
+                default:
+                    std::cerr << "::> gltfImageToFormat(): Unimplemented component count=" << componentCount << " for bitsPerComponent=" << bitsPerComponent << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        case 16:
+            switch (componentCount) {
+                case 1: return VK_FORMAT_R16_SFLOAT;
+                case 2: return VK_FORMAT_R16G16_SFLOAT;
+                case 3: return VK_FORMAT_R16G16B16_SFLOAT;
+                case 4: return VK_FORMAT_R16G16B16A16_SFLOAT;
+                default:
+                    std::cerr << "::> gltfImageToFormat(): Unimplemented component count=" << componentCount << " for bitsPerComponent=" << bitsPerComponent << std::endl;
+                    assert(false); return VK_FORMAT_UNDEFINED; // stub
+            }
+        default:
+            std::cerr << "::> gltfImageToFormat(): Unimplemented bitsPerComponent=" << bitsPerComponent << std::endl;
+            assert(false);
             return VK_FORMAT_UNDEFINED; // stub
     }
 }
@@ -1225,6 +1269,7 @@ static void bindMesh(
         const tinygltf::Model& model,
         const tinygltf::Mesh& mesh,
         const std::vector<HmlBufferView>& hmlBufferViews,
+        const std::vector<std::shared_ptr<HmlImageResource>>& hmlTextureResources,
         std::vector<std::unique_ptr<HmlComplexModelResource>>& hmlComplexModels) noexcept {
     std::cout << "Binding its mesh '" << mesh.name << "' which has " << mesh.primitives.size() << " primitives.\n";
     for (size_t i = 0; i < mesh.primitives.size(); i++) {
@@ -1237,8 +1282,6 @@ static void bindMesh(
 
         assert(model.bufferViews[indexBufferAccessor.bufferView].target == TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER
             && "::> The primitive uses an index buffer view that was not specified (and thus was not created) as an index buffer");
-
-        std::cout << "Uses material #" << primitive.material << "\n";
 
         VkPrimitiveTopology topology;
         switch (primitive.mode) {
@@ -1267,13 +1310,17 @@ static void bindMesh(
                 size = accessor.type;
             }
 
-            std::cout << "\tHas attribute " << attrib.first << " (buffer view [" << accessor.bufferView << "]) which has " << size << " components (" << tinygltf::GetComponentSizeInBytes(accessor.componentType) << " bytes per component) and " << byteStride << " byteStride\n";
+            std::cout << "\tHas attribute " << attrib.first
+                << " (buffer view [" << accessor.bufferView
+                << "]) which has " << size << " components ("
+                << tinygltf::GetComponentSizeInBytes(accessor.componentType)
+                << " bytes per component) and " << byteStride << " byteStride\n";
 
             assert(byteStride == tinygltf::GetComponentSizeInBytes(accessor.componentType) * size);
 
             hmlAttributesBuilder.add(
                 attributeType,
-                gltfToFormat(accessor.componentType, size),
+                gltfAttributeToFormat(accessor.componentType, size),
                 byteStride,
                 accessor.byteOffset);
 
@@ -1287,54 +1334,46 @@ static void bindMesh(
             if (!(it->hmlBuffer)) it = vertexBufferViews.erase(it);
         }
 
-        // ======== Textures
+        // ======== Collect textures
 
-        // for (size_t i = 0; i < model.textures.size(); i++) {
-        //     // fixme: Use material's baseColor
-        //     const tinygltf::Texture& tex = model.textures[i];
-        //     assert(tex.source > -1);
-        //     // GLuint texid;
-        //     // glGenTextures(1, &texid);
-        //     const tinygltf::Image& image = model.images[tex.source];
-        //
-        //     std::cout << "\tHas texture '" << (image.name.empty() ? image.uri : image.name) << "' (" << image.width << "x" << image.height << ") with a " << image.component << "-component Format and " << image.bits << " bits per channel\n";
-        //
-        //     // glBindTexture(GL_TEXTURE_2D, texid);
-        //     // glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        //     // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        //     // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        //     // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        //     // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        //
-        //     // std::cout << "\t\tFormat has " << image.component << " components\n";
-        //     // GLenum format = GL_RGBA;
-        //     // if (image.component == 1) {
-        //     //     format = GL_RED;
-        //     // } else if (image.component == 2) {
-        //     //     format = GL_RG;
-        //     // } else if (image.component == 3) {
-        //     //     format = GL_RGB;
-        //     // } else {
-        //     //     // ???
-        //     // }
-        //
-        //     // std::cout << "\t\tWith " << image.bits << " bits per channel\n";
-        //     // GLenum type = GL_UNSIGNED_BYTE;
-        //     // if (image.bits == 8) {
-        //     //     // ok
-        //     // } else if (image.bits == 16) {
-        //     //     type = GL_UNSIGNED_SHORT;
-        //     // } else {
-        //     //     // ???
-        //     // }
-        //
-        //     // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, format, type, &image.image.at(0));
-        // }
-
-
-
+        assert(primitive.material >= 0 && "::> Unimplemented support when Primitive has no Material");
+        HmlMaterial hmlMaterial;
+        assert(primitive.material < (int)model.materials.size());
+        const auto& material = model.materials[primitive.material];
+        std::cout << "Uses material #" << primitive.material << " with name '" << material.name << "'\n";
+        if (material.normalTexture.index != -1) {
+            assert(material.normalTexture.texCoord == 0 && "::> Unimplemented support for non-zero texCoord");
+            assert((size_t)material.normalTexture.index < hmlTextureResources.size());
+            std::cout << "\tUses Normal texture (#" << material.normalTexture.index << ").\n";
+            hmlMaterial.textures[HmlMaterial::PlaceNormal] = hmlTextureResources[material.normalTexture.index];
+        }
+        if (material.emissiveTexture.index != -1) {
+            assert(material.emissiveTexture.texCoord == 0 && "::> Unimplemented support for non-zero texCoord");
+            assert((size_t)material.emissiveTexture.index < hmlTextureResources.size());
+            std::cout << "\tUses Emissive texture (#" << material.emissiveTexture.index << ").\n";
+            hmlMaterial.textures[HmlMaterial::PlaceEmissive] = hmlTextureResources[material.emissiveTexture.index];
+        }
+        if (material.occlusionTexture.index != -1) {
+            assert(material.occlusionTexture.texCoord == 0 && "::> Unimplemented support for non-zero texCoord");
+            assert((size_t)material.occlusionTexture.index < hmlTextureResources.size());
+            std::cout << "\tUses Occlusion texture (#" << material.occlusionTexture.index << ").\n";
+            hmlMaterial.textures[HmlMaterial::PlaceOcclusion] = hmlTextureResources[material.occlusionTexture.index];
+        }
+        if (material.pbrMetallicRoughness.baseColorTexture.index != -1) {
+            assert(material.pbrMetallicRoughness.baseColorTexture.texCoord == 0 && "::> Unimplemented support for non-zero texCoord");
+            assert((size_t)material.pbrMetallicRoughness.baseColorTexture.index < hmlTextureResources.size());
+            std::cout << "\tUses BaseColor texture (#" << material.pbrMetallicRoughness.baseColorTexture.index << ").\n";
+            hmlMaterial.textures[HmlMaterial::PlaceBaseColor] = hmlTextureResources[material.pbrMetallicRoughness.baseColorTexture.index];
+        }
+        if (material.pbrMetallicRoughness.metallicRoughnessTexture.index != -1) {
+            assert(material.pbrMetallicRoughness.metallicRoughnessTexture.texCoord == 0 && "::> Unimplemented support for non-zero texCoord");
+            assert((size_t)material.pbrMetallicRoughness.metallicRoughnessTexture.index < hmlTextureResources.size());
+            std::cout << "\tUses MetallicRoughness texture (#" << material.pbrMetallicRoughness.metallicRoughnessTexture.index << ").\n";
+            hmlMaterial.textures[HmlMaterial::PlaceMetallicRoughness] = hmlTextureResources[material.pbrMetallicRoughness.metallicRoughnessTexture.index];
+        }
 
         // ======== Assemble HmlComplexModelResource
+
         auto model = std::make_unique<HmlComplexModelResource>();
         switch (indexBufferAccessor.componentType) {
             case TINYGLTF_COMPONENT_TYPE_SHORT:
@@ -1348,6 +1387,7 @@ static void bindMesh(
             default:
                 assert(false && "::> Unexpected type found for IndexBuffer component.");
         }
+        model->hmlMaterial = std::move(hmlMaterial);
         model->indexBufferView = hmlBufferViews[indexBufferAccessor.bufferView];
         model->vertexBufferViews = std::move(vertexBufferViews);
         model->hmlAttributes = hmlAttributesBuilder.seal();
@@ -1357,17 +1397,22 @@ static void bindMesh(
 }
 
 
-static void bindModelNodes(tinygltf::Model &model, tinygltf::Node &node, const std::vector<HmlBufferView>& hmlBufferViews, std::vector<std::unique_ptr<HmlComplexModelResource>>& hmlComplexModels) {
+static void bindModelNodes(
+        tinygltf::Model &model,
+        tinygltf::Node &node,
+        const std::vector<HmlBufferView>& hmlBufferViews,
+        const std::vector<std::shared_ptr<HmlImageResource>>& hmlTextureResources,
+        std::vector<std::unique_ptr<HmlComplexModelResource>>& hmlComplexModels) noexcept {
     std::cout << " with name '" << node.name << "'.\n";
 
     assert(0 <= node.mesh && (size_t)node.mesh < model.meshes.size());
-    bindMesh(model, model.meshes[node.mesh], hmlBufferViews, hmlComplexModels);
+    bindMesh(model, model.meshes[node.mesh], hmlBufferViews, hmlTextureResources, hmlComplexModels);
 
     for (size_t i = 0; i < node.children.size(); i++) {
         const auto childNode = node.children[i];
         assert(0 <= childNode && (size_t)childNode < model.nodes.size());
         std::cout << "Binding child #" << childNode;
-        bindModelNodes(model, model.nodes[childNode], hmlBufferViews, hmlComplexModels);
+        bindModelNodes(model, model.nodes[childNode], hmlBufferViews, hmlTextureResources, hmlComplexModels);
     }
 }
 
@@ -1433,6 +1478,29 @@ std::shared_ptr<HmlScene> HmlResourceManager::loadAsset(const char* path) noexce
         }
     }
 
+    // ======== Textures
+
+    std::vector<std::shared_ptr<HmlImageResource>> hmlTextureResources;
+    std::cout << "Have " << model.textures.size() << " textures:\n";
+    for (const tinygltf::Texture& tex : model.textures) {
+       assert(tex.source > -1);
+        const tinygltf::Image& image = model.images[tex.source];
+
+        std::cout << "\tTexture '" << (image.name.empty() ? image.uri : image.name)
+            << "' (" << image.width << "x" << image.height
+            << ") with a " << image.component << "-component Format and "
+            << image.bits << " bits per channel\n";
+
+
+        hmlTextureResources.push_back(newTextureResourceFromData(
+            static_cast<uint32_t>(image.width),
+            static_cast<uint32_t>(image.height),
+            image.component,
+            image.image.data(),
+            gltfImageToFormat(image.component, image.bits),
+            { VK_FILTER_LINEAR }));
+    }
+
     // ======== Create models
 
     // TODO This vector will be replaced by a tree data structure to emulate nodes
@@ -1444,7 +1512,7 @@ std::shared_ptr<HmlScene> HmlResourceManager::loadAsset(const char* path) noexce
     for (size_t i = 0; i < scene.nodes.size(); i++) {
         assert((scene.nodes[i] >= 0) && ((size_t)scene.nodes[i] < model.nodes.size()));
         std::cout << "Binding node #" << i;
-        bindModelNodes(model, model.nodes[scene.nodes[i]], hmlBufferViews, hmlComplexModels);
+        bindModelNodes(model, model.nodes[scene.nodes[i]], hmlBufferViews, hmlTextureResources, hmlComplexModels);
     }
 
     // ======== Return

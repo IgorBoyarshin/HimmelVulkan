@@ -114,6 +114,7 @@ struct HmlAttributes {
         AttributePlaceNormal     = 1,
         AttributePlaceTangent    = 2,
         AttributePlaceTexCoord_0 = 3,
+
         AttributeCount           = 4
     };
     enum AttributeType : uint8_t {
@@ -262,6 +263,37 @@ struct HmlModelResource {
 };
 
 
+struct HmlMaterial {
+    using Id = uint32_t;
+    Id id;
+
+    enum TexturePlace {
+        PlaceBaseColor         = 0,
+        PlaceMetallicRoughness = 1,
+        PlaceNormal            = 2,
+        PlaceOcclusion         = 3,
+        PlaceEmissive          = 4,
+
+        PlaceCount             = 5,
+    };
+    enum TextureType {
+        TypeBaseColor         = 1 << PlaceBaseColor,
+        TypeMetallicRoughness = 1 << PlaceMetallicRoughness,
+        TypeNormal            = 1 << PlaceNormal,
+        TypeOcclusion         = 1 << PlaceOcclusion,
+        TypeEmissive          = 1 << PlaceEmissive,
+    };
+
+    std::array<std::shared_ptr<HmlImageResource>, PlaceCount> textures;
+
+    inline HmlMaterial() noexcept : id(newId()) {}
+    ~HmlMaterial() noexcept;
+
+    private:
+    static Id newId() noexcept;
+};
+
+
 struct HmlComplexModelResource {
     using Id = uint32_t;
     Id id;
@@ -269,6 +301,8 @@ struct HmlComplexModelResource {
     std::vector<HmlBufferView> vertexBufferViews;
     HmlBufferView indexBufferView;
     IndicesCount indicesCount;
+
+    HmlMaterial hmlMaterial;
 
     // TODO Most HmlAttributes will be the same between HmlModels, so it is not great to store them per model.
     HmlAttributes hmlAttributes;
@@ -346,7 +380,7 @@ struct HmlResourceManager {
     std::unique_ptr<HmlImageResource> newShadowResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newRenderTargetImageResource(VkExtent2D extent, VkFormat format) noexcept;
     std::unique_ptr<HmlImageResource> newReadableRenderable(VkExtent2D extent, VkFormat format) noexcept;
-    std::unique_ptr<HmlImageResource> newTextureResourceFromData(uint32_t width, uint32_t height, uint32_t componentsCount, unsigned char* data, VkFormat format, std::optional<VkFilter> filter) noexcept;
+    std::unique_ptr<HmlImageResource> newTextureResourceFromData(uint32_t width, uint32_t height, uint32_t componentsCount, const unsigned char* data, VkFormat format, std::optional<VkFilter> filter) noexcept;
     std::unique_ptr<HmlImageResource> newTextureResource(const char* fileName, uint32_t componentsCount, VkFormat format, VkFilter filter) noexcept;
     std::unique_ptr<HmlImageResource> newImageResource(VkExtent2D extent) noexcept;
     std::unique_ptr<HmlImageResource> newDepthResource(VkExtent2D extent) noexcept;
@@ -359,6 +393,12 @@ struct HmlResourceManager {
     // Model with texture
     std::shared_ptr<HmlModelResource> newModel(const void* vertices, size_t verticesSizeBytes, const std::vector<uint32_t>& indices, const char* textureFileName, VkFilter filter) noexcept;
     // Complex model
+    // void bindMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh,
+    //     const std::vector<HmlBufferView>& hmlBufferViews,
+    //     std::vector<std::unique_ptr<HmlComplexModelResource>>& hmlComplexModels) noexcept;
+    // void bindModelNodes(tinygltf::Model &model, tinygltf::Node &node,
+    //     const std::vector<HmlBufferView>& hmlBufferViews,
+    //     std::vector<std::unique_ptr<HmlComplexModelResource>>& hmlComplexModels) noexcept;
     std::shared_ptr<HmlScene> loadAsset(const char* path) noexcept;
 
     // ========================================================================

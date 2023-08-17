@@ -16,7 +16,11 @@ layout(set = 0, binding = 0) uniform GeneralUbo {
 layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 color;
-    int textureIndex;
+    int baseColorTextureIndex;
+    int metallicRoughnessTextureIndex;
+    int normalTextureIndex;
+    int occlusionTextureIndex;
+    int emissiveTextureIndex;
     int id;
 } push;
 

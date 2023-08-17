@@ -1,13 +1,18 @@
 #version 450
 
-#define MAX_TEXTURES_COUNT 32
+// XXX Sync with HmlMaterial::PlaceCount
+#define MAX_TEXTURES_COUNT 5
 layout(set = 1, binding = 0) uniform sampler2D texSamplers[MAX_TEXTURES_COUNT];
 
 // XXX sync with Vertex shader
 layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 color;
-    int textureIndex;
+    int baseColorTextureIndex;
+    int metallicRoughnessTextureIndex;
+    int normalTextureIndex;
+    int occlusionTextureIndex;
+    int emissiveTextureIndex;
     int id;
 } push;
 
@@ -23,12 +28,11 @@ layout(location = 3) out vec4 gLightSpacePosition;
 layout(location = 4) out uint gId;
 
 void main() {
-    // if (0 <= push.textureIndex) {
-    //     gColor = texture(texSamplers[push.textureIndex], inFragTexCoord);
-    // } else {
-    //     gColor = vec4(push.color.rgb, 1.0);
-    // }
-    gColor = vec4(push.color.rgb, 1.0);
+    if (push.baseColorTextureIndex >= 0) {
+        gColor = texture(texSamplers[push.baseColorTextureIndex], inFragTexCoord);
+    } else {
+        gColor = vec4(push.color.rgb, 1.0);
+    }
     gPosition = vec4(inPosition, 1.0);
     gNormal = vec4(inNormal, 1.0);
     gLightSpacePosition = vec4(inLightSpacePosition, 1.0);

@@ -399,6 +399,16 @@ bool Himmel::initLights() noexcept {
             .radius = LIGHT_RADIUS,
         });
     }
+    { // The light for models
+        const auto pos = glm::vec3(10, 60, 40);
+        const auto color = glm::vec3(0.4, 0.2, 1.0);
+        pointLightsStatic.push_back(HmlLightRenderer::PointLight{
+            .color = color,
+            .intensity = 1000.0f,
+            .position = pos,
+            .radius = LIGHT_RADIUS,
+        });
+    }
     {
         pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
             .color = glm::vec3(1.0, 0.0, 0.0),
@@ -552,8 +562,8 @@ bool Himmel::initModels() noexcept {
     //     modelStorage.sponza = std::move(hmlScene->hmlComplexModelResources.at(0));
     // }
 
-    { // Cube
-        auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/Cube/Cube.gltf");
+    { // CoolCube
+        auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/CoolCube/Cube.gltf");
         modelStorage.complexCube = std::move(hmlScene->hmlComplexModelResources.at(0));
     }
 
@@ -1543,6 +1553,12 @@ bool Himmel::prepareResources() noexcept {
                 .preLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             },
+            HmlRenderPass::ColorAttachment{
+                .imageResources = brightness1Textures,
+                .loadColor = HmlRenderPass::LoadColor::Clear({{ 0.0f, 0.0f, 0.0f, 0.0f }}),
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
         },
         .depthAttachment = {
             HmlRenderPass::DepthStencilAttachment{
@@ -1650,7 +1666,8 @@ bool Himmel::prepareResources() noexcept {
             },
             HmlRenderPass::ColorAttachment{
                 .imageResources = brightness1Textures,
-                .loadColor = HmlRenderPass::LoadColor::Clear({{ 0.0f, 0.0f, 0.0f, 1.0f }}),
+                .loadColor = HmlRenderPass::LoadColor::Load(),
+                // .loadColor = HmlRenderPass::LoadColor::Clear({{ 0.0f, 0.0f, 0.0f, 1.0f }}),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },

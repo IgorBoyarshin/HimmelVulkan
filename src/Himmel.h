@@ -231,7 +231,7 @@ struct Himmel {
         inline void updateForDt(float dt) noexcept {
             static constexpr float SPEED = 0.2f;
             t += SPEED * dt;
-            t = 1.5f;
+            t = 3.5f;
 
             while (t > FULL_CYCLE) t -= FULL_CYCLE;
         }

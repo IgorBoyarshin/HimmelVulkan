@@ -25,7 +25,8 @@ void main() {
     float d = distance(inCoord, vec2(0.0, 0.0));
     float strength = 1.0 - clamp(d, 0.0, 1.0);
     outColor = vec4(inColor.rgb, inColor.a * smoothstep(0.0, 0.4, strength));
-    outBloom = vec4(vec3(inIntensity), outColor.a);
+    outBloom = vec4(vec3(outColor * inIntensity), outColor.a);
+    // outBloom = vec4(vec3(inIntensity), outColor.a);
     /* outBloom = vec4(inIntensity * outColor.rgb, outColor.a); */
     if (strength < 0.2) discard;
 }

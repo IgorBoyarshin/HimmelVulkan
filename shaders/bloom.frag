@@ -22,10 +22,13 @@ layout(location = 0) out vec4 outColor;
 
 void main() {
     vec3 color = texture(mainSampler, inTexCoord).rgb;
-    vec2 strength = texture(brightnessSampler, inTexCoord).ra;
+    // vec2 strength = texture(brightnessSampler, inTexCoord).ra;
 
     // Apply brightness
-    color *= (1.0 + strength.x * strength.y);
+    // color *= (1.0 + pow(strength.x * strength.y, 4));
+    const float emissiveFactor = 4.0;
+    vec4 emissive = texture(brightnessSampler, inTexCoord);
+    color += emissiveFactor * emissive.rgb * emissive.a;
 
     // Tone mapping and gamma correcton
     const float exposure = 1.7;
@@ -34,4 +37,5 @@ void main() {
     color = pow(mapped, vec3(1.0 / gamma));
 
     outColor = vec4(color, 1.0);
+    // outColor.rgb += texture(brightnessSampler, inTexCoord).rgb;
 }

@@ -14,3 +14,12 @@
 ==== OPTIMIZATION ====
 -- Create a custom queue for a circular buffer OR learn how to use and pass a custom allocator to queues.
 ======================
+
+==== C++ ====
+const auto dstSize = dst.size();
+std::copy(
+    std::move_iterator(src.begin()),
+    std::move_iterator(src.end()),
+    std::next(dst.begin(), dstSize);
+);
+======================

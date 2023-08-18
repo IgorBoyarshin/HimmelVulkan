@@ -21,7 +21,7 @@
 #include "HmlSnowParticleRenderer.h"
 #include "HmlTerrainRenderer.h"
 #include "HmlUiRenderer.h"
-// #include "HmlBlurRenderer.h"
+#include "HmlBlurRenderer.h"
 #include "HmlBloomRenderer.h"
 #include "HmlDeferredRenderer.h"
 #include "HmlLightRenderer.h"
@@ -273,6 +273,7 @@ struct Himmel {
     std::shared_ptr<HmlRenderer> hmlRenderer;
     std::shared_ptr<HmlComplexRenderer> hmlComplexRenderer;
     std::shared_ptr<HmlUiRenderer> hmlUiRenderer;
+    std::shared_ptr<HmlBlurRenderer> hmlBlurRenderer;
     std::shared_ptr<HmlBloomRenderer> hmlBloomRenderer;
     std::shared_ptr<HmlDeferredRenderer> hmlDeferredRenderer;
     std::shared_ptr<HmlTerrainRenderer> hmlTerrainRenderer;
@@ -285,6 +286,7 @@ struct Himmel {
     std::vector<std::shared_ptr<HmlImageResource>> gBufferColors;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferLightSpacePositions;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferIds;
+    std::vector<std::shared_ptr<HmlImageResource>> blurTempTextures;
     std::vector<std::shared_ptr<HmlImageResource>> brightness1Textures;
     std::vector<std::shared_ptr<HmlImageResource>> mainTextures;
     std::vector<std::shared_ptr<HmlImageResource>> hmlDepthResources;

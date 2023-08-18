@@ -1,10 +1,10 @@
-#if 0
-
 #include "HmlBlurRenderer.h"
 
 
-std::unique_ptr<HmlPipeline> HmlBlurRenderer::createPipeline(std::shared_ptr<HmlDevice> hmlDevice,
+std::vector<std::unique_ptr<HmlPipeline>> HmlBlurRenderer::createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept {
+    std::vector<std::unique_ptr<HmlPipeline>> pipelines;
+
     HmlGraphicsPipelineConfig config{
         .bindingDescriptions   = {},
         .attributeDescriptions = {},
@@ -28,52 +28,39 @@ std::unique_ptr<HmlPipeline> HmlBlurRenderer::createPipeline(std::shared_ptr<Hml
         .withDepthTest = false,
     };
 
-    return HmlPipeline::createGraphics(hmlDevice, std::move(config));
+    pipelines.push_back(HmlPipeline::createGraphics(hmlContext->hmlDevice, std::move(config)));
+    return pipelines;
 }
 
 
-std::unique_ptr<HmlBlurRenderer> HmlBlurRenderer::create(
-        std::shared_ptr<HmlWindow> hmlWindow,
-        std::shared_ptr<HmlDevice> hmlDevice,
-        std::shared_ptr<HmlCommands> hmlCommands,
-        // std::shared_ptr<HmlRenderPass> hmlRenderPass,
-        std::shared_ptr<HmlResourceManager> hmlResourceManager,
-        std::shared_ptr<HmlDescriptors> hmlDescriptors,
-        uint32_t imageCount,
-        uint32_t framesInFlight) noexcept {
+std::unique_ptr<HmlBlurRenderer> HmlBlurRenderer::create(std::shared_ptr<HmlContext> hmlContext) noexcept {
     auto hmlRenderer = std::make_unique<HmlBlurRenderer>();
-    hmlRenderer->hmlWindow = hmlWindow;
-    hmlRenderer->hmlDevice = hmlDevice;
-    hmlRenderer->hmlCommands = hmlCommands;
-    // hmlRenderer->hmlRenderPass = hmlRenderPass;
-    hmlRenderer->hmlResourceManager = hmlResourceManager;
-    hmlRenderer->hmlDescriptors = hmlDescriptors;
+    hmlRenderer->hmlContext = hmlContext;
 
-    hmlRenderer->framesInFlight = framesInFlight;
+    const auto imageCount = hmlContext->imageCount();
 
-
-    hmlRenderer->descriptorPool = hmlDescriptors->buildDescriptorPool()
+    hmlRenderer->descriptorPool = hmlContext->hmlDescriptors->buildDescriptorPool()
         .withTextures(imageCount * 2)
         .maxDescriptorSets(imageCount * 2)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorPool) return { nullptr };
 
-    hmlRenderer->descriptorSetLayoutTextures = hmlDescriptors->buildDescriptorSetLayout()
+    hmlRenderer->descriptorSetLayoutTextures = hmlContext->hmlDescriptors->buildDescriptorSetLayout()
         .withTextureAt(0, VK_SHADER_STAGE_FRAGMENT_BIT)
-        .build(hmlDevice);
+        .build(hmlContext->hmlDevice);
     if (!hmlRenderer->descriptorSetLayoutTextures) return { nullptr };
     hmlRenderer->descriptorSetLayouts.push_back(hmlRenderer->descriptorSetLayoutTextures);
 
-    hmlRenderer->descriptorSet_first_0_perImage = hmlDescriptors->createDescriptorSets(imageCount,
+    hmlRenderer->descriptorSet_first_0_perImage = hmlContext->hmlDescriptors->createDescriptorSets(imageCount,
         hmlRenderer->descriptorSetLayoutTextures, hmlRenderer->descriptorPool);
     if (hmlRenderer->descriptorSet_first_0_perImage.empty()) return { nullptr };
 
-    hmlRenderer->descriptorSet_second_0_perImage = hmlDescriptors->createDescriptorSets(imageCount,
+    hmlRenderer->descriptorSet_second_0_perImage = hmlContext->hmlDescriptors->createDescriptorSets(imageCount,
         hmlRenderer->descriptorSetLayoutTextures, hmlRenderer->descriptorPool);
     if (hmlRenderer->descriptorSet_second_0_perImage.empty()) return { nullptr };
 
 
-    // hmlRenderer->hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent,
+    // hmlRenderer->hmlPipeline = createPipeline(hmlContext->hmlDevice, hmlRenderPass->extent,
     //     hmlRenderPass->renderPass, hmlRenderer->descriptorSetLayouts);
     // if (!hmlRenderer->hmlPipeline) return { nullptr };
 
@@ -92,8 +79,8 @@ HmlBlurRenderer::~HmlBlurRenderer() noexcept {
     // NOTE depends on swapchain recreation, but because it only depends on the
     // NOTE number of images, which most likely will not change, we ignore it.
     // DescriptorSets are freed automatically upon the deletion of the pool
-    vkDestroyDescriptorPool(hmlDevice->device, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(hmlDevice->device, descriptorSetLayoutTextures, nullptr);
+    vkDestroyDescriptorPool(hmlContext->hmlDevice->device, descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(hmlContext->hmlDevice->device, descriptorSetLayoutTextures, nullptr);
 }
 
 
@@ -103,9 +90,9 @@ void HmlBlurRenderer::specify(
     const auto imageCount = firstTextures.size();
     for (size_t imageIndex = 0; imageIndex < imageCount; imageIndex++) {
         HmlDescriptorSetUpdater(descriptorSet_first_0_perImage[imageIndex])
-            .textureAt(0, firstTextures[imageIndex]->sampler, firstTextures[imageIndex]->view).update(hmlDevice);
+            .textureAt(0, firstTextures[imageIndex]->sampler, firstTextures[imageIndex]->view).update(hmlContext->hmlDevice);
         HmlDescriptorSetUpdater(descriptorSet_second_0_perImage[imageIndex])
-            .textureAt(0, secondTextures[imageIndex]->sampler, secondTextures[imageIndex]->view).update(hmlDevice);
+            .textureAt(0, secondTextures[imageIndex]->sampler, secondTextures[imageIndex]->view).update(hmlContext->hmlDevice);
     }
 }
 
@@ -121,18 +108,29 @@ void HmlBlurRenderer::modeVertical() noexcept {
 
 
 VkCommandBuffer HmlBlurRenderer::draw(const HmlFrameData& frameData) noexcept {
-    auto commandBuffer = commandBuffersPerRenderPass[getCurrentRenderPassIndex()][frameData.frameIndex];
+    auto commandBuffer = getCurrentCommands()[frameData.frameInFlightIndex];
     const auto inheritanceInfo = VkCommandBufferInheritanceInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         .pNext = VK_NULL_HANDLE,
         .renderPass = currentRenderPass->renderPass,
         .subpass = 0, // we only have a single one
-        .framebuffer = currentRenderPass->framebuffers[frameData.imageIndex],
+        .framebuffer = currentRenderPass->framebuffers[frameData.swapchainImageIndex],
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags = static_cast<VkQueryControlFlags>(0),
         .pipelineStatistics = static_cast<VkQueryPipelineStatisticFlags>(0)
     };
-    hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+    hmlContext->hmlCommands->beginRecordingSecondaryOnetime(commandBuffer, &inheritanceInfo);
+
+#if USE_DEBUG_LABELS
+    hml::DebugLabel debugLabel(commandBuffer, isVertical ? "Blur vertical" : "Blur horizontal");
+#endif
+#if USE_TIMESTAMP_QUERIES
+    if (isVertical) {
+        hmlContext->hmlQueries->registerEvent("HmlBlurRenderer: vertical pass", "BVw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    } else {
+        hmlContext->hmlQueries->registerEvent("HmlBlurRenderer: horizontal pass", "BHw", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    }
+#endif
 
     const auto& hmlPipelines = getCurrentPipelines();
     assert(hmlPipelines.size() == 1 && "::> Expected only a single pipeline in HmlBlurRenderer.\n");
@@ -141,14 +139,14 @@ VkCommandBuffer HmlBlurRenderer::draw(const HmlFrameData& frameData) noexcept {
 
     std::array<VkDescriptorSet, 1> descriptorSets = {
         (isVertical == 0) ?
-            descriptorSet_first_0_perImage[frameData.imageIndex] :
-            descriptorSet_second_0_perImage[frameData.imageIndex]
+            descriptorSet_first_0_perImage[frameData.swapchainImageIndex] :
+            descriptorSet_second_0_perImage[frameData.swapchainImageIndex]
     };
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         hmlPipeline->layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
     PushConstant pushConstant{
-        isVertical = isVertical,
+        .isHorizontal = !isVertical,
     };
     vkCmdPushConstants(commandBuffer, hmlPipeline->layout,
         hmlPipeline->pushConstantsStages, 0, sizeof(PushConstant), &pushConstant);
@@ -159,7 +157,15 @@ VkCommandBuffer HmlBlurRenderer::draw(const HmlFrameData& frameData) noexcept {
     const uint32_t firstVertex = 0;
     vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
-    hmlCommands->endRecording(commandBuffer);
+#if USE_TIMESTAMP_QUERIES
+    if (isVertical) {
+        hmlContext->hmlQueries->registerEvent("HmlBlurRenderer: vertical pass", "BV", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    } else {
+        hmlContext->hmlQueries->registerEvent("HmlBlurRenderer: horizontal pass", "BH", commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    }
+#endif
+
+    hmlContext->hmlCommands->endRecording(commandBuffer);
     return commandBuffer;
 }
 
@@ -170,7 +176,7 @@ VkCommandBuffer HmlBlurRenderer::draw(const HmlFrameData& frameData) noexcept {
 //
 //
 // void addRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
-//     auto hmlPipeline = createPipeline(hmlDevice, newHmlRenderPass->extent, newHmlRenderPass, descriptorSetLayouts);
+//     auto hmlPipeline = createPipeline(hmlContext->hmlDevice, newHmlRenderPass->extent, newHmlRenderPass, descriptorSetLayouts);
 //     pipelineForRenderPassStorage.emplace_back(newHmlRenderPass, std::move(hmlPipeline));
 // }
 //
@@ -183,9 +189,7 @@ VkCommandBuffer HmlBlurRenderer::draw(const HmlFrameData& frameData) noexcept {
 
 // void HmlBlurRenderer::replaceRenderPass(std::shared_ptr<HmlRenderPass> newHmlRenderPass) noexcept {
 //     hmlRenderPass = newHmlRenderPass;
-//     hmlPipeline = createPipeline(hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
+//     hmlPipeline = createPipeline(hmlContext->hmlDevice, hmlRenderPass->extent, hmlRenderPass->renderPass, descriptorSetLayouts);
 //     // NOTE The command pool is reset for all renderers prior to calling this function.
 //     // NOTE commandBuffers must be rerecorded -- is done during baking
 // }
-
-#endif

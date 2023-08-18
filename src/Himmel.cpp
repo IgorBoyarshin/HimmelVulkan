@@ -169,8 +169,8 @@ bool Himmel::initRenderers(const char* heightmapFile) noexcept {
     hmlUiRenderer = HmlUiRenderer::create(hmlContext);
     if (!hmlUiRenderer) return false;
 
-    // hmlBlurRenderer = HmlBlurRenderer::create(hmlContext);
-    // if (!hmlBlurRenderer) return false;
+    hmlBlurRenderer = HmlBlurRenderer::create(hmlContext);
+    if (!hmlBlurRenderer) return false;
 
     hmlBloomRenderer = HmlBloomRenderer::create(hmlContext);
     if (!hmlBloomRenderer) return false;
@@ -1402,6 +1402,7 @@ bool Himmel::prepareResources() noexcept {
     gBufferColors.resize(count);
     gBufferLightSpacePositions.resize(count);
     gBufferIds.resize(count);
+    blurTempTextures.resize(count);
     brightness1Textures.resize(count);
     mainTextures.resize(count);
     hmlDepthResources.resize(count);
@@ -1415,6 +1416,7 @@ bool Himmel::prepareResources() noexcept {
         // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
         gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         gBufferIds[i]                 = hmlContext->hmlResourceManager->newReadableRenderable(extent, VK_FORMAT_R32_UINT);
+        blurTempTextures[i]            = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         mainTextures[i]               = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         hmlDepthResources[i]          = hmlContext->hmlResourceManager->newDepthResource(extent);
@@ -1424,10 +1426,11 @@ bool Himmel::prepareResources() noexcept {
         if (!gBufferColors[i])              return false;
         if (!gBufferLightSpacePositions[i]) return false;
         if (!gBufferIds[i])                 return false;
+        if (!blurTempTextures[i])            return false;
         if (!brightness1Textures[i])        return false;
         if (!mainTextures[i])               return false;
-        if (!hmlDepthResources[i]) return false;
-        if (!hmlShadows[i]) return false;
+        if (!hmlDepthResources[i])          return false;
+        if (!hmlShadows[i])                 return false;
     }
 
     size_t idsBufferSizeBytes;
@@ -1442,6 +1445,7 @@ bool Himmel::prepareResources() noexcept {
 
     hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, hmlShadows });
     hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, hmlShadows });
+    hmlBlurRenderer->specify(brightness1Textures, blurTempTextures);
     hmlBloomRenderer->specify(mainTextures, brightness1Textures);
 
 
@@ -1455,6 +1459,7 @@ bool Himmel::prepareResources() noexcept {
         // NOTE oldLayout is correct for the moment because the resources have just been created with correct layouts specified
         for (auto res : hmlShadows)                 res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
         for (auto res : mainTextures)               res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+        for (auto res : blurTempTextures)           res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
         for (auto res : brightness1Textures)        res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
         for (auto res : gBufferPositions)           res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
         for (auto res : gBufferColors)              res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
@@ -1470,6 +1475,7 @@ bool Himmel::prepareResources() noexcept {
     static const auto STAGE_NAME_GEOMETRY_PASS = "Geometry pass";
     static const auto STAGE_NAME_DEFERRED_PASS = "Deferred pass";
     static const auto STAGE_NAME_AFTER_PASS    = "After pass";
+    static const auto STAGE_NAME_BLUR_PASS     = "Blur pass";
     static const auto STAGE_NAME_BLOOM_PASS    = "Bloom pass";
     static const auto STAGE_NAME_UI_PASS       = "UI pass";
     const float VERY_FAR = 10000.0f;
@@ -1695,6 +1701,76 @@ bool Himmel::prepareResources() noexcept {
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT // read textures in FS
                             //    | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT // perform a clearing loadOp
                                | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, // read and compare depth
+                .dependencyFlags = 0,
+            }
+        },
+        .postFunc = std::nullopt,
+        .flags = HmlDispatcher::STAGE_NO_FLAGS,
+    });
+    // ================================= PASS =================================
+    // ======== Blurs the brightness1Textures texture (horizontal pass)
+    // Input: brightness1Textures
+    allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .name = STAGE_NAME_BLUR_PASS,
+        .preFunc = [&](HmlDispatcher& dispatcher, bool prepPhase, const HmlFrameData& frameData){
+            hmlBlurRenderer->modeHorizontal();
+        },
+        .drawers = { hmlBlurRenderer },
+        .differentExtent = std::nullopt,
+        .colorAttachments = {
+            HmlRenderPass::ColorAttachment{
+                .imageResources = blurTempTextures,
+                .loadColor = HmlRenderPass::LoadColor::DontCare(),
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+        },
+        .depthAttachment = std::nullopt,
+        .subpassDependencies = {
+            VkSubpassDependency{
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                // Wait for all these to finish:
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // output to blurTempTextures
+                // ... and only after that allow us to:
+                .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT, // read blurTempTextures in FS
+                .dependencyFlags = 0,
+            }
+        },
+        .postFunc = std::nullopt,
+        .flags = HmlDispatcher::STAGE_NO_FLAGS,
+    });
+    // ================================= PASS =================================
+    // ======== Blurs the brightness1Textures texture (vertical pass)
+    // Input: blurTempTextures
+    allGood &= hmlDispatcher->addStage(HmlDispatcher::StageCreateInfo{
+        .name = STAGE_NAME_BLUR_PASS,
+        .preFunc = [&](HmlDispatcher& dispatcher, bool prepPhase, const HmlFrameData& frameData){
+            hmlBlurRenderer->modeVertical();
+        },
+        .drawers = { hmlBlurRenderer },
+        .differentExtent = std::nullopt,
+        .colorAttachments = {
+            HmlRenderPass::ColorAttachment{
+                .imageResources = brightness1Textures,
+                .loadColor = HmlRenderPass::LoadColor::DontCare(),
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+        },
+        .depthAttachment = std::nullopt,
+        .subpassDependencies = {
+            VkSubpassDependency{
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                // Wait for all these to finish:
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // output to blurTempTextures
+                // ... and only after that allow us to:
+                .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT, // read blurTempTextures in FS
                 .dependencyFlags = 0,
             }
         },

@@ -338,6 +338,7 @@ struct Himmel {
         // std::shared_ptr<HmlComplexModelResource> sponza;
     } modelStorage;
 
+    std::shared_ptr<HmlComplexRenderer::Entity> coolCubeEntity;
     std::vector<std::shared_ptr<HmlRenderer::Entity>> entities;
     std::vector<std::shared_ptr<HmlComplexRenderer::Entity>> complexEntities;
     // NOTE Since it's really a bad performance thing to have an array of pointers,

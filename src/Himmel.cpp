@@ -321,6 +321,8 @@ bool Himmel::initEntities() noexcept {
 
             complexEntities.push_back(std::make_shared<HmlComplexRenderer::Entity>(modelStorage.complexCube));
             complexEntities.back()->modelMatrix = modelMatrix;
+
+            coolCubeEntity = complexEntities.back();
         }
         {
             auto modelMatrix = glm::mat4(1.0f);
@@ -399,12 +401,12 @@ bool Himmel::initLights() noexcept {
             .radius = LIGHT_RADIUS,
         });
     }
-    { // The light for models
-        const auto pos = glm::vec3(10, 60, 40);
-        const auto color = glm::vec3(0.4, 0.2, 1.0);
+    { // The light for CoolCube
+        const auto pos = glm::vec3(10, 70, 50);
+        const auto color = glm::vec3(1.0, 1.0, 1.0);
         pointLightsStatic.push_back(HmlLightRenderer::PointLight{
             .color = color,
-            .intensity = 1000.0f,
+            .intensity = 1800.0f,
             .position = pos,
             .radius = LIGHT_RADIUS,
         });
@@ -1012,6 +1014,15 @@ bool Himmel::run() noexcept {
 
 void Himmel::updateForDt(float dt, float sinceStart) noexcept {
     sun.updateForDt(dt);
+
+    { // CoolCube
+        auto modelMatrix = glm::mat4(1.0f);
+        modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 60.0f});
+        modelMatrix = glm::scale(modelMatrix, glm::vec3(3.0f));
+        modelMatrix = glm::rotate(modelMatrix, glm::radians(20 * sinceStart), glm::vec3(0.0, 1.0, 0.0));
+
+        coolCubeEntity->modelMatrix = modelMatrix;
+    }
 
     for (size_t i = 0; i < pointLightsDynamic.size(); i++) {
         const float unit = 40.0f;

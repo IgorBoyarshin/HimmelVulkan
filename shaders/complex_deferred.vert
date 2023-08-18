@@ -33,6 +33,7 @@ layout(location = 0) out vec2 outFragTexCoord;
 layout(location = 1) out vec3 outPosition;
 layout(location = 2) out vec3 outNormal;
 layout(location = 3) out vec3 outLightSpacePosition;
+layout(location = 4) out mat3 outTBN;
 
 void main() {
     vec4 posWorld = push.model * vec4(inPosition, 1.0);
@@ -42,4 +43,9 @@ void main() {
     outPosition = posWorld.xyz;
     vec4 posInLightSpace = uboGeneral.globalLightProj * uboGeneral.globalLightView * posWorld;
     outLightSpacePosition = posInLightSpace.xyz / posInLightSpace.w;
+
+    vec3 T = normalize(vec3((push.model * vec4(inTangent.rgb, 0.0))));
+    vec3 N = normalize(vec3(push.model * vec4(inNormal, 0.0)));
+    vec3 B = cross(N, T);
+    outTBN = mat3(T, B, N);
 }

@@ -70,6 +70,9 @@ struct HmlComplexRenderer : HmlDrawer {
     //
     // inline void setMode(Mode newMode) noexcept { mode = newMode; }
 
+    bool withAO = true;
+    bool withEmissive = true;
+    bool withNormals = true;
 
     VkDescriptorPool descriptorPool;
     // VkDescriptorSet  descriptorSet_textures_1;

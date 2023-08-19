@@ -27,6 +27,7 @@ layout(location = 2) out vec4 gColor;
 layout(location = 3) out vec4 gLightSpacePosition;
 layout(location = 4) out uint gId;
 layout(location = 5) out vec4 gEmissive;
+layout(location = 6) out vec4 gMaterial;
 
 void main() {
     if (push.baseColorTextureIndex >= 0) {
@@ -35,12 +36,32 @@ void main() {
         gColor = vec4(push.color.rgb, 1.0);
     }
     gPosition = vec4(inPosition, 1.0);
-    gNormal = vec4(inNormal, 1.0);
+
+    vec3 normal = inNormal;
+    // TODO manual tangent calculation
+    // if (push.normalTextureIndex >= 0) {
+    //     normal = texture(texSamplers[push.normalTextureIndex], inFragTexCoord).rgb;
+    //     normal = normal * 2.0 - 1.0;
+    //     normal = normalize(inTBN * normal);
+    // }
+    gNormal = vec4(normal, 1.0);
+
     gLightSpacePosition = vec4(inLightSpacePosition, 1.0);
     gId = push.id;
+
+    vec4 emissive = vec4(0.0);
     if (push.emissiveTextureIndex >= 0) {
-        gEmissive = texture(texSamplers[push.emissiveTextureIndex], inFragTexCoord);
-    } else {
-        gEmissive = vec4(0);
+        emissive = texture(texSamplers[push.emissiveTextureIndex], inFragTexCoord);
     }
+    gEmissive = emissive;
+
+    vec2 metallicRoughness = vec2(0.0, 1.0);
+    if (push.metallicRoughnessTextureIndex >= 0) {
+        metallicRoughness = texture(texSamplers[push.metallicRoughnessTextureIndex], inFragTexCoord).bg;
+    }
+    float ao = 1.0;
+    if (push.occlusionTextureIndex >= 0) {
+        ao = texture(texSamplers[push.occlusionTextureIndex], inFragTexCoord).r;
+    }
+    gMaterial = vec4(metallicRoughness, ao, 0.0);
 }

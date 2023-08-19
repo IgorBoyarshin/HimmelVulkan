@@ -316,13 +316,23 @@ bool Himmel::initEntities() noexcept {
 
         {
             auto modelMatrix = glm::mat4(1.0f);
-            modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 60.0f});
-            modelMatrix = glm::scale(modelMatrix, glm::vec3(3.0f));
+            // modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 60.0f});
+            // modelMatrix = glm::scale(modelMatrix, glm::vec3(3.0f));
 
             complexEntities.push_back(std::make_shared<HmlComplexRenderer::Entity>(modelStorage.complexCube));
             complexEntities.back()->modelMatrix = modelMatrix;
 
             coolCubeEntity = complexEntities.back();
+        }
+        {
+            auto modelMatrix = glm::mat4(1.0f);
+            // modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 60.0f});
+            // modelMatrix = glm::scale(modelMatrix, glm::vec3(3.0f));
+
+            complexEntities.push_back(std::make_shared<HmlComplexRenderer::Entity>(modelStorage.rustyCube));
+            complexEntities.back()->modelMatrix = modelMatrix;
+
+            rustyCubeEntity = complexEntities.back();
         }
         {
             auto modelMatrix = glm::mat4(1.0f);
@@ -429,6 +439,12 @@ bool Himmel::initLights() noexcept {
             .intensity = 3800.0f,
             .position = {},
             .radius = LIGHT_RADIUS,
+        });
+        pointLightsDynamic.push_back(HmlLightRenderer::PointLight{
+            .color = glm::vec3(1.0, 1.0, 1.0),
+            .intensity = 2000.0f,
+            .position = {},
+            .radius = LIGHT_RADIUS * 0.5f,
         });
     }
 
@@ -567,6 +583,11 @@ bool Himmel::initModels() noexcept {
     { // CoolCube
         auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/CoolCube/Cube.gltf");
         modelStorage.complexCube = std::move(hmlScene->hmlComplexModelResources.at(0));
+    }
+
+    { // RustyCube
+        auto hmlScene = hmlContext->hmlResourceManager->loadAsset("../models/RustyCube/Cube.gltf");
+        modelStorage.rustyCube = std::move(hmlScene->hmlComplexModelResources.at(0));
     }
 
     { // Damanged helmet
@@ -1019,9 +1040,18 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         auto modelMatrix = glm::mat4(1.0f);
         modelMatrix = glm::translate(modelMatrix, glm::vec3{0.0f, 60.0f, 60.0f});
         modelMatrix = glm::scale(modelMatrix, glm::vec3(3.0f));
-        modelMatrix = glm::rotate(modelMatrix, glm::radians(20 * sinceStart), glm::vec3(0.0, 1.0, 0.0));
+        // modelMatrix = glm::rotate(modelMatrix, glm::radians(20 * sinceStart), glm::vec3(0.0, 1.0, 0.0));
 
         coolCubeEntity->modelMatrix = modelMatrix;
+    }
+
+    { // RustyCube
+        auto modelMatrix = glm::mat4(1.0f);
+        modelMatrix = glm::translate(modelMatrix, glm::vec3{20.0f, 62.0f, 60.0f});
+        modelMatrix = glm::scale(modelMatrix, glm::vec3(3.0f));
+        // modelMatrix = glm::rotate(modelMatrix, glm::radians(20 * sinceStart), glm::vec3(0.0, 1.0, 0.0));
+
+        rustyCubeEntity->modelMatrix = modelMatrix;
     }
 
     for (size_t i = 0; i < pointLightsDynamic.size(); i++) {
@@ -1038,8 +1068,58 @@ void Himmel::updateForDt(float dt, float sinceStart) noexcept {
         pointLightsDynamic[i].position = model[3];
     }
 
+    { // Special dynamic light for PBR testing
+        static float t = 0.0f;
+        const float speed = 1.0f;
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_J) == GLFW_PRESS) t -= speed;
+        if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_K) == GLFW_PRESS) t += speed;
+
+        glm::mat4 model(1.0);
+        model = glm::translate(model, glm::vec3(0, 60, 60));
+        model = glm::rotate(model, glm::radians(t), glm::vec3(1.0, 0.0, 0.0));
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 10.0f)); // inner radius
+        pointLightsDynamic[pointLightsDynamic.size() - 1].position = model[3];
+    }
+
     if (glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         exitRequested = true;
+    }
+
+    { // Toggle ambient occlusion
+        static bool pressed = false;
+        static bool with = true;
+        if (!pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_O) == GLFW_PRESS) {
+            pressed = true;
+
+            with = !with;
+            hmlComplexRenderer->withAO = with;
+        } else if (pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_O) == GLFW_RELEASE) {
+            pressed = false;
+        }
+    }
+    { // Toggle normal map
+        static bool pressed = false;
+        static bool with = true;
+        if (!pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_N) == GLFW_PRESS) {
+            pressed = true;
+
+            with = !with;
+            hmlComplexRenderer->withNormals = with;
+        } else if (pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_N) == GLFW_RELEASE) {
+            pressed = false;
+        }
+    }
+    { // Toggle emissive map
+        static bool pressed = false;
+        static bool with = true;
+        if (!pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_E) == GLFW_PRESS) {
+            pressed = true;
+
+            with = !with;
+            hmlComplexRenderer->withEmissive = with;
+        } else if (pressed && glfwGetKey(hmlContext->hmlWindow->window, GLFW_KEY_E) == GLFW_RELEASE) {
+            pressed = false;
+        }
     }
 
 
@@ -1413,6 +1493,7 @@ bool Himmel::prepareResources() noexcept {
     gBufferColors.resize(count);
     gBufferLightSpacePositions.resize(count);
     gBufferIds.resize(count);
+    gBufferMaterials.resize(count);
     blurTempTextures.resize(count);
     brightness1Textures.resize(count);
     mainTextures.resize(count);
@@ -1427,7 +1508,8 @@ bool Himmel::prepareResources() noexcept {
         // gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R32G32B32A32_SFLOAT);
         gBufferLightSpacePositions[i] = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R16G16B16A16_SFLOAT);
         gBufferIds[i]                 = hmlContext->hmlResourceManager->newReadableRenderable(extent, VK_FORMAT_R32_UINT);
-        blurTempTextures[i]            = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
+        gBufferMaterials[i]           = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_UNORM);
+        blurTempTextures[i]           = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         brightness1Textures[i]        = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         mainTextures[i]               = hmlContext->hmlResourceManager->newRenderTargetImageResource(extent, VK_FORMAT_R8G8B8A8_SRGB);
         hmlDepthResources[i]          = hmlContext->hmlResourceManager->newDepthResource(extent);
@@ -1437,7 +1519,8 @@ bool Himmel::prepareResources() noexcept {
         if (!gBufferColors[i])              return false;
         if (!gBufferLightSpacePositions[i]) return false;
         if (!gBufferIds[i])                 return false;
-        if (!blurTempTextures[i])            return false;
+        if (!gBufferMaterials[i])           return false;
+        if (!blurTempTextures[i])           return false;
         if (!brightness1Textures[i])        return false;
         if (!mainTextures[i])               return false;
         if (!hmlDepthResources[i])          return false;
@@ -1454,7 +1537,7 @@ bool Himmel::prepareResources() noexcept {
     idsBuffer->map();
 
 
-    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, hmlShadows });
+    hmlDeferredRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, hmlShadows, gBufferMaterials });
     hmlUiRenderer->specify({ gBufferPositions, gBufferNormals, gBufferColors, gBufferLightSpacePositions, hmlShadows });
     hmlBlurRenderer->specify(brightness1Textures, blurTempTextures);
     hmlBloomRenderer->specify(mainTextures, brightness1Textures);
@@ -1477,6 +1560,7 @@ bool Himmel::prepareResources() noexcept {
         for (auto res : gBufferNormals)             res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
         for (auto res : gBufferLightSpacePositions) res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
         // for (auto res : gBufferIds)                 res->transitionLayoutTo(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, commandBuffer); // no need because already created in this layout
+        for (auto res : gBufferMaterials)           res->transitionLayoutTo(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
         for (auto res : hmlContext->hmlSwapchain->imageResources) res->transitionLayoutTo(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
 
         hmlContext->hmlCommands->endSingleTimeCommands(commandBuffer);
@@ -1490,6 +1574,8 @@ bool Himmel::prepareResources() noexcept {
     static const auto STAGE_NAME_BLOOM_PASS    = "Bloom pass";
     static const auto STAGE_NAME_UI_PASS       = "UI pass";
     const float VERY_FAR = 10000.0f;
+    const float DEFAULT_METALLIC = 0.0f;
+    const float DEFAULT_ROUGHNESS = 1.0f;
     bool allGood = true;
     // TODO Use a Builder pattern to create the Dispatcher and seal it at the end,
     // thus allowing it to check itself for correctness.
@@ -1573,6 +1659,12 @@ bool Himmel::prepareResources() noexcept {
             HmlRenderPass::ColorAttachment{
                 .imageResources = brightness1Textures,
                 .loadColor = HmlRenderPass::LoadColor::Clear({{ 0.0f, 0.0f, 0.0f, 0.0f }}),
+                .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+            HmlRenderPass::ColorAttachment{
+                .imageResources = gBufferMaterials,
+                .loadColor = HmlRenderPass::LoadColor::Clear({{ DEFAULT_METALLIC, DEFAULT_ROUGHNESS }}),
                 .preLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .postLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },

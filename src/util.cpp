@@ -6,8 +6,8 @@ namespace hml {}
 // Combine different channels
 // int width, height, channels;
 // // NOTE Will force alpha even if it is not present
-// stbi_uc* pixels = stbi_load("../models/CoolCube/rusty-ribbed-metal_metallic.png", &width, &height, &channels, 3);
-// stbi_uc* pixels2 = stbi_load("../models/CoolCube/rusty-ribbed-metal_roughness.png", &width, &height, &channels, 3);
+// stbi_uc* pixels = stbi_load("../models/RustyCube/cube_metallic.png", &width, &height, &channels, 3);
+// stbi_uc* pixels2 = stbi_load("../models/RustyCube/cube_roughness.png", &width, &height, &channels, 3);
 // assert(pixels);
 // assert(pixels2);
 // for (int y = 0; y < height; y+=1) {
@@ -17,6 +17,7 @@ namespace hml {}
 //         // pixels[3*(y * width + x) + 2] = 0;
 //     }
 // }
-// auto res = stbi_write_png("../models/CoolCube/igorek.png", width, height, 3, pixels, width*3);
+// auto res = stbi_write_png("../models/RustyCube/cube_metallic_roughness.png", width, height, 3, pixels, width*3);
+// assert(res == 1);
 // stbi_image_free(pixels);
 // stbi_image_free(pixels2);

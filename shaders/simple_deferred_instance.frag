@@ -20,6 +20,7 @@ layout(location = 2) out vec4 gColor;
 layout(location = 3) out vec4 gLightSpacePosition;
 layout(location = 4) out uint gId;
 layout(location = 5) out vec4 gEmissive;
+layout(location = 6) out vec4 gMaterial;
 
 void main() {
     if (0 <= push.textureIndex) {
@@ -32,4 +33,5 @@ void main() {
     gLightSpacePosition = vec4(inLightSpacePosition, 1.0);
     gId = 0; // TODO
     gEmissive = vec4(0);
+    gMaterial = vec4(0.0, 1.0, 1.0, 0.0);
 }

@@ -29,7 +29,7 @@ struct HmlDeferredRenderer : HmlDrawer {
     std::vector<std::shared_ptr<HmlImageResource>> imageResources;
 
 
-    static constexpr uint32_t G_COUNT = 5; // XXX must match the shader
+    static constexpr uint32_t G_COUNT = 6; // XXX must match the shader
 
     std::vector<std::unique_ptr<HmlPipeline>> createPipelines(
         std::shared_ptr<HmlRenderPass> hmlRenderPass, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) noexcept override;

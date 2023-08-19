@@ -231,7 +231,8 @@ struct Himmel {
         inline void updateForDt(float dt) noexcept {
             static constexpr float SPEED = 0.2f;
             t += SPEED * dt;
-            t = 3.5f;
+            // t = 3.9f;
+            // t = 1.8f;
 
             while (t > FULL_CYCLE) t -= FULL_CYCLE;
         }
@@ -286,6 +287,7 @@ struct Himmel {
     std::vector<std::shared_ptr<HmlImageResource>> gBufferColors;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferLightSpacePositions;
     std::vector<std::shared_ptr<HmlImageResource>> gBufferIds;
+    std::vector<std::shared_ptr<HmlImageResource>> gBufferMaterials;
     std::vector<std::shared_ptr<HmlImageResource>> blurTempTextures;
     std::vector<std::shared_ptr<HmlImageResource>> brightness1Textures;
     std::vector<std::shared_ptr<HmlImageResource>> mainTextures;
@@ -334,11 +336,13 @@ struct Himmel {
         std::shared_ptr<HmlModelResource> cube;
 
         std::shared_ptr<HmlComplexModelResource> complexCube;
+        std::shared_ptr<HmlComplexModelResource> rustyCube;
         std::shared_ptr<HmlComplexModelResource> damagedHelmet;
         // std::shared_ptr<HmlComplexModelResource> sponza;
     } modelStorage;
 
     std::shared_ptr<HmlComplexRenderer::Entity> coolCubeEntity;
+    std::shared_ptr<HmlComplexRenderer::Entity> rustyCubeEntity;
     std::vector<std::shared_ptr<HmlRenderer::Entity>> entities;
     std::vector<std::shared_ptr<HmlComplexRenderer::Entity>> complexEntities;
     // NOTE Since it's really a bad performance thing to have an array of pointers,

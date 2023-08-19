@@ -244,9 +244,9 @@ VkCommandBuffer HmlComplexRenderer::draw(const HmlFrameData& frameData) noexcept
                     .color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
                     .baseColorTextureIndex = indexForPlace(HmlMaterial::PlaceBaseColor, hmlMaterial),
                     .metallicRoughnessTextureIndex = indexForPlace(HmlMaterial::PlaceMetallicRoughness, hmlMaterial),
-                    .normalTextureIndex = indexForPlace(HmlMaterial::PlaceNormal, hmlMaterial),
-                    .occlusionTextureIndex = indexForPlace(HmlMaterial::PlaceOcclusion, hmlMaterial),
-                    .emissiveTextureIndex = indexForPlace(HmlMaterial::PlaceEmissive, hmlMaterial),
+                    .normalTextureIndex = withNormals ? indexForPlace(HmlMaterial::PlaceNormal, hmlMaterial) : NO_TEXTURE_MARK,
+                    .occlusionTextureIndex = withAO ? indexForPlace(HmlMaterial::PlaceOcclusion, hmlMaterial) : NO_TEXTURE_MARK,
+                    .emissiveTextureIndex = withEmissive ? indexForPlace(HmlMaterial::PlaceEmissive, hmlMaterial) : NO_TEXTURE_MARK,
                     .id = entity->id,
                 };
                 vkCmdPushConstants(commandBuffer, hmlPipeline->layout,

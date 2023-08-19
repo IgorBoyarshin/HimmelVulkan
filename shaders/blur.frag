@@ -10,7 +10,7 @@ layout(location = 0) in  vec2 inTexCoord;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    const int R = 3;
+    const int R = 1;
     vec2 step;
     if (push.isHorizontal == 1) {
         step = vec2(1.0 / textureSize(tex, 0).x, 0);

@@ -382,7 +382,7 @@ bool Himmel::initEntities() noexcept {
 bool Himmel::initLights() noexcept {
     // Add lights
     const float LIGHT_RADIUS = 2.0f;
-    const size_t lightsCount = 2;
+    const size_t lightsCount = 12;
     for (size_t i = 0; i < lightsCount; i++) {
         const auto pos = glm::vec3(
             hml::getRandomUniformFloat(world->start.x, world->finish.x),
@@ -401,6 +401,7 @@ bool Himmel::initLights() noexcept {
             .radius = LIGHT_RADIUS,
         });
     }
+#if WITH_PHYSICS
     { // The light for the setup
         const auto pos = glm::vec3(0, 157, 0);
         const auto color = glm::vec3(1.0, 1.0, 1.0);
@@ -411,6 +412,7 @@ bool Himmel::initLights() noexcept {
             .radius = LIGHT_RADIUS,
         });
     }
+#endif
     { // The light for CoolCube
         const auto pos = glm::vec3(10, 70, 50);
         const auto color = glm::vec3(1.0, 1.0, 1.0);
@@ -612,7 +614,7 @@ bool Himmel::initPhysics() noexcept {
 
 
 void Himmel::initPhysicsTestbench() noexcept {
-    // testbenchBoxWithObjects();
+    testbenchBoxWithObjects();
     // testbenchFriction();
 }
 
@@ -1430,7 +1432,7 @@ void Himmel::updateForImage(uint32_t imageIndex) noexcept {
             .globalLightView = globalLightView,
             .globalLightProj = globalLightProj,
             .globalLightDir = globalLightDir,
-            .ambientStrength = 0.5f,
+            .ambientStrength = 0.2f,
             .fogColor = weather.fogColor,
             .fogDensity = weather.fogDensity,
             .cameraPos = hmlCamera->pos,

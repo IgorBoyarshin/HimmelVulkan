@@ -238,8 +238,7 @@ void main() {
     shadowFactor = clamp(shadowFactor, 0.3, 1.0);
     Lo *= shadowFactor;
 
-    // vec3 ambient = vec3(uboGeneral.ambientStrength) * albedo * ao;
-    vec3 ambient = vec3(0.2) * albedo * ao;
+    vec3 ambient = vec3(uboGeneral.ambientStrength) * albedo * ao;
     vec3 color   = ambient + Lo;
 
     outColor = vec4(color, 1.0);

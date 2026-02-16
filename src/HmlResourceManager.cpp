@@ -1418,12 +1418,16 @@ static void bindModelNodes(
 
 
 std::shared_ptr<HmlScene> HmlResourceManager::loadAsset(const char* path) noexcept {
+    const auto startTime = std::chrono::high_resolution_clock::now();
+
     tinygltf::Model model;
     tinygltf::TinyGLTF loader;
     std::string err;
     std::string warn;
 
+    const auto markStartLoadTime = std::chrono::high_resolution_clock::now();
     bool parsed = loader.LoadASCIIFromFile(&model, &err, &warn, path);
+    const auto markEndLoadTime = std::chrono::high_resolution_clock::now();
     //bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, path); // for binary glTF(.glb)
 
     if (!warn.empty()) std::cerr << "::> GLTF Loader warning:" << warn.c_str() << ".\n";
@@ -1435,6 +1439,7 @@ std::shared_ptr<HmlScene> HmlResourceManager::loadAsset(const char* path) noexce
 
     // ======== Create buffers
 
+    const auto markStartBuffersTime = std::chrono::high_resolution_clock::now();
     std::vector<HmlBufferView> hmlBufferViews;
     std::cout << "Have " << model.buffers.size() << " buffers:\n";
     for (size_t i = 0; i < model.buffers.size(); i++) {
@@ -1477,9 +1482,11 @@ std::shared_ptr<HmlScene> HmlResourceManager::loadAsset(const char* path) noexce
             hmlBufferViews.push_back(HmlBufferView{ hmlBuffer, start });
         }
     }
+    const auto markEndBuffersTime = std::chrono::high_resolution_clock::now();
 
-    // ======== Textures
+    // ======== Create textures
 
+    const auto markStartTexturesTime = std::chrono::high_resolution_clock::now();
     std::vector<std::shared_ptr<HmlImageResource>> hmlTextureResources;
     std::cout << "Have " << model.textures.size() << " textures:\n";
     for (const tinygltf::Texture& tex : model.textures) {
@@ -1500,9 +1507,11 @@ std::shared_ptr<HmlScene> HmlResourceManager::loadAsset(const char* path) noexce
             gltfImageToFormat(image.component, image.bits),
             { VK_FILTER_LINEAR }));
     }
+    const auto markEndTexturesTime = std::chrono::high_resolution_clock::now();
 
     // ======== Create models
 
+    const auto markStartModelsTime = std::chrono::high_resolution_clock::now();
     // TODO This vector will be replaced by a tree data structure to emulate nodes
     std::vector<std::unique_ptr<HmlComplexModelResource>> hmlComplexModels;
 
@@ -1514,8 +1523,26 @@ std::shared_ptr<HmlScene> HmlResourceManager::loadAsset(const char* path) noexce
         std::cout << "Binding node #" << i;
         bindModelNodes(model, model.nodes[scene.nodes[i]], hmlBufferViews, hmlTextureResources, hmlComplexModels);
     }
+    const auto markEndModelsTime = std::chrono::high_resolution_clock::now();
 
     // ======== Return
+
+    const auto endTime = std::chrono::high_resolution_clock::now();
+    std::cout << "Took " <<
+        static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count())
+        << "ms total to load " << path << "\n";
+    std::cout << "\tLoad: " <<
+        static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(markEndLoadTime - markStartLoadTime).count())
+        << "ms\n";
+    std::cout << "\tBuffers: " <<
+        static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(markEndBuffersTime - markStartBuffersTime).count())
+        << "ms\n";
+    std::cout << "\tTextures: " <<
+        static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(markEndTexturesTime - markStartTexturesTime).count())
+        << "ms\n";
+    std::cout << "\tModel: " <<
+        static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(markEndModelsTime - markStartModelsTime).count())
+        << "ms\n";
 
     auto hmlScene = std::make_shared<HmlScene>();
     hmlScene->hmlComplexModelResources = std::move(hmlComplexModels);

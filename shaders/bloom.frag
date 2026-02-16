@@ -12,7 +12,7 @@ void main() {
 
     // Apply brightness
     // color *= (1.0 + pow(strength.x * strength.y, 4));
-    const float emissiveFactor = 8.0;
+    const float emissiveFactor = 1.0; // XXX breaks lights color
     vec4 emissive = texture(brightnessSampler, inTexCoord);
     color += emissiveFactor * emissive.rgb * emissive.a;
 

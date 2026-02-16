@@ -6,8 +6,10 @@ layout(set = 0, binding = 0) uniform GeneralUbo {
     mat4 proj;
     mat4 globalLightView;
     mat4 globalLightProj;
-    vec4 globalLightDir_ambientStrength;
-    vec4 fogColor_density;
+    vec3 globalLightDir;
+    float ambientStrength;
+    vec3 fogColor;
+    float fogDensity;
     vec3 cameraPos;
     float dayNightCycleT;
 } uboGeneral;

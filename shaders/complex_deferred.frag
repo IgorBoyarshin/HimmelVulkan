@@ -31,12 +31,15 @@ layout(location = 5) out vec4 gEmissive;
 layout(location = 6) out vec4 gMaterial;
 
 void main() {
+    gPosition = vec4(inPosition, 1.0);
+    gLightSpacePosition = vec4(inLightSpacePosition, 1.0);
+    gId = push.id;
+
     if (push.baseColorTextureIndex >= 0) {
         gColor = texture(texSamplers[push.baseColorTextureIndex], inFragTexCoord);
     } else {
         gColor = vec4(push.color.rgb, 1.0);
     }
-    gPosition = vec4(inPosition, 1.0);
 
     vec3 normal = inNormal;
     if (push.normalTextureIndex >= 0) {
@@ -45,9 +48,6 @@ void main() {
         normal = normalize(inTBN * normal);
     }
     gNormal = vec4(normal, 1.0);
-
-    gLightSpacePosition = vec4(inLightSpacePosition, 1.0);
-    gId = push.id;
 
     vec4 emissive = vec4(0.0);
     if (push.emissiveTextureIndex >= 0) {
